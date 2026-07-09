@@ -1,0 +1,11 @@
+:: StoryTitle
+Living Characters
+
+:: StoryData
+{
+  "ifid": "LC-LIVING-CHARACTERS-2026",
+  "format": "SugarCube",
+  "format-version": "2.37.3",
+  "start": "Start",
+  "zoom": 1
+}

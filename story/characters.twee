@@ -1,0 +1,100 @@
+:: Mop [char]
+@room The Garden
+@mood Sleepy
+@items small hat, acorn
+@lede Mop lives near the mossy wall.
+
+[[👋 Hello->Mop-hello]]
+[[❓ Question->Mop-question]]
+[[🤫 Secret->Mop-secret]]
+[[😮 Reaction->Mop-reaction]]
+[[🎒 Item->Mop-item-small-hat]]
+
+:: Mop-hello
+I just need five more minutes…
+
+[[← Back->Mop]]
+
+:: Mop-question
+Do you ever wonder why pillows are so soft?
+
+[[← Back->Mop]]
+
+:: Mop-secret
+I have a secret napping spot.
+
+[[← Back->Mop]]
+
+:: Mop-reaction
+When it gets too loud I pull my hat down.
+
+[[← Back->Mop]]
+
+:: Mop-item-small-hat
+This acorn is from a very important tree.
+
+[[← Back->Mop]]
+
+
+:: Gravel [char]
+@room The Library
+@mood Curious
+@items magnifying glass, notebook
+@lede Gravel notices everything.
+
+[[👋 Hello->Gravel-hello]]
+[[❓ Question->Gravel-question]]
+[[🤫 Secret->Gravel-secret]]
+[[😮 Reaction->Gravel-reaction]]
+[[🎒 Item->Gravel-item-magnifying-glass]]
+
+:: Gravel-hello
+Have you seen anything unusual?
+
+[[← Back->Gravel]]
+
+:: Gravel-question
+What is at the bottom of the garden?
+
+[[← Back->Gravel]]
+
+:: Gravel-secret
+I saw something move in the library.
+
+[[← Back->Gravel]]
+
+:: Gravel-reaction
+Every new thing goes straight in the notebook.
+
+[[← Back->Gravel]]
+
+:: Gravel-item-magnifying-glass
+This magnifying glass belonged to someone very small.
+
+[[← Back->Gravel]]
+
+
+:: Biscuit [char]
+@room The Kitchen
+@mood Happy
+@items lucky pebble
+@lede Biscuit is always cheerful.
+
+[[👋 Hello->Biscuit-hello]]
+[[😮 Reaction->Biscuit-reaction]]
+[[🎒 Item->Biscuit-item-lucky-pebble]]
+
+:: Biscuit-hello
+Everything is going to be okay!
+
+[[← Back->Biscuit]]
+
+:: Biscuit-reaction
+When the sun comes out I do a little spin.
+
+[[← Back->Biscuit]]
+
+:: Biscuit-item-lucky-pebble
+My lucky pebble is warm no matter the weather.
+
+[[← Back->Biscuit]]

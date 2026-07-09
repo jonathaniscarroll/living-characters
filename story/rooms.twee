@@ -1,0 +1,61 @@
+:: Start
+Welcome to the Living Characters world.
+
+Choose a room to explore:
+
+<< if rooms.length > 0 >>
+  <<for _i to 0; _i lt rooms.length; _i++>>
+    [[<<= rooms[_i].name >>]]
+  <</for>>
+<<else>>
+  //No rooms have been added yet. Use the authoring tool to create your world.//
+  
+  [[Open authoring tool->AuthoringTool]]
+<</if>>
+
+:: AuthoringTool
+The authoring tool is available at:
+
+[[author/index.html|author/index.html]]
+
+Use it to:
+* Add **rooms** with real-world GPS coordinates and a trigger radius
+* Add **characters** who live in each room
+* Write **dialogue** using the five prompt types (Hello, Question, Secret, Reaction, Item)
+* Export your world as a **.twee** file
+* Import that file back into the story source
+
+[[← Back->Start]]
+
+:: The Garden [room]
+@room 44.648800,−63.575200
+@radius 30
+@lede Sun-warm stones and overgrown paths.
+
+Characters here:
+
+[[Mop]]
+
+[[← Back->Start]]
+
+:: The Library [room]
+@room 44.647600,−63.572800
+@radius 25
+@lede Shelves made of stacked stones.
+
+Characters here:
+
+[[Gravel]]
+
+[[← Back->Start]]
+
+:: The Kitchen [room]
+@room 44.646400,−63.569900
+@radius 20
+@lede Always something good on the stove.
+
+Characters here:
+
+[[Biscuit]]
+
+[[← Back->Start]]

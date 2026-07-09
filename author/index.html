@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Living Characters — Authoring Tool</title>
+  <script>
+    // Redirect to the main app (index.html is served at root in dev,
+    // or at /author/index.html in the Pages build).
+    // In production (Pages), the app is served from the parent directory.
+    // This file is the entry point for the authoring tool.
+    // The actual app lives at ../index.html (repo root) during development.
+    // When deployed, the author/ folder is a copy of the full editor UI.
+  </script>
+  <style>
+    body { margin:0; background:#1a1a2e; color:#eaeaea; font-family:system-ui,sans-serif;
+           display:flex; align-items:center; justify-content:center; min-height:100vh; }
+    .box { text-align:center; max-width:480px; padding:32px; }
+    h1 { font-size:22px; margin-bottom:12px; }
+    p  { color:#a0a0b0; font-size:14px; line-height:1.7; }
+    a  { color:#f5a623; }
+  </style>
+</head>
+<body>
+  <div class="box">
+    <h1>🏠 Living Characters — Authoring Tool</h1>
+    <p>This is the authoring interface for the Living Characters virtual world builder.</p>
+    <p>The full interactive tool (map, characters, rooms, GPS) lives at
+       <a href="../">the root of this site</a> during development.</p>
+    <p>When building for production, copy the full <code>index.html</code>
+       into this <code>author/</code> folder so it is deployed alongside
+       the compiled Twine story.</p>
+    <p style="margin-top:24px;color:#4ade80;font-size:13px">
+      ✓ Build pipeline active — this folder is copied to
+      <code>build/author/</code> by GitHub Actions.
+    </p>
+  </div>
+</body>
+</html>

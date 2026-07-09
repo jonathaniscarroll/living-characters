@@ -1,0 +1,67 @@
+name: Build and Deploy Twine
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Verify vendored tools
+        run: |
+          test -f vendor/tweego/tweego
+          test -f vendor/storyformats/sugarcube-2/format.js
+          chmod +x vendor/tweego/tweego
+
+      - name: Build story
+        env:
+          TWEEGO_PATH: vendor/storyformats
+        run: |
+          mkdir -p build
+          vendor/tweego/tweego --format=sugarcube-2 -o build/index.html story
+
+      - name: Copy authoring tool
+        run: |
+          if [ -d author ]; then
+            cp -r author build/author
+          fi
+
+      - name: Verify output
+        run: |
+          test -f build/index.html
+          ls -la build
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: build
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
