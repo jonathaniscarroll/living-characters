@@ -1,0 +1,613 @@
+:: StoryTitle
+
+Living Characters
+
+:: StoryData
+
+{
+  "ifid": "A1B2C3D4-E5F6-7890-ABCD-EF1234567890",
+  "format": "SugarCube",
+  "format-version": "2.36.1",
+  "start": "Start"
+}
+
+:: StoryInit
+
+<<set $world to {
+  active: null,
+  displayed: null,
+  mode: "browse",
+  gray: false,
+  error: ""
+}>>
+
+:: StoryInterface
+
+<div class="window">
+  <div class="titlebar">
+    <div>Living Characters — Our Shared World</div>
+    <div class="buttons">
+      <div class="box"></div><div class="box"></div><div class="box"></div>
+    </div>
+  </div>
+
+  <div class="menubar">World &nbsp; Characters &nbsp; Objects &nbsp; Help</div>
+
+  <div class="toolbar">
+    <button class="button95" id="homeBtn">&#127968; Home</button>
+    <button class="button95" id="allCharsBtn">&#128100; All Characters</button>
+    <button class="button95" id="themeBtn">&#9728; Gray Mode</button>
+    <input type="password" id="ghTokenInput" class="token-input" placeholder="GitHub token (to leave notes)" autocomplete="current-password">
+  </div>
+
+  <div class="layout">
+    <div class="marquee-box">
+      <marquee behavior="scroll" direction="left">LIVING CHARACTERS :: CLICK A CHARACTER TO VISIT THEM :: LEAVE A NOTE FOR YOUR FRIENDS :: OUR WORLD GROWS ALL WEEK</marquee>
+    </div>
+
+    <table class="core">
+      <tr>
+        <td width="62%">
+          <div class="char-portrait" id="charPortrait"></div>
+          <div class="passage-title" id="passageTitle">Welcome to Our World</div>
+          <div class="lede" id="passageLede">Click a character on the right to visit them.</div>
+          <div class="mood-ring" id="moodRing"></div>
+          <div class="bodycopy" id="passageBody">This is the shared world we built together. Every character here was made by hand — felted, sculpted, drawn, and brought to life. Click any name on the right to visit that character and see what they have to say.</div>
+          <div class="passage-image-wrap" id="passageImageWrap" style="display:none;">
+            <img id="passageImage" src="" alt="" style="max-width:100%;margin-bottom:10px;border:2px inset #c0c0c0;">
+          </div>
+          <div class="passage-audio-wrap" id="passageAudioWrap" style="display:none;">
+            <audio id="passageAudio" controls style="width:100%;margin-bottom:10px;"></audio>
+          </div>
+          <div id="friendsPanel" style="display:none;">
+            <div class="panel-title" style="margin-top:14px;">FRIENDS &amp; CONNECTIONS</div>
+            <div id="friendsList" class="friends-list"></div>
+          </div>
+          <div id="commentsPanel" style="display:none;">
+            <div class="panel-title" style="margin-top:14px;">NOTES LEFT FOR THIS CHARACTER</div>
+            <div id="commentList" class="comment-list"></div>
+            <div class="comment-form">
+              <textarea id="commentInput" class="comment-textarea" placeholder="Leave a note for this character..."></textarea>
+              <button class="button95" id="commentSubmit">Leave a Note &#128140;</button>
+              <div id="commentStatus" class="comment-status"></div>
+            </div>
+          </div>
+          <div id="passages" style="display:none;"></div>
+        </td>
+        <td width="38%">
+          <div class="panel-title">ALL CHARACTERS</div>
+          <div class="char-list-box">
+            <ol class="char-list" id="charList"></ol>
+          </div>
+          <div class="panel-title" style="margin-top:10px;">OBJECTS &amp; ITEMS</div>
+          <div class="items-box" id="itemsBox">
+            <div style="color:#888;font-style:italic;font-size:12px;padding:6px;">Items collected during the week appear here.</div>
+          </div>
+        </td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="statusbar">
+    <div id="statusText">Choose a character to begin.</div>
+    <div>Living Characters v1.0</div>
+  </div>
+</div>
+
+:: Story Stylesheet [stylesheet]
+
+body {
+  margin: 0;
+  background: #c0c0c0;
+  color: #000000;
+  font-family: "Times New Roman", Times, serif;
+  font-size: 16px;
+}
+
+a { color: #0000cc; }
+
+#ui-bar { display: none; }
+#story { margin: 0; }
+
+.window {
+  max-width: 900px;
+  margin: 18px auto;
+  border: 2px solid #000;
+  background: #d4d0c8;
+  box-shadow: 3px 3px 0 #7f7f7f;
+}
+
+.titlebar {
+  background: linear-gradient(90deg, #800080, #c040c0);
+  color: #fff;
+  padding: 6px 8px;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 14px;
+  font-weight: bold;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.titlebar .buttons { display: flex; gap: 4px; }
+.titlebar .box {
+  width: 14px; height: 14px;
+  background: #d4d0c8;
+  border-top: 2px solid #fff;
+  border-left: 2px solid #fff;
+  border-right: 2px solid #404040;
+  border-bottom: 2px solid #404040;
+}
+
+.menubar, .toolbar, .statusbar {
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 13px;
+  background: #d4d0c8;
+  border-top: 1px solid #ffffff;
+  border-bottom: 1px solid #808080;
+  padding: 5px 8px;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+.token-input {
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 12px;
+  border: 2px inset #808080;
+  padding: 3px 6px;
+  background: #fff;
+  height: 26px;
+  flex: 1;
+  min-width: 0;
+  max-width: 200px;
+}
+
+.layout { padding: 12px; }
+
+table.core {
+  width: 100%;
+  border-collapse: collapse;
+  background: #ffffff;
+  border: 2px inset #c0c0c0;
+}
+
+table.core td {
+  vertical-align: top;
+  border: 1px solid #808080;
+  padding: 10px;
+}
+
+.passage-title {
+  font-size: 28px;
+  font-weight: bold;
+  margin: 0 0 8px 0;
+  color: #800080;
+}
+
+.lede {
+  margin: 0 0 10px 0;
+  color: #333333;
+  font-style: italic;
+}
+
+.bodycopy {
+  font-size: 18px;
+  line-height: 1.5;
+  margin-bottom: 14px;
+  white-space: pre-wrap;
+}
+
+.panel-title {
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 13px;
+  font-weight: bold;
+  margin-bottom: 8px;
+  background: #800080;
+  color: #ffffff;
+  padding: 4px 6px;
+}
+
+/* ── Character portrait / animation ─── */
+
+.char-portrait {
+  width: 80px;
+  height: 80px;
+  float: right;
+  margin: 0 0 8px 12px;
+  border: 2px inset #808080;
+  background: #f0e8f8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 36px;
+  overflow: hidden;
+  position: relative;
+}
+
+.char-portrait img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Mixamo-inspired CSS animation stubs */
+@keyframes char-wave {
+  0%,100% { transform: rotate(0deg); }
+  25%      { transform: rotate(-15deg); }
+  75%      { transform: rotate(15deg); }
+}
+@keyframes char-idle {
+  0%,100% { transform: translateY(0); }
+  50%      { transform: translateY(-4px); }
+}
+@keyframes char-dance {
+  0%,100% { transform: rotate(0deg) scale(1); }
+  25%      { transform: rotate(-10deg) scale(1.05); }
+  75%      { transform: rotate(10deg) scale(1.05); }
+}
+@keyframes char-jump {
+  0%,100% { transform: translateY(0); }
+  40%      { transform: translateY(-14px); }
+}
+@keyframes char-think {
+  0%,100% { transform: rotate(0deg); }
+  50%      { transform: rotate(8deg); }
+}
+@keyframes char-bow {
+  0%,100% { transform: rotate(0deg); }
+  50%      { transform: rotate(20deg); }
+}
+@keyframes char-sleep {
+  0%,100% { transform: rotate(0deg) translateY(0); }
+  50%      { transform: rotate(5deg) translateY(3px); }
+}
+@keyframes char-point {
+  0%,100% { transform: rotate(0deg); }
+  50%      { transform: rotate(-20deg) translateX(8px); }
+}
+
+.anim-wave  { animation: char-wave  1.2s ease-in-out infinite; }
+.anim-idle  { animation: char-idle  2.0s ease-in-out infinite; }
+.anim-dance { animation: char-dance 0.8s ease-in-out infinite; }
+.anim-jump  { animation: char-jump  0.9s ease-in-out infinite; }
+.anim-think { animation: char-think 2.5s ease-in-out infinite; }
+.anim-bow   { animation: char-bow   2.0s ease-in-out infinite; }
+.anim-sleep { animation: char-sleep 3.0s ease-in-out infinite; }
+.anim-point { animation: char-point 1.8s ease-in-out infinite; }
+
+/* ── Mood ring ─── */
+
+.mood-ring {
+  height: 6px;
+  border-radius: 3px;
+  margin-bottom: 10px;
+  background: transparent;
+  transition: background 0.4s;
+}
+.mood-happy   { background: #f4c430; }
+.mood-sad     { background: #4080c0; }
+.mood-excited { background: #ff7700; }
+.mood-sleepy  { background: #9060b0; }
+.mood-shy     { background: #f080a0; }
+.mood-grumpy  { background: #c03020; }
+
+/* ── Character list (sidebar) ─── */
+
+.char-list-box {
+  background: #f0e8f8;
+  border: 2px inset #808080;
+  padding: 6px;
+  min-height: 120px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.char-list {
+  margin: 0;
+  padding-left: 18px;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 13px;
+}
+
+.char-list li { margin-bottom: 10px; line-height: 1.4; }
+
+.char-list a {
+  color: #800080;
+  font-weight: bold;
+  text-decoration: none;
+}
+
+.char-list a:hover { text-decoration: underline; }
+
+.char-lede-preview {
+  display: block;
+  font-size: 11px;
+  color: #555;
+  font-style: italic;
+}
+
+/* ── Items box ─── */
+
+.items-box {
+  background: #fff8f0;
+  border: 2px inset #808080;
+  padding: 6px;
+  min-height: 60px;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 13px;
+}
+
+/* ── Friends list ─── */
+
+.friends-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px 0;
+}
+
+.friend-btn {
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 12px;
+  background: #d4d0c8;
+  color: #000;
+  border-top: 2px solid #ffffff;
+  border-left: 2px solid #ffffff;
+  border-right: 2px solid #404040;
+  border-bottom: 2px solid #404040;
+  padding: 3px 8px;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-block;
+}
+
+.friend-btn:hover {
+  background: #c8c4bc;
+}
+
+/* ── Comments ─── */
+
+.comment-list {
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 13px;
+  border: 2px inset #808080;
+  background: #fff;
+  min-height: 40px;
+  max-height: 200px;
+  overflow-y: auto;
+  margin-bottom: 8px;
+  padding: 4px;
+}
+
+.comment-item {
+  border-bottom: 1px solid #e0e0e0;
+  padding: 6px 4px;
+}
+
+.comment-item:last-child { border-bottom: none; }
+
+.comment-meta {
+  font-size: 11px;
+  color: #666;
+  margin-bottom: 3px;
+}
+
+.comment-body {
+  font-size: 13px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.comment-empty {
+  color: #888;
+  font-style: italic;
+  padding: 6px 4px;
+  font-size: 12px;
+}
+
+.comment-form {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.comment-textarea {
+  font-family: "Times New Roman", serif;
+  font-size: 14px;
+  border: 2px inset #808080;
+  padding: 5px;
+  resize: vertical;
+  min-height: 60px;
+  background: #fff;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.comment-status {
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 12px;
+  min-height: 16px;
+  color: #800080;
+}
+
+/* ── Button95 ─── */
+
+.button95 {
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 13px;
+  background: #d4d0c8;
+  color: #000;
+  border-top: 2px solid #ffffff;
+  border-left: 2px solid #ffffff;
+  border-right: 2px solid #404040;
+  border-bottom: 2px solid #404040;
+  padding: 4px 10px;
+  min-height: 30px;
+  cursor: pointer;
+}
+
+.button95:active {
+  border-top: 2px solid #404040;
+  border-left: 2px solid #404040;
+  border-right: 2px solid #ffffff;
+  border-bottom: 2px solid #ffffff;
+}
+
+.marquee-box {
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 12px;
+  background: #fff0ff;
+  border: 1px solid #c080c0;
+  padding: 4px;
+  margin-bottom: 10px;
+}
+
+.statusbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+@media (max-width: 760px) {
+  table.core, table.core tbody, table.core tr, table.core td {
+    display: block; width: 100%;
+  }
+  .passage-title { font-size: 22px; }
+  .bodycopy { font-size: 16px; }
+  .token-input { max-width: 100%; font-size: 16px; }
+}
+
+:: Story JavaScript [script]
+
+window.setup = window.setup || {};
+setup.world = setup.world || {};
+
+// ── Parse character passage directives (mirrors spatial-narrative @parse) ──
+setup.world.parse = function (passageText) {
+  var lines = passageText.split(/\n/);
+  var meta = { image: null, lede: '', animation: 'idle', mood: '', body: [], links: [] };
+  lines.forEach(function (line) {
+    var t = line.trim();
+    if      (t.indexOf('@image ')     === 0) { meta.image     = t.slice(7).trim(); }
+    else if (t.indexOf('@lede ')      === 0) { meta.lede      = t.slice(6).trim(); }
+    else if (t.indexOf('@animation ') === 0) { meta.animation = t.slice(11).trim(); }
+    else if (t.indexOf('@mood ')      === 0) { meta.mood      = t.slice(6).trim(); }
+    else {
+      var linkMatch = t.match(/^\[\[(.+?)\]\]$/);
+      if (linkMatch) { meta.links.push(linkMatch[1].trim()); }
+      else { meta.body.push(line); }
+    }
+  });
+  meta.bodyText = meta.body.join('\n').trim();
+  return meta;
+};
+
+// ── Get all [character]-tagged passages ──
+setup.world.characters = function () {
+  return Story.lookup('tags', 'character').map(function (p) {
+    var parsed = setup.world.parse(p.text);
+    return {
+      name: p.title,
+      image: parsed.image,
+      lede: parsed.lede,
+      animation: parsed.animation,
+      mood: parsed.mood,
+      body: parsed.bodyText,
+      links: parsed.links
+    };
+  });
+};
+
+// ── Navigate to a character ──
+setup.world.visit = function (name) {
+  var v  = State.variables.world;
+  var ch = setup.world.characters().find(function (c) { return c.name === name; });
+  if (!ch) { return; }
+  v.active    = name;
+  v.displayed = name;
+  setup.world.render(ch);
+  setup.world.comments.load(name);
+  var statusEl = document.getElementById('statusText');
+  if (statusEl) { statusEl.textContent = 'Visiting: ' + name; }
+};
+
+// ── Render the active character to the DOM ──
+setup.world.render = function (ch) {
+  var titleEl   = document.getElementById('passageTitle');
+  var ledeEl    = document.getElementById('passageLede');
+  var bodyEl    = document.getElementById('passageBody');
+  var moodEl    = document.getElementById('moodRing');
+  var portrait  = document.getElementById('charPortrait');
+  var imageWrap = document.getElementById('passageImageWrap');
+  var imageEl   = document.getElementById('passageImage');
+  var audioWrap = document.getElementById('passageAudioWrap');
+  var friendsP  = document.getElementById('friendsPanel');
+  var friendsL  = document.getElementById('friendsList');
+
+  if (titleEl)  { titleEl.textContent = ch.name; }
+  if (ledeEl)   { ledeEl.textContent  = ch.lede; }
+  if (bodyEl)   { bodyEl.textContent  = ch.body; }
+
+  // Mood ring
+  if (moodEl) {
+    moodEl.className = 'mood-ring' + (ch.mood ? ' mood-' + ch.mood : '');
+  }
+
+  // Portrait: image if available, else animated emoji placeholder
+  if (portrait) {
+    portrait.innerHTML = '';
+    portrait.className = 'char-portrait';
+    if (ch.image) {
+      var img = document.createElement('img');
+      img.src = 'media/' + ch.image;
+      img.alt = ch.name;
+      portrait.appendChild(img);
+    } else {
+      portrait.textContent = '\uD83E\uDDF8'; // 🧸
+    }
+    if (ch.animation) {
+      portrait.classList.add('anim-' + ch.animation);
+    }
+  }
+
+  // Large image below body
+  if (imageWrap && imageEl) {
+    if (ch.image) {
+      imageEl.src = 'media/' + ch.image;
+      imageEl.alt = ch.name;
+      imageWrap.style.display = '';
+    } else {
+      imageWrap.style.display = 'none';
+      imageEl.src = '';
+    }
+  }
+
+  // Friends list
+  if (friendsP && friendsL) {
+    if (ch.links && ch.links.length > 0) {
+      friendsL.innerHTML = '';
+      ch.links.forEach(function (name) {
+        var btn = document.createElement('button');
+        btn.className = 'friend-btn';
+        btn.textContent = name;
+        btn.addEventListener('click', function () { setup.world.visit(name); });
+        friendsL.appendChild(btn);
+      });
+      friendsP.style.display = '';
+    } else {
+      friendsP.style.display = 'none';
+    }
+  }
+};
+
+// ── Build sidebar character list ──
+setup.world.renderCharList = function () {
+  var list = document.getElementById('charList');
+  if (!list) { return; }
+  list.innerHTML = '';
+  setup.world.characters().forEach(function (ch) {
