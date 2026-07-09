@@ -4,242 +4,180 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Living Characters — Virtual World</title>
-  <style>
-    /* ── THEME VARS ── */
-    :root {
-      --bg: #1a1a2e;
-      --surface: #16213e;
-      --surface2: #0f3460;
-      --accent: #e94560;
-      --accent2: #f5a623;
-      --text: #eaeaea;
-      --text-muted: #a0a0b0;
-      --pin-size: 52px;
-      --radius: 12px;
-      --border: #ffffff18;
-    }
-    /* ── NETSCAPECORE THEME ── */
-    body.netscape {
-      --bg: #c0c0c0;
-      --surface: #d4d0c8;
-      --surface2: #a0a098;
-      --accent: #000080;
-      --accent2: #800000;
-      --text: #000000;
-      --text-muted: #444444;
-      --border: #808080;
-      font-family: 'MS Sans Serif', 'Segoe UI', Tahoma, sans-serif !important;
-    }
-    body.netscape #header {
-      background: linear-gradient(90deg, #000080 0%, #1084d0 100%) !important;
-      border-bottom: 2px solid #808080 !important;
-      color: white;
-    }
-    body.netscape #header h1 { color: white !important; font-size: 13px; }
-    body.netscape .hbtn {
-      background: #d4d0c8 !important; color: #000 !important;
-      border: 2px solid !important;
-      border-color: #ffffff #808080 #808080 #ffffff !important;
-      border-radius: 0 !important; font-size: 11px !important;
-    }
-    body.netscape .hbtn:active {
-      border-color: #808080 #ffffff #ffffff #808080 !important;
-    }
-    body.netscape .hbtn.add { background: #d4d0c8 !important; color: #000080 !important; font-weight: bold !important; }
-    body.netscape #card {
-      border-left: 2px solid #808080 !important;
-      background: #d4d0c8 !important;
-    }
-    body.netscape #card-body blockquote {
-      border-left: 3px solid #000080 !important;
-      background: #ffffff !important;
-    }
-    body.netscape #modal {
-      border: 2px solid !important;
-      border-color: #ffffff #808080 #808080 #ffffff !important;
-      border-radius: 0 !important;
-      background: #d4d0c8 !important;
-    }
-    body.netscape #modal h2 {
-      background: linear-gradient(90deg, #000080, #1084d0);
-      color: white;
-      margin: -24px -24px 12px -24px;
-      padding: 4px 8px;
-      font-size: 12px;
-      font-weight: bold;
-    }
-    body.netscape .field input,
-    body.netscape .field select,
-    body.netscape .field textarea {
-      background: #ffffff !important;
-      border: 2px inset #808080 !important;
-      border-radius: 0 !important;
-      color: #000 !important;
-    }
-    body.netscape .mbtn, body.netscape .card-btn {
-      background: #d4d0c8 !important; color: #000 !important;
-      border: 2px solid !important;
-      border-color: #ffffff #808080 #808080 #ffffff !important;
-      border-radius: 0 !important;
-    }
-    body.netscape .mbtn.save { color: #000080 !important; font-weight: bold !important; }
-    body.netscape .mbtn:active, body.netscape .card-btn:active {
-      border-color: #808080 #ffffff #ffffff #808080 !important;
-    }
-    body.netscape .dialogue-block {
-      background: #ffffff !important;
-      border: 2px inset #808080 !important;
-      border-radius: 0 !important;
-    }
-    body.netscape .prompt-pill {
-      border-radius: 0 !important;
-      background: #d4d0c8 !important; color: #000 !important;
-      border: 2px solid !important;
-      border-color: #ffffff #808080 #808080 #ffffff !important;
-    }
-    body.netscape .prompt-pill.active {
-      border-color: #808080 #ffffff #ffffff #808080 !important;
-      background: #a0a8d0 !important;
-    }
-    body.netscape #map-canvas {
-      background: #87CEEB !important;
-    }
-    body.netscape .loc-label { color: #000080 !important; }
-    body.netscape .pin { border-color: #000080 !important; background: #fff !important; }
-    body.netscape .pin-label { background: #ffffcc !important; color: #000 !important; border: 1px solid #808080; }
-    body.netscape #tooltip {
-      background: #ffffcc !important; color: #000 !important;
-      border: 1px solid #808080 !important;
-      border-radius: 0 !important;
-    }
-    body.netscape .item-chip { background: #fff !important; border: 1px solid #808080 !important; border-radius: 0 !important; }
 
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <style>
+    :root {
+      --bg: #1a1a2e; --surface: #16213e; --surface2: #0f3460;
+      --accent: #e94560; --accent2: #f5a623;
+      --text: #eaeaea; --text-muted: #a0a0b0;
+      --pin-size: 52px; --radius: 12px; --border: #ffffff18;
+    }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html, body { height: 100%; background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; overflow: hidden; }
 
     /* ── HEADER ── */
     #header {
-      position: fixed; top: 0; left: 0; right: 0; z-index: 200;
-      background: linear-gradient(90deg, #0f3460 0%, #16213e 100%);
+      position: fixed; top: 0; left: 0; right: 0; z-index: 1100;
+      background: linear-gradient(90deg, #0f3460, #16213e);
       border-bottom: 1px solid var(--border);
       display: flex; align-items: center; justify-content: space-between;
       padding: 0 16px; height: 48px;
     }
-    #header h1 { font-size: 15px; font-weight: 700; letter-spacing: .04em; color: var(--text); }
-    #header .btns { display: flex; gap: 8px; }
+    #header h1 { font-size: 15px; font-weight: 700; letter-spacing: .04em; }
+    #header .btns { display: flex; gap: 6px; align-items: center; }
     .hbtn {
-      font-size: 12px; padding: 5px 12px; border-radius: 6px; border: none; cursor: pointer;
-      font-family: inherit; font-weight: 600; letter-spacing: .03em;
-      transition: opacity .15s;
+      font-size: 11px; padding: 5px 10px; border-radius: 6px; border: none; cursor: pointer;
+      font-family: inherit; font-weight: 600; transition: opacity .15s;
     }
-    .hbtn:hover { opacity: .85; }
-    .hbtn.add { background: var(--accent); color: #fff; }
+    .hbtn:hover { opacity: .8; }
+    .hbtn.add-char  { background: var(--accent); color: #fff; }
+    .hbtn.add-room  { background: #2d5a27; color: #90ee90; }
+    .hbtn.gps-btn   { background: #1a3a5c; color: #90caf9; }
+    .hbtn.sim-btn   { background: #3a2d5c; color: #c9b8ff; }
+    .hbtn.export-btn{ background: #2d5a27; color: #90ee90; }
+    .hbtn.import-btn{ background: #1a3a5c; color: #90caf9; }
     .hbtn.toggle-mode { background: #ffffff18; color: var(--text); }
-    .hbtn.fullscreen { background: #ffffff10; color: var(--text-muted); }
-    .hbtn.netscape-toggle { background: #ffffff10; color: var(--text-muted); }
-    .hbtn.export-twee { background: #2d5a27; color: #90ee90; }
-    .hbtn.import-twee { background: #1a3a5c; color: #90caf9; }
-    body.netscape .hbtn.export-twee { background: #d4d0c8 !important; color: #006400 !important; }
-    body.netscape .hbtn.import-twee { background: #d4d0c8 !important; color: #000080 !important; }
-    #mode-label { font-size: 11px; color: var(--text-muted); margin-right: 6px; }
+    #mode-label { font-size: 10px; color: var(--text-muted); }
+    #gps-status { font-size: 10px; color: #90caf9; max-width: 180px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-    /* ── MAP CANVAS ── */
-    #map-wrap {
+    /* ── MAP ── */
+    #map {
       position: fixed; top: 48px; left: 0; right: 0; bottom: 0;
-      overflow: hidden; cursor: grab;
-    }
-    #map-wrap.dragging { cursor: grabbing; }
-    #map-canvas {
-      position: absolute; top: 0; left: 0;
-      width: 2400px; height: 1600px;
-      background: radial-gradient(ellipse at 30% 40%, #1a3a5c 0%, #0d1b2a 60%, #0a0f1e 100%);
-      transform-origin: 0 0;
-      user-select: none;
-    }
-    #map-canvas::before {
-      content: '';
-      position: absolute; inset: 0;
-      background-image:
-        linear-gradient(rgba(255,255,255,.03) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255,255,255,.03) 1px, transparent 1px);
-      background-size: 80px 80px;
-    }
-    body.netscape #map-canvas::before {
-      background-image:
-        linear-gradient(rgba(0,0,128,.08) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(0,0,128,.08) 1px, transparent 1px);
+      z-index: 1;
     }
 
-    /* ── DROP OVERLAY ── */
-    #drop-overlay {
-      position: fixed; inset: 0; z-index: 1000;
-      background: rgba(0,0,80,.75); backdrop-filter: blur(6px);
-      display: flex; flex-direction: column; align-items: center; justify-content: center;
-      pointer-events: none; opacity: 0; transition: opacity .2s;
-      color: #fff; font-size: 22px; gap: 12px;
+    /* ── COMPASS PANEL ── */
+    #compass-panel {
+      position: fixed; bottom: 20px; left: 20px; z-index: 1050;
+      background: rgba(10,15,30,.92); border: 1px solid var(--border);
+      border-radius: 12px; padding: 14px; width: 200px;
+      backdrop-filter: blur(8px);
+      transition: opacity .3s;
     }
-    #drop-overlay.active { opacity: 1; pointer-events: all; }
-    #drop-overlay .drop-sub { font-size: 13px; color: #a0c8ff; }
-
-    /* ── LOCATION LABELS ── */
-    .loc-label {
+    #compass-panel h4 { font-size: 10px; text-transform: uppercase; letter-spacing: .1em; color: var(--text-muted); margin-bottom: 10px; }
+    .compass-rose {
+      position: relative; width: 130px; height: 130px;
+      margin: 0 auto 10px auto;
+      border: 2px solid #ffffff30; border-radius: 50%;
+      background: radial-gradient(circle, #16213e 60%, #0a0f1e);
+    }
+    .compass-rose .north {
+      position: absolute; top: 4px; left: 50%; transform: translateX(-50%);
+      font-size: 11px; font-weight: 800; color: var(--accent);
+    }
+    .compass-rose .center-dot {
+      position: absolute; left: 50%; top: 50%;
+      width: 8px; height: 8px; margin: -4px;
+      background: #fff; border-radius: 50%;
+    }
+    .heading-needle {
+      position: absolute; left: 50%; top: 50%;
+      width: 3px; height: 52px;
+      margin-left: -1.5px; margin-top: -52px;
+      background: var(--accent);
+      transform-origin: 50% 100%;
+    }
+    .heading-needle::before {
+      content: ''; position: absolute;
+      left: -5px; top: -8px;
+      border-left: 6.5px solid transparent;
+      border-right: 6.5px solid transparent;
+      border-bottom: 10px solid var(--accent);
+    }
+    .room-marker-compass {
+      position: absolute; left: 50%; top: 50%;
+      width: 0; height: 0; transform-origin: 0 0;
+    }
+    .room-marker-compass .dot {
       position: absolute;
-      font-size: 11px; font-weight: 600; letter-spacing: .08em;
-      text-transform: uppercase; color: rgba(255,255,255,.35);
-      text-align: center; pointer-events: none;
-      transform: translateX(-50%);
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: var(--accent2);
+      left: -5px; top: -55px;
+      border: 1px solid #fff;
+    }
+    .room-marker-compass.nearest .dot { background: #4ade80; }
+    .compass-list { font-size: 11px; display: flex; flex-direction: column; gap: 5px; }
+    .compass-list-item { display: flex; justify-content: space-between; color: var(--text-muted); }
+    .compass-list-item .room-name { color: var(--text); font-weight: 600; }
+    .compass-list-item.inside .room-name { color: #4ade80; }
+
+    /* ── ROOM VIEW overlay ── */
+    #room-view {
+      position: fixed; inset: 48px 0 0 0; z-index: 1200;
+      background: var(--bg);
+      display: flex; flex-direction: column;
+      transform: translateY(100%);
+      transition: transform .35s cubic-bezier(.16,1,.3,1);
+    }
+    #room-view.open { transform: translateY(0); }
+    #room-header {
+      background: linear-gradient(90deg, #0f3460, #16213e);
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 12px;
+      padding: 0 16px; height: 44px; flex-shrink: 0;
+    }
+    #room-back {
+      background: none; border: none; color: var(--accent2);
+      font-size: 13px; font-weight: 700; cursor: pointer;
+      font-family: inherit; padding: 0;
+    }
+    #room-title { font-size: 14px; font-weight: 800; }
+    #room-lede  { font-size: 11px; color: var(--text-muted); margin-left: auto; }
+    #room-stage {
+      flex: 1; position: relative; overflow: hidden;
+      background: radial-gradient(ellipse at 30% 40%, #1a3a5c 0%, #0d1b2a 60%, #0a0f1e 100%);
+    }
+    /* Isometric grid hint */
+    #room-stage::before {
+      content: ''; position: absolute; inset: 0;
+      background-image:
+        linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px);
+      background-size: 60px 60px;
+      transform: skewY(-8deg);
+      pointer-events: none;
+    }
+    .room-char-pin {
+      position: absolute;
+      transform: translate(-50%, -50%);
+      cursor: pointer;
+      display: flex; flex-direction: column; align-items: center; gap: 4px;
+      transition: transform .2s;
+    }
+    .room-char-pin:hover { transform: translate(-50%, -50%) scale(1.15); }
+    .room-char-pin .avatar {
+      width: 64px; height: 64px; border-radius: 50%;
+      border: 3px solid var(--accent);
+      background: var(--surface2);
+      overflow: hidden;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 30px;
+    }
+    .room-char-pin .avatar img { width: 100%; height: 100%; object-fit: cover; }
+    .room-char-pin .name-tag {
+      background: rgba(10,15,30,.85); color: var(--text);
+      font-size: 10px; font-weight: 700;
+      padding: 2px 8px; border-radius: 20px;
+      backdrop-filter: blur(4px);
       white-space: nowrap;
     }
-    .loc-zone {
-      position: absolute;
-      border-radius: 50%;
-      border: 1px dashed rgba(255,255,255,.08);
-      pointer-events: none;
-      transform: translate(-50%, -50%);
-    }
-    body.netscape .loc-zone { border-color: rgba(0,0,128,.2) !important; }
-
-    /* ── PINS ── */
-    .pin {
-      position: absolute;
-      width: var(--pin-size); height: var(--pin-size);
-      border-radius: 50%;
-      border: 3px solid var(--accent);
-      overflow: hidden;
-      cursor: pointer;
-      transform: translate(-50%, -50%);
-      transition: transform .18s, box-shadow .18s;
-      box-shadow: 0 0 0 0 var(--accent);
-      background: var(--surface2);
-    }
-    .pin img { width: 100%; height: 100%; object-fit: cover; }
-    .pin:hover { transform: translate(-50%, -50%) scale(1.18); box-shadow: 0 0 16px 4px var(--accent); }
-    .pin.selected { border-color: var(--accent2); box-shadow: 0 0 20px 6px var(--accent2); transform: translate(-50%,-50%) scale(1.22); }
-    .pin-label {
-      position: absolute;
-      bottom: calc(var(--pin-size) / 2 + 4px);
-      left: 50%; transform: translateX(-50%) translateY(0);
-      background: rgba(15,15,30,.85);
-      color: var(--text); font-size: 10px; font-weight: 700;
-      padding: 2px 7px; border-radius: 20px;
-      white-space: nowrap; pointer-events: none;
-      backdrop-filter: blur(6px);
-    }
-    .pin-wrap { position: absolute; }
-
-    /* ── MOOD RING ── */
-    .mood-ring {
-      position: absolute; inset: -5px; border-radius: 50%;
+    .room-char-pin .mood-ring {
+      position: absolute; inset: -4px; border-radius: 50%;
       border: 2px solid transparent;
       animation: pulse-ring 2.5s ease-in-out infinite;
       pointer-events: none;
     }
     @keyframes pulse-ring {
-      0%, 100% { opacity: .5; transform: scale(1); }
-      50% { opacity: 1; transform: scale(1.08); }
+      0%,100% { opacity:.5; transform:scale(1); }
+      50% { opacity:1; transform:scale(1.08); }
     }
 
-    /* ── CHARACTER CARD (sidebar) ── */
+    /* ── CHARACTER CARD sidebar ── */
     #card {
       position: fixed; right: 0; top: 48px; bottom: 0;
       width: 340px; max-width: 100vw;
@@ -248,14 +186,13 @@
       display: flex; flex-direction: column;
       transform: translateX(100%);
       transition: transform .28s cubic-bezier(.16,1,.3,1);
-      z-index: 150;
-      overflow-y: auto;
+      z-index: 1300; overflow-y: auto;
     }
     #card.open { transform: translateX(0); }
     #card-close {
       position: absolute; top: 10px; right: 12px;
       background: none; border: none; color: var(--text-muted);
-      font-size: 20px; cursor: pointer; line-height: 1;
+      font-size: 20px; cursor: pointer;
     }
     #card-anim {
       width: 100%; aspect-ratio: 1;
@@ -263,104 +200,45 @@
       display: flex; align-items: center; justify-content: center;
       overflow: hidden; flex-shrink: 0;
     }
-    body.netscape #card-anim { background: #ffffff; border-bottom: 2px solid #808080; }
     #card-anim img { max-width: 100%; max-height: 100%; object-fit: contain; }
-    #card-anim .placeholder { font-size: 64px; line-height: 1; }
+    #card-anim .placeholder { font-size: 64px; }
     #card-body { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
-    #card-name { font-size: 20px; font-weight: 800; }
+    #card-name  { font-size: 20px; font-weight: 800; }
     #card-location { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .06em; }
     #card-mood-row { display: flex; align-items: center; gap: 8px; }
     #card-mood-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
     #card-mood-text { font-size: 13px; }
     #card-items h3, #card-dialogue h3 { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--text-muted); margin-bottom: 6px; }
     #card-items-list { display: flex; flex-wrap: wrap; gap: 6px; }
-    .item-chip {
-      background: rgba(255,255,255,.08); border-radius: 20px;
-      padding: 4px 10px; font-size: 12px;
-    }
-    /* dialogue passages in card */
-    #card-dialogue .passage-list { display: flex; flex-direction: column; gap: 8px; }
+    .item-chip { background: rgba(255,255,255,.08); border-radius: 20px; padding: 4px 10px; font-size: 12px; }
     .dialogue-block {
-      border-left: 3px solid var(--accent);
-      padding: 8px 12px;
-      background: rgba(255,255,255,.04);
-      border-radius: 0 8px 8px 0;
+      border-left: 3px solid var(--accent); padding: 8px 12px;
+      background: rgba(255,255,255,.04); border-radius: 0 8px 8px 0;
       font-size: 13px; line-height: 1.6;
     }
-    .dialogue-block .passage-type {
-      font-size: 10px; text-transform: uppercase; letter-spacing: .08em;
-      color: var(--accent2); font-weight: 700; margin-bottom: 3px;
-    }
+    .dialogue-block .passage-type { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--accent2); font-weight: 700; margin-bottom: 3px; }
     .dialogue-block .passage-text { color: var(--text-muted); font-style: italic; }
-    #card-photo {
-      width: 100%; aspect-ratio: 4/3;
-      background: #0a0f1e;
-      display: flex; align-items: center; justify-content: center;
-      overflow: hidden;
-    }
-    #card-photo img { width: 100%; height: 100%; object-fit: cover; }
     .card-actions { display: flex; gap: 8px; padding: 0 16px 16px; }
-    .card-btn {
-      flex: 1; padding: 8px; border-radius: 8px; border: none;
-      font-size: 12px; font-weight: 700; cursor: pointer;
-      font-family: inherit;
-    }
-    .card-btn.edit { background: rgba(255,255,255,.1); color: var(--text); }
+    .card-btn { flex: 1; padding: 8px; border-radius: 8px; border: none; font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit; }
+    .card-btn.edit   { background: rgba(255,255,255,.1); color: var(--text); }
     .card-btn.delete { background: rgba(233,69,96,.15); color: var(--accent); }
 
-    /* ── TWEE PREVIEW ── */
-    #twee-preview-overlay {
-      position: fixed; inset: 0; z-index: 400;
-      background: rgba(0,0,0,.75); backdrop-filter: blur(4px);
+    /* ── MODALS ── */
+    .modal-overlay {
+      position: fixed; inset: 0; z-index: 1400;
+      background: rgba(0,0,0,.65); backdrop-filter: blur(4px);
       display: flex; align-items: center; justify-content: center;
       opacity: 0; pointer-events: none; transition: opacity .2s;
     }
-    #twee-preview-overlay.open { opacity: 1; pointer-events: all; }
-    #twee-preview-box {
-      background: #0a0f1e; border: 1px solid #ffffff28;
-      border-radius: 10px; padding: 20px;
-      width: 640px; max-width: calc(100vw - 32px);
-      max-height: calc(100vh - 64px);
-      display: flex; flex-direction: column; gap: 12px;
-    }
-    body.netscape #twee-preview-box {
-      background: #d4d0c8; border: 2px solid; border-color: #ffffff #808080 #808080 #ffffff;
-      border-radius: 0;
-    }
-    #twee-preview-box h2 { font-size: 14px; font-weight: 800; }
-    #twee-source {
-      flex: 1; overflow-y: auto; max-height: 55vh;
-      font-family: 'Courier New', monospace; font-size: 11px;
-      background: #000510; color: #90ee90;
-      border: 1px solid #ffffff18; border-radius: 6px;
-      padding: 12px; white-space: pre; tab-size: 2;
-      line-height: 1.5;
-    }
-    body.netscape #twee-source {
-      background: #ffffff; color: #006400; border: 2px inset #808080; border-radius: 0;
-    }
-    .preview-actions { display: flex; gap: 10px; }
-
-    /* ── ADD / EDIT MODAL ── */
-    #modal-overlay {
-      position: fixed; inset: 0; z-index: 300;
-      background: rgba(0,0,0,.65); backdrop-filter: blur(4px);
-      display: flex; align-items: center; justify-content: center;
-      opacity: 0; pointer-events: none;
-      transition: opacity .2s;
-    }
-    #modal-overlay.open { opacity: 1; pointer-events: all; }
-    #modal {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 24px;
+    .modal-overlay.open { opacity: 1; pointer-events: all; }
+    .modal-box {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 24px;
       width: 480px; max-width: calc(100vw - 32px);
-      max-height: calc(100vh - 64px);
-      overflow-y: auto;
+      max-height: calc(100vh - 64px); overflow-y: auto;
       display: flex; flex-direction: column; gap: 14px;
     }
-    #modal h2 { font-size: 16px; font-weight: 800; }
+    .modal-box h2 { font-size: 16px; font-weight: 800; }
     .modal-section-title {
       font-size: 10px; text-transform: uppercase; letter-spacing: .1em;
       color: var(--accent2); font-weight: 700;
@@ -371,111 +249,51 @@
     .field input, .field select, .field textarea {
       background: rgba(255,255,255,.06); border: 1px solid var(--border);
       border-radius: 8px; padding: 9px 12px;
-      color: var(--text); font-size: 13px; font-family: inherit;
-      outline: none; transition: border-color .15s;
+      color: var(--text); font-size: 13px; font-family: inherit; outline: none;
     }
     .field input:focus, .field select:focus, .field textarea:focus { border-color: var(--accent); }
     .field textarea { resize: vertical; min-height: 52px; }
-    .field select option { background: #16213e; }
+    .modal-actions { display: flex; gap: 10px; margin-top: 4px; }
+    .mbtn { flex: 1; padding: 10px; border-radius: 8px; border: none; font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit; }
+    .mbtn.save   { background: var(--accent); color: #fff; }
+    .mbtn.cancel { background: rgba(255,255,255,.08); color: var(--text); }
     .file-row { display: flex; gap: 8px; align-items: center; }
     .file-preview { width: 52px; height: 52px; border-radius: 8px; object-fit: cover; background: #0a0f1e; flex-shrink: 0; }
-    .file-btn {
-      flex: 1; padding: 8px 12px; border-radius: 8px;
-      background: rgba(255,255,255,.06); border: 1px dashed #ffffff28;
-      color: var(--text-muted); font-size: 12px; font-family: inherit;
-      cursor: pointer; text-align: center;
-    }
-    .modal-actions { display: flex; gap: 10px; margin-top: 4px; }
-    .mbtn {
-      flex: 1; padding: 10px; border-radius: 8px; border: none;
-      font-size: 13px; font-weight: 700; cursor: pointer;
-      font-family: inherit;
-    }
-    .mbtn.save { background: var(--accent); color: #fff; }
-    .mbtn.cancel { background: rgba(255,255,255,.08); color: var(--text); }
-
-    /* ── MOOD PICKER ── */
+    .file-btn { flex: 1; padding: 8px 12px; border-radius: 8px; background: rgba(255,255,255,.06); border: 1px dashed #ffffff28; color: var(--text-muted); font-size: 12px; font-family: inherit; cursor: pointer; text-align: center; }
     .mood-picker { display: flex; gap: 8px; flex-wrap: wrap; }
-    .mood-opt {
-      padding: 4px 12px; border-radius: 20px; border: 1px solid transparent;
-      font-size: 12px; cursor: pointer; background: rgba(255,255,255,.06);
-      transition: border-color .12s, background .12s;
-    }
+    .mood-opt { padding: 4px 12px; border-radius: 20px; border: 1px solid transparent; font-size: 12px; cursor: pointer; background: rgba(255,255,255,.06); }
     .mood-opt.active { border-color: var(--accent2); background: rgba(245,166,35,.15); }
-
-    /* ── DIALOGUE BUILDER ── */
     #dialogue-builder { display: flex; flex-direction: column; gap: 10px; }
     .prompt-row { display: flex; gap: 6px; align-items: flex-start; }
-    .prompt-pill {
-      flex-shrink: 0; padding: 5px 10px; border-radius: 20px;
-      font-size: 11px; font-weight: 700; cursor: pointer;
-      background: rgba(255,255,255,.08); border: 1px solid var(--border);
-      color: var(--text-muted); white-space: nowrap;
-      transition: background .12s, color .12s;
-    }
+    .prompt-pill { flex-shrink: 0; padding: 5px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; cursor: pointer; background: rgba(255,255,255,.08); border: 1px solid var(--border); color: var(--text-muted); white-space: nowrap; }
     .prompt-pill.active { background: rgba(245,166,35,.2); color: var(--accent2); border-color: var(--accent2); }
-    .prompt-input {
-      flex: 1; background: rgba(255,255,255,.06); border: 1px solid var(--border);
-      border-radius: 8px; padding: 7px 10px;
-      color: var(--text); font-size: 12px; font-family: inherit;
-      outline: none; resize: none; min-height: 36px;
-      transition: border-color .15s;
-    }
+    .prompt-input { flex: 1; background: rgba(255,255,255,.06); border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px; color: var(--text); font-size: 12px; font-family: inherit; outline: none; resize: none; min-height: 36px; }
     .prompt-input:focus { border-color: var(--accent); }
     .prompt-hint { font-size: 10px; color: var(--text-muted); margin-top: -6px; margin-left: 2px; }
-    body.netscape .prompt-input {
-      background: #ffffff; border: 2px inset #808080; border-radius: 0;
-      color: #000;
+
+    /* Room latlng picker mini-map */
+    #room-latlng-map {
+      width: 100%; height: 200px;
+      border-radius: 8px; border: 1px solid var(--border);
+      z-index: 0;
     }
 
-    /* ── PROJECTOR MODE ── */
-    body.projector #card { display: none; }
-    body.projector #header .hbtn.add { display: none; }
+    /* twee preview */
+    #twee-preview-overlay .modal-box { max-height: calc(100vh - 64px); }
+    #twee-source { flex: 1; overflow-y: auto; max-height: 50vh; font-family: 'Courier New', monospace; font-size: 11px; background: #000510; color: #90ee90; border: 1px solid #ffffff18; border-radius: 6px; padding: 12px; white-space: pre; line-height: 1.5; }
 
-    /* ── TOOLTIP on hover ── */
-    #tooltip {
-      position: fixed; z-index: 500;
-      background: rgba(10,15,30,.92); backdrop-filter: blur(8px);
-      border: 1px solid var(--border); border-radius: 10px;
-      padding: 10px 14px; pointer-events: none;
-      opacity: 0; transition: opacity .12s;
-      max-width: 220px;
-    }
+    /* tooltip */
+    #tooltip { position: fixed; z-index: 1500; background: rgba(10,15,30,.92); backdrop-filter: blur(8px); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; pointer-events: none; opacity: 0; transition: opacity .12s; max-width: 200px; }
     #tooltip.show { opacity: 1; }
     #tooltip .tt-name { font-size: 13px; font-weight: 800; }
-    #tooltip .tt-loc { font-size: 10px; color: var(--text-muted); text-transform: uppercase; }
+    #tooltip .tt-loc  { font-size: 10px; color: var(--text-muted); text-transform: uppercase; }
     #tooltip .tt-mood { font-size: 11px; margin-top: 3px; }
 
-    /* ── LOCATION PICKER in modal ── */
-    #loc-picker-wrap { position: relative; }
-    #loc-picker-map {
-      width: 100%; height: 160px;
-      background: radial-gradient(ellipse at 30% 40%, #1a3a5c, #0a0f1e);
-      border-radius: 8px; border: 1px solid var(--border);
-      position: relative; overflow: hidden; cursor: crosshair;
-    }
-    body.netscape #loc-picker-map { background: #87CEEB; border: 2px inset #808080; border-radius: 0; }
-    #loc-picker-map .lp-grid {
-      position: absolute; inset: 0;
-      background-image:
-        linear-gradient(rgba(255,255,255,.04) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255,255,255,.04) 1px, transparent 1px);
-      background-size: 40px 40px;
-    }
-    .lp-zone-label {
-      position: absolute; font-size: 9px; color: rgba(255,255,255,.3);
-      text-transform: uppercase; letter-spacing: .06em; pointer-events: none;
-      transform: translateX(-50%);
-    }
-    body.netscape .lp-zone-label { color: rgba(0,0,128,.5); }
-    #lp-crosshair {
-      position: absolute; width: 16px; height: 16px;
-      border: 2px solid var(--accent); border-radius: 50%;
-      transform: translate(-50%,-50%);
-      pointer-events: none;
-    }
+    /* drop overlay */
+    #drop-overlay { position: fixed; inset: 0; z-index: 2000; background: rgba(0,0,80,.75); backdrop-filter: blur(6px); display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; opacity: 0; transition: opacity .2s; color: #fff; font-size: 22px; gap: 12px; }
+    #drop-overlay.active { opacity: 1; pointer-events: all; }
+    #drop-overlay .drop-sub { font-size: 13px; color: #a0c8ff; }
 
-    /* scrollbar */
     ::-webkit-scrollbar { width: 6px; }
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: #ffffff20; border-radius: 3px; }
@@ -485,774 +303,634 @@
 
 <!-- HEADER -->
 <div id="header">
-  <h1>🏠 Living Characters — Virtual World</h1>
-  <div style="display:flex;align-items:center;gap:8px;">
-    <span id="mode-label">Facilitator mode</span>
-    <button class="hbtn netscape-toggle" onclick="toggleNetscape()" title="Toggle Netscapecore style">🪟 Style</button>
-    <button class="hbtn import-twee" onclick="triggerImport()" title="Import a .twee file">⬆ Import .twee</button>
-    <button class="hbtn export-twee" onclick="previewAndExportTwee()">⬇ Export .twee</button>
-    <button class="hbtn toggle-mode" onclick="toggleMode()">Switch to Projector View</button>
-    <button class="hbtn add" onclick="openModal(null)">+ Add Character</button>
+  <h1>🏠 Living Characters</h1>
+  <div class="btns">
+    <span id="gps-status">GPS: off</span>
+    <button class="hbtn gps-btn"  onclick="startGPS()">📍 GPS</button>
+    <button class="hbtn sim-btn"  onclick="startSim()">🚶 Simulate</button>
+    <button class="hbtn add-room" onclick="openRoomModal(null)">+ Room</button>
+    <button class="hbtn add-char" onclick="openCharModal(null)">+ Character</button>
+    <button class="hbtn import-btn" onclick="triggerImport()">⬆ .twee</button>
+    <button class="hbtn export-btn" onclick="previewTwee()">⬇ .twee</button>
+    <button class="hbtn toggle-mode" onclick="toggleMode()">Projector</button>
+    <span id="mode-label">Facilitator</span>
   </div>
 </div>
 
-<!-- hidden import input -->
-<input id="twee-import-input" type="file" accept=".twee,.txt" style="display:none" onchange="handleImportFile(event)" />
-
 <!-- MAP -->
-<div id="map-wrap">
-  <div id="map-canvas">
-    <!-- Zones and labels rendered by JS -->
+<div id="map"></div>
+
+<!-- COMPASS PANEL -->
+<div id="compass-panel">
+  <h4>🧭 Rooms from here</h4>
+  <div class="compass-rose" id="compass-rose">
+    <div class="north">N</div>
+    <div class="heading-needle" id="heading-needle"></div>
+    <div class="center-dot"></div>
+  </div>
+  <div class="compass-list" id="compass-list"></div>
+</div>
+
+<!-- ROOM VIEW -->
+<div id="room-view">
+  <div id="room-header">
+    <button id="room-back" onclick="closeRoom()">← Map</button>
+    <div id="room-title">Room</div>
+    <div id="room-lede"></div>
+  </div>
+  <div id="room-stage"></div>
+</div>
+
+<!-- CHARACTER CARD -->
+<div id="card">
+  <button id="card-close" onclick="closeCard()">✕</button>
+  <div id="card-anim"><div class="placeholder">🧸</div></div>
+  <div id="card-body">
+    <div><div id="card-name"></div><div id="card-location"></div></div>
+    <div id="card-mood-row"><div id="card-mood-dot"></div><div id="card-mood-text"></div></div>
+    <div id="card-items"><h3>Items</h3><div id="card-items-list"></div></div>
+    <div id="card-dialogue"><h3>Dialogue</h3><div class="passage-list" id="card-passage-list"></div></div>
+  </div>
+  <div class="card-actions">
+    <button class="card-btn edit"   onclick="editSelectedChar()">Edit</button>
+    <button class="card-btn delete" onclick="deleteSelectedChar()">Remove</button>
+  </div>
+</div>
+
+<!-- TWEE PREVIEW -->
+<div class="modal-overlay" id="twee-preview-overlay">
+  <div class="modal-box" style="gap:12px">
+    <h2>📄 Twee Export Preview</h2>
+    <pre id="twee-source"></pre>
+    <div class="modal-actions">
+      <button class="mbtn cancel" onclick="closeTweePreview()">Close</button>
+      <button class="mbtn save"   onclick="downloadTwee()">⬇ Download</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD/EDIT ROOM MODAL -->
+<div class="modal-overlay" id="room-modal-overlay">
+  <div class="modal-box">
+    <h2 id="room-modal-title">Add a Room</h2>
+    <div class="modal-section-title">🗺️ Where is it?</div>
+    <p style="font-size:11px;color:var(--text-muted)">Click the map below to set the room's real-world position, then set a trigger radius.</p>
+    <div class="field"><label>Room name</label><input id="rf-name" type="text" placeholder="e.g. The Library, The Garden..." /></div>
+    <div class="field"><label>Description / lede</label><textarea id="rf-lede" rows="2" placeholder="A short description shown when players enter."></textarea></div>
+    <div class="field"><label>Click map to place — or type lat, lng</label>
+      <div style="display:flex;gap:8px">
+        <input id="rf-lat" type="number" step="any" placeholder="Lat" style="flex:1" />
+        <input id="rf-lng" type="number" step="any" placeholder="Lng" style="flex:1" />
+      </div>
+      <div id="room-latlng-map"></div>
+    </div>
+    <div class="field"><label>Trigger radius (metres)</label><input id="rf-radius" type="number" value="30" min="5" max="500" /></div>
+    <div class="field"><label>Backdrop style</label>
+      <select id="rf-backdrop">
+        <option value="forest">🌲 Forest</option>
+        <option value="stone">🪨 Stone hall</option>
+        <option value="water">🌊 Waterside</option>
+        <option value="wood">🪵 Wooden room</option>
+        <option value="grass">🌿 Garden</option>
+        <option value="dark">🌑 Dark cave</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="mbtn cancel" onclick="closeRoomModal()">Cancel</button>
+      <button class="mbtn save"   onclick="saveRoom()">Save Room</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD/EDIT CHARACTER MODAL -->
+<div class="modal-overlay" id="char-modal-overlay">
+  <div class="modal-box">
+    <h2 id="char-modal-title">Add a Character</h2>
+    <div class="modal-section-title">👤 Who are they?</div>
+    <div class="field"><label>Character name</label><input id="cf-name" type="text" placeholder="e.g. Mop, Gravel, Biscuit..." /></div>
+    <div class="field"><label>Which room do they live in?</label>
+      <select id="cf-room"><option value="">— choose a room —</option></select>
+    </div>
+    <div class="field"><label>Photo (felt / clay)</label>
+      <div class="file-row">
+        <img id="cf-photo-preview" class="file-preview" src="" style="display:none" />
+        <label class="file-btn" for="cf-photo-input">Upload photo</label>
+        <input id="cf-photo-input" type="file" accept="image/*" style="display:none" onchange="previewFile('cf-photo-input','cf-photo-preview','photoData')" />
+      </div>
+    </div>
+    <div class="field"><label>Mixamo animation (GIF)</label>
+      <div class="file-row">
+        <img id="cf-anim-preview" class="file-preview" src="" style="display:none" />
+        <label class="file-btn" for="cf-anim-input">Upload Mixamo GIF</label>
+        <input id="cf-anim-input" type="file" accept="image/gif,image/png,image/jpeg" style="display:none" onchange="previewFile('cf-anim-input','cf-anim-preview','animData')" />
+      </div>
+    </div>
+    <div class="field"><label>Mood</label><div class="mood-picker" id="mood-picker"></div></div>
+    <div class="field"><label>Items (comma-separated)</label><input id="cf-items" type="text" placeholder="small hat, acorn, lucky pebble" /></div>
+    <div class="modal-section-title">💬 What do they say?</div>
+    <div id="dialogue-builder"></div>
+    <div class="modal-actions">
+      <button class="mbtn cancel" onclick="closeCharModal()">Cancel</button>
+      <button class="mbtn save"   onclick="saveCharacter()">Save</button>
+    </div>
   </div>
 </div>
 
 <!-- DROP OVERLAY -->
 <div id="drop-overlay">
   <div>📄 Drop .twee file to import</div>
-  <div class="drop-sub">Characters will be loaded from the file</div>
-</div>
-
-<!-- CHARACTER CARD SIDEBAR -->
-<div id="card">
-  <button id="card-close" onclick="closeCard()">&#x2715;</button>
-  <div id="card-anim"><div class="placeholder">🧸</div></div>
-  <div id="card-body">
-    <div>
-      <div id="card-name"></div>
-      <div id="card-location"></div>
-    </div>
-    <div id="card-mood-row">
-      <div id="card-mood-dot"></div>
-      <div id="card-mood-text"></div>
-    </div>
-    <div id="card-items">
-      <h3>Items</h3>
-      <div id="card-items-list"></div>
-    </div>
-    <div id="card-dialogue">
-      <h3>Dialogue</h3>
-      <div class="passage-list" id="card-passage-list"></div>
-    </div>
-    <div id="card-photo"></div>
-  </div>
-  <div class="card-actions">
-    <button class="card-btn edit" onclick="editSelected()">Edit</button>
-    <button class="card-btn delete" onclick="deleteSelected()">Remove</button>
-  </div>
-</div>
-
-<!-- TWEE PREVIEW OVERLAY -->
-<div id="twee-preview-overlay">
-  <div id="twee-preview-box">
-    <h2>📄 Twee Export Preview</h2>
-    <pre id="twee-source"></pre>
-    <div class="preview-actions">
-      <button class="mbtn cancel" onclick="closeTweePreview()">Close</button>
-      <button class="mbtn save" onclick="downloadTwee()">⬇ Download .twee</button>
-    </div>
-  </div>
-</div>
-
-<!-- ADD/EDIT MODAL -->
-<div id="modal-overlay">
-  <div id="modal">
-    <h2 id="modal-title">Add a Character</h2>
-
-    <div class="modal-section-title">👤 Who are they?</div>
-
-    <div class="field">
-      <label>Character name</label>
-      <input id="f-name" type="text" placeholder="e.g. Mop, Gravel, Biscuit..." />
-    </div>
-
-    <div class="field">
-      <label>Character photo (felting / clay)</label>
-      <div class="file-row">
-        <img id="f-photo-preview" class="file-preview" src="" style="display:none" />
-        <label class="file-btn" for="f-photo-input">Upload photo (JPG / PNG)</label>
-        <input id="f-photo-input" type="file" accept="image/*" style="display:none" onchange="previewFile('f-photo-input','f-photo-preview','photoData')" />
-      </div>
-    </div>
-
-    <div class="field">
-      <label>Mixamo animation (GIF or image)</label>
-      <div class="file-row">
-        <img id="f-anim-preview" class="file-preview" src="" style="display:none" />
-        <label class="file-btn" for="f-anim-input">Upload Mixamo GIF / PNG</label>
-        <input id="f-anim-input" type="file" accept="image/gif,image/png,image/jpeg" style="display:none" onchange="previewFile('f-anim-input','f-anim-preview','animData')" />
-      </div>
-      <small style="font-size:11px;color:var(--text-muted);margin-top:4px;">From <a href="https://www.mixamo.com" target="_blank" style="color:var(--accent2)">mixamo.com</a> → download as GIF or screenshot the animation preview.</small>
-    </div>
-
-    <div class="field">
-      <label>Mood</label>
-      <div class="mood-picker" id="mood-picker"><!-- rendered by JS --></div>
-    </div>
-
-    <div class="field">
-      <label>Location on the map — click to place</label>
-      <div id="loc-picker-map">
-        <div class="lp-grid"></div>
-        <div id="lp-crosshair" style="display:none"></div>
-      </div>
-      <input id="f-loc-x" type="hidden" />
-      <input id="f-loc-y" type="hidden" />
-      <small id="f-loc-label" style="font-size:11px;color:var(--text-muted);margin-top:4px;">Click the map above to choose a spot.</small>
-    </div>
-
-    <div class="field">
-      <label>Items (comma-separated)</label>
-      <input id="f-items" type="text" placeholder="e.g. small hat, acorn, lucky pebble" />
-    </div>
-
-    <div class="modal-section-title">💬 What do they say?</div>
-    <p style="font-size:11px;color:var(--text-muted);margin-top:-6px;">Fill in one or more. Each becomes a dialogue passage in the story.</p>
-
-    <div id="dialogue-builder"><!-- rendered by JS --></div>
-
-    <div class="modal-actions">
-      <button class="mbtn cancel" onclick="closeModal()">Cancel</button>
-      <button class="mbtn save" onclick="saveCharacter()">Save</button>
-    </div>
-  </div>
+  <div class="drop-sub">Rooms and characters will be loaded</div>
 </div>
 
 <!-- TOOLTIP -->
 <div id="tooltip">
   <div class="tt-name" id="tt-name"></div>
-  <div class="tt-loc" id="tt-loc"></div>
+  <div class="tt-loc"  id="tt-loc"></div>
   <div class="tt-mood" id="tt-mood"></div>
 </div>
 
+<!-- hidden import input -->
+<input id="twee-import-input" type="file" accept=".twee,.txt" style="display:none" onchange="handleImportFile(event)" />
+
 <script>
-/* ═══════════════════════════════════════
+/* ════════════════════════════════════════════════════════
    DATA
-═══════════════════════════════════════ */
+════════════════════════════════════════════════════════ */
 const MOODS = [
-  { label: 'Happy',   color: '#4ade80', emoji: '😊' },
-  { label: 'Sleepy',  color: '#818cf8', emoji: '😴' },
-  { label: 'Hungry',  color: '#fb923c', emoji: '🍽️' },
-  { label: 'Grumpy',  color: '#f87171', emoji: '😤' },
-  { label: 'Curious', color: '#38bdf8', emoji: '🔍' },
-  { label: 'Shy',     color: '#e879f9', emoji: '🫣' },
-  { label: 'Excited', color: '#fbbf24', emoji: '⚡' },
-  { label: 'Cozy',    color: '#a78bfa', emoji: '🌙' },
+  { label:'Happy',   color:'#4ade80', emoji:'😊' },
+  { label:'Sleepy',  color:'#818cf8', emoji:'😴' },
+  { label:'Hungry',  color:'#fb923c', emoji:'🍽️' },
+  { label:'Grumpy',  color:'#f87171', emoji:'😤' },
+  { label:'Curious', color:'#38bdf8', emoji:'🔍' },
+  { label:'Shy',     color:'#e879f9', emoji:'🫣' },
+  { label:'Excited', color:'#fbbf24', emoji:'⚡' },
+  { label:'Cozy',    color:'#a78bfa', emoji:'🌙' },
 ];
 
-// Dialogue prompt types — kid-friendly labels → Twee passage suffix
-// Mirrors spatial-narrative's directional sub-passages, but keyed to dialogue states
 const PROMPT_TYPES = [
-  { key: 'hello',    label: '👋 Hello',    hint: 'What does this character say when you first meet them?',     placeholder: 'Hi! I\'m Mop. I live near the mossy wall.' },
-  { key: 'question', label: '❓ Question',  hint: 'Something they wonder about or want to know.',              placeholder: 'Do you think clouds have names?' },
-  { key: 'secret',   label: '🤫 Secret',   hint: 'Something only you know if you ask nicely.',                placeholder: 'I found a tiny door once. I never told anyone.' },
-  { key: 'reaction', label: '😮 Reaction', hint: 'How they feel about something happening in the world.',      placeholder: 'When it rains, I feel like dancing.' },
-  { key: 'item',     label: '🎒 Item',     hint: 'What they say about one of their items (name the item!).',  placeholder: 'This acorn is from a very important tree.' },
+  { key:'hello',    label:'👋 Hello',    hint:'What do they say when you first meet them?',    placeholder:'Hi! I live near the mossy wall.' },
+  { key:'question', label:'❓ Question',  hint:'Something they wonder about.',                 placeholder:'Do you think clouds have names?' },
+  { key:'secret',   label:'🤫 Secret',   hint:'Something only you know if you ask nicely.',   placeholder:'I found a tiny door once.' },
+  { key:'reaction', label:'😮 Reaction', hint:'How they feel about the world.',                placeholder:'When it rains I feel like dancing.' },
+  { key:'item',     label:'🎒 Item',     hint:'What they say about one of their items.',       placeholder:'This acorn is from a very important tree.' },
 ];
 
-const ZONES = [
-  { name: 'The Lobby',    x: 0.22, y: 0.30, r: 0.10 },
-  { name: 'The Kitchen',  x: 0.52, y: 0.20, r: 0.09 },
-  { name: 'The Garden',   x: 0.78, y: 0.55, r: 0.11 },
-  { name: 'The Workshop', x: 0.20, y: 0.68, r: 0.10 },
-  { name: 'The Rooftop',  x: 0.60, y: 0.75, r: 0.09 },
-  { name: 'The Library',  x: 0.42, y: 0.50, r: 0.08 },
-];
+const BACKDROP_GRADIENTS = {
+  forest: 'radial-gradient(ellipse at 30% 40%, #1a3d1a 0%, #0d1e0d 70%, #060e06 100%)',
+  stone:  'radial-gradient(ellipse at 30% 40%, #3a3a4a 0%, #1e1e2a 70%, #0a0a0f 100%)',
+  water:  'radial-gradient(ellipse at 30% 40%, #0d3a5c 0%, #061e36 70%, #020a15 100%)',
+  wood:   'radial-gradient(ellipse at 30% 40%, #4a2e10 0%, #2a1a08 70%, #100a02 100%)',
+  grass:  'radial-gradient(ellipse at 30% 40%, #1a4a1a 0%, #0e2a0e 70%, #060f06 100%)',
+  dark:   'radial-gradient(ellipse at 30% 40%, #1a0a2e 0%, #0d0516 70%, #020005 100%)',
+};
 
-let characters = JSON.parse(localStorage.getItem('lc_chars') || '[]');
-let selectedId = null;
-let editingId = null;
-let activeMood = MOODS[0].label;
-let tempPhotoData = null;
-let tempAnimData = null;
-let lpX = null, lpY = null;
+let rooms      = JSON.parse(localStorage.getItem('lc_rooms')  || '[]');
+let characters = JSON.parse(localStorage.getItem('lc_chars')  || '[]');
+let selectedCharId = null;
+let editingCharId  = null;
+let editingRoomId  = null;
+let activeMood     = MOODS[0].label;
+let tempPhotoData  = null;
+let tempAnimData   = null;
+let activeRoomId   = null;   // currently open room view
 
-// Map pan/zoom
-let scale = 0.55, panX = 0, panY = 0;
-let dragging = false, dragStart = { x: 0, y: 0 }, panStart = { x: 0, y: 0 };
+/* ════════════════════════════════════════════════════════
+   GPS ENGINE — direct port from spatial-narrative
+════════════════════════════════════════════════════════ */
+const geo = {
+  watchId: null,
+  current: null,   // { lat, lng }
+  heading: null,   // degrees, device compass
+  mode: 'off',
+};
 
-const MAP_W = 2400, MAP_H = 1600;
+function haversineMeters(aLat, aLng, bLat, bLng) {
+  const R = 6371000, r = d => d * Math.PI / 180;
+  const dLat = r(bLat-aLat), dLng = r(bLng-aLng);
+  const q = Math.sin(dLat/2)**2 + Math.cos(r(aLat)) * Math.cos(r(bLat)) * Math.sin(dLng/2)**2;
+  return 2 * R * Math.atan2(Math.sqrt(q), Math.sqrt(1-q));
+}
 
-/* ═══════════════════════════════════════════════════════════════════
-   TWEE PIPELINE — mirroring spatial-narrative's parse() engine
-   
-   In spatial-narrative, passage text contains @geo directives that
-   encode lat/lng/radius and meta. Here we use @char directives that
-   encode x/y position and character meta — same pipeline, different
-   coordinate space.
+function bearingDegrees(aLat, aLng, bLat, bLng) {
+  const r = d => d * Math.PI / 180, d = r => r * 180 / Math.PI;
+  const φ1=r(aLat), φ2=r(bLat), λ1=r(aLng), λ2=r(bLng);
+  const y = Math.sin(λ2-λ1)*Math.cos(φ2);
+  const x = Math.cos(φ1)*Math.sin(φ2) - Math.sin(φ1)*Math.cos(φ2)*Math.cos(λ2-λ1);
+  return ((Math.atan2(y,x)*180/Math.PI)%360+360)%360;
+}
 
-   Directive grammar (one per line, starts at line start):
-     @char <x>,<y>           — position on 0–1 normalised canvas
-     @mood <MoodLabel>       — mood string
-     @zone <Zone Name>       — override nearest-zone label
-     @items <item1>,<item2>  — comma-separated item list
-     @lede <text>            — short description shown in card header
-     @after <ms>             — ms before switching to an alternate passage
-     @then <PassageName>     — passage to switch to after @after ms
-   
-   Everything else is body text. [[Links]] are parsed for sub-passage
-   wiring, matching spatial-narrative's getLinkedTargets() pattern.
-═══════════════════════════════════════════════════════════════════ */
+function startGPS() {
+  if (!navigator.geolocation) { setGPSStatus('Not supported'); return; }
+  geo.mode = 'live';
+  setGPSStatus('Requesting…');
+  if (geo.watchId !== null) navigator.geolocation.clearWatch(geo.watchId);
+  geo.watchId = navigator.geolocation.watchPosition(
+    pos => {
+      geo.current = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      setGPSStatus(geo.current.lat.toFixed(4) + ', ' + geo.current.lng.toFixed(4));
+      onPositionUpdate();
+    },
+    err => setGPSStatus('Error: ' + err.message),
+    { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
+  );
+  enableCompass();
+}
 
-const lc = {};
-
-/**
- * Parse a Twee passage body for @char directives and body text.
- * Returns a meta object — parallel shape to spatial-narrative's parse().
- */
-lc.parse = function(passageText) {
-  const lines = passageText.split(/\n/);
-  const meta = {
-    x: null, y: null,
-    mood: null, zone: null,
-    lede: '', items: [],
-    after: null, then: null,
-    dirs: []   // kept for future directional sub-passages
-  };
-  const body = [];
-
-  lines.forEach(function(line) {
-    const t = line.trim();
-    if (t.indexOf('@char ') === 0) {
-      const parts = t.slice(6).split(',').map(v => parseFloat(v.trim()));
-      meta.x = parts[0];
-      meta.y = parts[1];
-    } else if (t.indexOf('@mood ') === 0) {
-      meta.mood = t.slice(6).trim();
-    } else if (t.indexOf('@zone ') === 0) {
-      meta.zone = t.slice(6).trim();
-    } else if (t.indexOf('@items ') === 0) {
-      meta.items = t.slice(7).split(',').map(s => s.trim()).filter(Boolean);
-    } else if (t.indexOf('@lede ') === 0) {
-      meta.lede = t.slice(6).trim();
-    } else if (t.indexOf('@after ') === 0) {
-      meta.after = Number(t.slice(7).trim());
-    } else if (t.indexOf('@then ') === 0) {
-      meta.then = t.slice(6).trim();
-    } else {
-      body.push(line);
+async function enableCompass() {
+  try {
+    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+      const r = await DeviceOrientationEvent.requestPermission();
+      if (r !== 'granted') return;
     }
-  });
+    window.addEventListener('deviceorientation', e => {
+      const h = typeof e.webkitCompassHeading === 'number' ? e.webkitCompassHeading
+              : typeof e.alpha === 'number' ? ((360 - e.alpha) % 360 + 360) % 360 : null;
+      if (h === null) return;
+      geo.heading = h;
+      renderCompass();
+    }, true);
+  } catch(_) {}
+}
 
-  meta.body = body.join('\n').trim();
-  return meta;
-};
-
-/**
- * Extract [[Link]] targets from passage text.
- * Direct port of spatial-narrative's getLinkedTargets().
- */
-lc.getLinkedTargets = function(text) {
-  const targets = [];
-  const seen = Object.create(null);
-  const regex = /\[\[(.+?)\]\]/g;
-  let match;
-  while ((match = regex.exec(text)) !== null) {
-    let raw = match[1].trim();
-    let target = raw;
-    if (raw.indexOf('->') !== -1)      { target = raw.split('->')[1].trim(); }
-    else if (raw.indexOf('<-') !== -1) { target = raw.split('<-')[0].trim(); }
-    else if (raw.indexOf('|') !== -1)  { target = raw.split('|')[1].trim(); }
-    else if (raw.indexOf('→') !== -1)  { target = raw.split('→')[1].trim(); }
-    else if (raw.indexOf('←') !== -1)  { target = raw.split('←')[0].trim(); }
-    if (target && !seen[target]) { seen[target] = true; targets.push(target); }
-  }
-  return targets;
-};
-
-/**
- * Parse a full .twee string into a flat array of passage objects.
- * Each object: { name, tags, text }
- * Mirrors the structure SugarCube/Tweego use.
- */
-lc.parseTweeSource = function(src) {
-  // Split on :: PassageName [optional tags]
-  const passageRe = /^::\s*(.+?)(?:\s*\[([^\]]*)\])?\s*$/m;
-  const sections = src.split(/^(?=::)/m).filter(s => s.trim());
-  const passages = [];
-  sections.forEach(function(section) {
-    const firstLine = section.split('\n')[0];
-    const m = firstLine.match(passageRe);
-    if (!m) return;
-    const name = m[1].trim();
-    const tags = m[2] ? m[2].split(/\s+/).filter(Boolean) : [];
-    const text = section.slice(firstLine.length + 1).trimEnd();
-    passages.push({ name, tags, text });
-  });
-  return passages;
-};
-
-/**
- * Build characters[] from a parsed .twee passage list.
- * Root passages tagged [char] (or having @char directive) become characters.
- * Sub-passages (Name-hello, Name-question, etc.) are folded into passages{}.
- */
-lc.charactersFromPassages = function(passages) {
-  // Index all passages by name
-  const byName = {};
-  passages.forEach(p => { byName[p.name] = p; });
-
-  // Identify root character passages: tagged [char] OR containing @char
-  const roots = passages.filter(p => {
-    if (p.tags.includes('char')) return true;
-    if (p.text.indexOf('@char ') !== -1) return true;
-    return false;
-  });
-
-  const result = [];
-  roots.forEach(function(root) {
-    const meta = lc.parse(root.text);
-    // x/y default to a spread position if not set
-    const idx = result.length;
-    const x = (meta.x !== null && isFinite(meta.x)) ? meta.x : 0.2 + (idx % 5) * 0.15;
-    const y = (meta.y !== null && isFinite(meta.y)) ? meta.y : 0.25 + Math.floor(idx / 5) * 0.2;
-
-    const moodLabel = meta.mood
-      ? MOODS.find(m => m.label.toLowerCase() === meta.mood.toLowerCase())?.label || MOODS[0].label
-      : MOODS[0].label;
-
-    // Gather sub-passages
-    const passages = {};
-    const safeName = root.name.replace(/\s+/g, '_');
-    PROMPT_TYPES.forEach(function(pt) {
-      // Try both spaced and underscored variants
-      const candidate = byName[root.name + '-' + pt.key]
-        || byName[safeName + '-' + pt.key];
-      if (candidate) {
-        const submeta = lc.parse(candidate.text);
-        passages[pt.key] = submeta.body || candidate.text.trim();
-      } else {
-        passages[pt.key] = '';
-      }
-    });
-
-    // Also check linked targets from root passage body for sub-passages
-    const linked = lc.getLinkedTargets(root.text);
-    linked.forEach(function(target) {
-      const p = byName[target];
-      if (!p) return;
-      PROMPT_TYPES.forEach(function(pt) {
-        if (target.endsWith('-' + pt.key) || target.endsWith('_' + pt.key)) {
-          if (!passages[pt.key]) {
-            const submeta = lc.parse(p.text);
-            passages[pt.key] = submeta.body || p.text.trim();
-          }
-        }
-      });
-    });
-
-    // Body text → hello fallback
-    if (!passages.hello && meta.body) { passages.hello = meta.body; }
-
-    const items = meta.items.length ? meta.items :
-      meta.body.match(/@items (.+)/)?.[1]?.split(',').map(s=>s.trim()).filter(Boolean) || [];
-
-    result.push({
-      id: Date.now() + '_' + idx,
-      name: root.name,
-      mood: moodLabel,
-      x, y,
-      items,
-      lede: meta.lede,
-      dialogue: passages.hello || '',
-      passages,
-      photoData: null,
-      animData: null
-    });
-  });
-
-  return result;
-};
-
-/**
- * Generate .twee source from the current characters[].
- * Produces a self-contained file with StoryTitle, StoryData, StoryInit,
- * and one root passage + sub-passages per character.
- * 
- * The root passage is tagged [char] and contains @char directives —
- * making it round-trip importable.
- */
-lc.buildTweeSource = function(chars) {
-  if (!chars || chars.length === 0) return '';
-  const lines = [];
-
-  // ── StoryTitle
-  lines.push(':: StoryTitle');
-  lines.push('Living Characters — Virtual World');
-  lines.push('');
-
-  // ── StoryData (SugarCube compatible)
-  lines.push(':: StoryData');
-  lines.push(JSON.stringify({
-    ifid: 'LC-' + Date.now(),
-    format: 'SugarCube',
-    'format-version': '2.36.1',
-    start: 'Start'
-  }, null, 2));
-  lines.push('');
-
-  // ── StoryInit — character registry for runtime use
-  lines.push(':: StoryInit');
-  lines.push('<<set $lc to {');
-  lines.push('  active: null,');
-  lines.push('  characters: []');
-  lines.push('}>>')
-  lines.push('');
-
-  // ── Start passage — lists all characters (mirrors spatial-narrative Start)
-  lines.push(':: Start');
-  lines.push('Tap a character pin on the map to open their card and explore their dialogue tree.');
-  lines.push('');
-  chars.forEach(ch => {
-    const safeName = ch.name.replace(/\s+/g, '_');
-    lines.push(`[[${ch.name} → ${safeName}]]`);
-  });
-  lines.push('');
-
-  // ── One root passage + sub-passages per character
-  chars.forEach(function(ch) {
-    const safeName = ch.name.replace(/\s+/g, '_');
-    const mood = MOODS.find(m => m.label === ch.mood) || MOODS[0];
-    const zone = nearestZone(ch.x, ch.y);
-    const items = (ch.items || []).join(', ') || 'nothing in particular';
-
-    // Root passage [char] — contains all @char directives for round-trip
-    lines.push(`:: ${safeName} [char]`);
-    lines.push(`@char ${ch.x.toFixed(4)},${ch.y.toFixed(4)}`);
-    lines.push(`@mood ${ch.mood}`);
-    lines.push(`@zone ${zone}`);
-    if (ch.items && ch.items.length) lines.push(`@items ${ch.items.join(', ')}`);
-    if (ch.lede) lines.push(`@lede ${ch.lede}`);
-    lines.push('');
-    // Body: intro + links to all filled sub-passages
-    const linkedPassages = PROMPT_TYPES.filter(pt => ch.passages && ch.passages[pt.key] && ch.passages[pt.key].trim());
-    if (linkedPassages.length > 0) {
-      linkedPassages.forEach(pt => {
-        lines.push(`[[${pt.label} → ${safeName}-${pt.key}]]`);
-      });
-    } else if (ch.dialogue) {
-      lines.push(ch.dialogue);
-    }
-    lines.push('');
-
-    // Sub-passage per dialogue type
-    PROMPT_TYPES.forEach(function(pt) {
-      const text = ch.passages && ch.passages[pt.key] ? ch.passages[pt.key].trim() : '';
-      if (!text) return;
-      lines.push(`:: ${safeName}-${pt.key}`);
-      lines.push(text);
-      lines.push('');
-      lines.push(`[[← Back to ${ch.name} → ${safeName}]]`);
-      lines.push('');
-    });
-
-    // Item sub-passages (mirrors spatial-narrative's item passage pattern)
-    if (ch.items && ch.items.length > 0) {
-      ch.items.forEach(function(item) {
-        const safeItem = item.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9-]/g, '').toLowerCase();
-        lines.push(`:: ${safeName}-item-${safeItem}`);
-        lines.push(`${ch.name} holds the ${item} carefully.`);
-        lines.push('');
-        lines.push(`[[← Back to ${ch.name} → ${safeName}]]`);
-        lines.push('');
-      });
-    }
-  });
-
-  return lines.join('\n');
-};
-
-/* ═══════════════════════════════════════
-   IMPORT / EXPORT UI
-═══════════════════════════════════════ */
-let _exportSource = '';
-
-function previewAndExportTwee() {
-  if (characters.length === 0) {
-    alert('No characters to export yet!');
+function startSim() {
+  geo.mode = 'sim';
+  // If rooms exist, simulate walking between their positions
+  if (rooms.length === 0) {
+    setGPSStatus('Add rooms first to simulate!');
     return;
   }
-  _exportSource = lc.buildTweeSource(characters);
-  document.getElementById('twee-source').textContent = _exportSource;
-  document.getElementById('twee-preview-overlay').classList.add('open');
+  setGPSStatus('Simulating…');
+  const path = [];
+  rooms.forEach(rm => {
+    // approach from offset, then step into radius
+    path.push({ lat: rm.lat + 0.0003, lng: rm.lng + 0.0003, heading: 200 });
+    path.push({ lat: rm.lat,           lng: rm.lng,           heading: 200 });
+    path.push({ lat: rm.lat - 0.0002, lng: rm.lng - 0.0002, heading: 200 });
+  });
+  let i = 0;
+  geo.current = { lat: path[0].lat, lng: path[0].lng };
+  geo.heading = path[0].heading;
+  onPositionUpdate();
+  const t = setInterval(() => {
+    i++;
+    if (i >= path.length) { clearInterval(t); setGPSStatus('Sim done'); return; }
+    geo.current = { lat: path[i].lat, lng: path[i].lng };
+    geo.heading = path[i].heading;
+    setGPSStatus('Sim: ' + path[i].lat.toFixed(4) + ', ' + path[i].lng.toFixed(4));
+    onPositionUpdate();
+  }, 1800);
 }
 
-function closeTweePreview() {
-  document.getElementById('twee-preview-overlay').classList.remove('open');
-}
+function setGPSStatus(msg) { document.getElementById('gps-status').textContent = 'GPS: ' + msg; }
 
-function downloadTwee() {
-  if (!_exportSource) return;
-  const blob = new Blob([_exportSource], { type: 'text/plain' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'living-characters.twee';
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
-function triggerImport() {
-  document.getElementById('twee-import-input').value = '';
-  document.getElementById('twee-import-input').click();
-}
-
-function handleImportFile(evt) {
-  const file = evt.target.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = function(e) {
-    importTweeSource(e.target.result);
-  };
-  reader.readAsText(file);
-}
-
-function importTweeSource(src) {
-  try {
-    const passages = lc.parseTweeSource(src);
-    const imported = lc.charactersFromPassages(passages);
-    if (imported.length === 0) {
-      alert('No characters found in this .twee file.\n\nMake sure root passages are tagged [char] or contain an @char directive.');
-      return;
-    }
-    const merge = confirm(
-      `Found ${imported.length} character(s):\n${imported.map(c => '• ' + c.name).join('\n')}\n\nMerge with existing characters? (Cancel = replace all)`
-    );
-    if (merge) {
-      // Replace matching names, add new ones
-      imported.forEach(function(imp) {
-        const existing = characters.findIndex(c => c.name === imp.name);
-        if (existing >= 0) {
-          // Preserve media data
-          imp.photoData = characters[existing].photoData;
-          imp.animData = characters[existing].animData;
-          characters[existing] = imp;
-        } else {
-          characters.push(imp);
-        }
-      });
+function onPositionUpdate() {
+  // Move Leaflet position marker
+  if (geo.current) {
+    if (!posMarker) {
+      posMarker = L.circleMarker([geo.current.lat, geo.current.lng], {
+        radius: 8, fillColor: '#4ade80', color: '#fff', weight: 2, fillOpacity: 1
+      }).addTo(leafletMap);
     } else {
-      characters = imported;
+      posMarker.setLatLng([geo.current.lat, geo.current.lng]);
     }
-    save();
-    renderAll();
-    alert(`✓ Imported ${imported.length} character(s).`);
-  } catch(err) {
-    alert('Import failed: ' + err.message);
+    // Auto-pan map to current position if first fix
+    if (geo.mode === 'live' && !geo._panned) {
+      leafletMap.setView([geo.current.lat, geo.current.lng], 17);
+      geo._panned = true;
+    }
+  }
+  renderCompass();
+  checkProximity();
+}
+
+function checkProximity() {
+  if (!geo.current || rooms.length === 0) return;
+  const ranked = rooms.map(rm => ({
+    ...rm,
+    dist: haversineMeters(geo.current.lat, geo.current.lng, rm.lat, rm.lng)
+  })).sort((a,b) => a.dist - b.dist);
+  const inside = ranked.find(rm => rm.dist <= rm.radius);
+  if (inside && inside.id !== activeRoomId) {
+    openRoom(inside.id);
   }
 }
 
-// ── Drag-and-drop .twee import ──
-document.addEventListener('dragover', function(e) {
-  if (Array.from(e.dataTransfer.items).some(i => i.kind === 'file')) {
-    e.preventDefault();
-    document.getElementById('drop-overlay').classList.add('active');
-  }
-});
-document.addEventListener('dragleave', function(e) {
-  if (!e.relatedTarget || e.relatedTarget === document.documentElement) {
-    document.getElementById('drop-overlay').classList.remove('active');
-  }
-});
-document.addEventListener('drop', function(e) {
-  e.preventDefault();
-  document.getElementById('drop-overlay').classList.remove('active');
-  const file = e.dataTransfer.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = function(ev) { importTweeSource(ev.target.result); };
-  reader.readAsText(file);
-});
+function renderCompass() {
+  const needle = document.getElementById('heading-needle');
+  needle.style.transform = 'rotate(' + (geo.heading || 0) + 'deg)';
+  const rose = document.getElementById('compass-rose');
+  // remove old room markers on compass rose
+  rose.querySelectorAll('.room-marker-compass').forEach(el => el.remove());
+  const list = document.getElementById('compass-list');
+  list.innerHTML = '';
 
-/* ═══════════════════════════════════════
-   INIT
-═══════════════════════════════════════ */
-function init() {
-  buildMapZones();
-  buildMoodPicker();
-  buildLocPickerZones();
-  buildDialogueBuilder();
-  renderAll();
-  initMapInteraction();
-  const wrap = document.getElementById('map-wrap');
-  panX = (wrap.clientWidth - MAP_W * scale) / 2;
-  panY = (wrap.clientHeight - MAP_H * scale) / 2;
-  applyTransform();
-}
+  if (!geo.current || rooms.length === 0) return;
 
-/* ═══════════════════════════════════════
-   MAP ZONES
-═══════════════════════════════════════ */
-function buildMapZones() {
-  const canvas = document.getElementById('map-canvas');
-  ZONES.forEach(z => {
-    const px = z.x * MAP_W, py = z.y * MAP_H;
-    const rw = z.r * MAP_W, rh = z.r * MAP_H;
-    const ring = document.createElement('div');
-    ring.className = 'loc-zone';
-    ring.style.cssText = `left:${px}px;top:${py}px;width:${rw*2}px;height:${rh*2}px;`;
-    canvas.appendChild(ring);
-    const lbl = document.createElement('div');
-    lbl.className = 'loc-label';
-    lbl.textContent = z.name;
-    lbl.style.cssText = `left:${px}px;top:${py - rh - 14}px;`;
-    canvas.appendChild(lbl);
+  const annotated = rooms.map(rm => {
+    const dist = haversineMeters(geo.current.lat, geo.current.lng, rm.lat, rm.lng);
+    const bearing = bearingDegrees(geo.current.lat, geo.current.lng, rm.lat, rm.lng);
+    const relative = ((bearing - (geo.heading || 0)) % 360 + 360) % 360;
+    return { ...rm, dist, bearing, relative };
+  }).sort((a,b) => a.dist - b.dist);
+
+  annotated.forEach((rm, i) => {
+    // compass rose dot
+    const marker = document.createElement('div');
+    marker.className = 'room-marker-compass' + (i === 0 ? ' nearest' : '');
+    marker.style.transform = 'rotate(' + rm.relative + 'deg)';
+    marker.innerHTML = '<div class="dot" title="' + rm.name + '"></div>';
+    rose.appendChild(marker);
+
+    // list entry
+    const li = document.createElement('div');
+    li.className = 'compass-list-item' + (rm.dist <= rm.radius ? ' inside' : '');
+    li.innerHTML = '<span class="room-name">' + rm.name + '</span><span>' + Math.round(rm.dist) + ' m</span>';
+    list.appendChild(li);
   });
 }
 
-/* ═══════════════════════════════════════
-   RENDER PINS
-═══════════════════════════════════════ */
-function renderAll() {
-  document.querySelectorAll('.pin-wrap').forEach(p => p.remove());
-  characters.forEach(ch => renderPin(ch));
+/* ════════════════════════════════════════════════════════
+   LEAFLET MAP
+════════════════════════════════════════════════════════ */
+const DEFAULT_CENTER = [44.6488, -63.5752]; // Halifax — overridden by GPS or room positions
+const DEFAULT_ZOOM   = 16;
+
+const leafletMap = L.map('map').setView(DEFAULT_CENTER, DEFAULT_ZOOM);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '© OpenStreetMap contributors',
+  maxZoom: 19,
+}).addTo(leafletMap);
+
+let posMarker = null;
+const roomLayers = {}; // id → { circle, marker }
+
+function renderRoomsOnMap() {
+  // Remove old layers
+  Object.values(roomLayers).forEach(l => { l.circle.remove(); l.marker.remove(); });
+  Object.keys(roomLayers).forEach(k => delete roomLayers[k]);
+
+  rooms.forEach(rm => {
+    const circle = L.circle([rm.lat, rm.lng], {
+      radius: rm.radius,
+      color: '#f5a623', fillColor: '#f5a623', fillOpacity: 0.08, weight: 2,
+    }).addTo(leafletMap);
+
+    const icon = L.divIcon({
+      className: '',
+      html: '<div style="background:#0f3460;border:2px solid #f5a623;border-radius:8px;padding:4px 8px;color:#f5a623;font-size:11px;font-weight:700;white-space:nowrap;backdrop-filter:blur(4px)">' + rm.name + '</div>',
+      iconAnchor: [0, 0],
+    });
+    const marker = L.marker([rm.lat, rm.lng], { icon }).addTo(leafletMap);
+    marker.on('click', () => openRoom(rm.id));
+
+    roomLayers[rm.id] = { circle, marker };
+  });
 }
 
-function renderPin(ch) {
-  const canvas = document.getElementById('map-canvas');
-  const mood = MOODS.find(m => m.label === ch.mood) || MOODS[0];
-  const px = ch.x * MAP_W;
-  const py = ch.y * MAP_H;
+/* ════════════════════════════════════════════════════════
+   ROOM VIEW
+════════════════════════════════════════════════════════ */
+function openRoom(roomId) {
+  const rm = rooms.find(r => r.id === roomId);
+  if (!rm) return;
+  activeRoomId = roomId;
+  document.getElementById('room-title').textContent = rm.name;
+  document.getElementById('room-lede').textContent  = rm.lede || '';
 
-  const wrap = document.createElement('div');
-  wrap.className = 'pin-wrap';
-  wrap.style.cssText = `position:absolute;left:${px}px;top:${py}px;`;
+  const stage = document.getElementById('room-stage');
+  stage.style.background = BACKDROP_GRADIENTS[rm.backdrop] || BACKDROP_GRADIENTS.stone;
+  stage.innerHTML = '';
 
-  const pin = document.createElement('div');
-  pin.className = 'pin' + (selectedId === ch.id ? ' selected' : '');
-  pin.dataset.id = ch.id;
+  // Place characters that belong to this room
+  const roomChars = characters.filter(ch => ch.roomId === roomId);
+  const count = roomChars.length;
+  roomChars.forEach((ch, i) => {
+    const mood = MOODS.find(m => m.label === ch.mood) || MOODS[0];
+    // Arrange in a loose arc
+    const angle = (i / Math.max(count, 1)) * Math.PI * 2 - Math.PI / 2;
+    const rx = 0.5 + Math.cos(angle) * 0.28;
+    const ry = 0.5 + Math.sin(angle) * 0.22;
+    const pin = document.createElement('div');
+    pin.className = 'room-char-pin';
+    pin.style.left = (rx * 100) + '%';
+    pin.style.top  = (ry * 100) + '%';
+    pin.innerHTML = (
+      '<div class="mood-ring" style="border-color:' + mood.color + '"></div>' +
+      '<div class="avatar">' + (ch.photoData ? '<img src="' + ch.photoData + '" alt="' + esc(ch.name) + '">' : '🧸') + '</div>' +
+      '<div class="name-tag">' + esc(ch.name) + '</div>'
+    );
+    pin.addEventListener('click', () => selectCharacter(ch.id));
+    pin.addEventListener('mouseenter', e => showTooltip(e, ch));
+    pin.addEventListener('mouseleave', hideTooltip);
+    pin.addEventListener('mousemove',  e => moveTooltip(e));
+    stage.appendChild(pin);
+  });
 
-  if (ch.photoData) {
-    const img = document.createElement('img');
-    img.src = ch.photoData;
-    img.alt = ch.name;
-    pin.appendChild(img);
-  } else {
-    pin.style.cssText += 'display:flex;align-items:center;justify-content:center;font-size:24px;';
-    pin.textContent = '🧸';
+  if (roomChars.length === 0) {
+    stage.innerHTML = '<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:rgba(255,255,255,.3);font-size:14px;text-align:center">No characters in this room yet.<br><small>Add one with + Character</small></div>';
   }
 
-  const ring = document.createElement('div');
-  ring.className = 'mood-ring';
-  ring.style.borderColor = mood.color;
-  pin.appendChild(ring);
-
-  pin.addEventListener('click', (e) => { e.stopPropagation(); selectCharacter(ch.id); });
-  pin.addEventListener('mouseenter', (e) => showTooltip(e, ch));
-  pin.addEventListener('mouseleave', hideTooltip);
-  pin.addEventListener('mousemove', (e) => moveTooltip(e));
-
-  const lbl = document.createElement('div');
-  lbl.className = 'pin-label';
-  lbl.style.cssText = 'position:absolute;bottom:calc(26px + 6px);left:50%;transform:translateX(-50%);';
-  lbl.textContent = ch.name;
-
-  wrap.appendChild(pin);
-  wrap.appendChild(lbl);
-  canvas.appendChild(wrap);
+  document.getElementById('room-view').classList.add('open');
 }
 
-/* ═══════════════════════════════════════
-   SELECT / CARD
-═══════════════════════════════════════ */
+function closeRoom() {
+  document.getElementById('room-view').classList.remove('open');
+  closeCard();
+  activeRoomId = null;
+}
+
+/* ════════════════════════════════════════════════════════
+   CHARACTER CARD
+════════════════════════════════════════════════════════ */
 function selectCharacter(id) {
-  selectedId = id;
+  selectedCharId = id;
   const ch = characters.find(c => c.id === id);
   if (!ch) return;
-  document.querySelectorAll('.pin').forEach(p => p.classList.remove('selected'));
-  const pin = document.querySelector(`.pin[data-id="${id}"]`);
-  if (pin) pin.classList.add('selected');
-
   const mood = MOODS.find(m => m.label === ch.mood) || MOODS[0];
-  document.getElementById('card-name').textContent = ch.name;
-  document.getElementById('card-location').textContent = ch.lede || nearestZone(ch.x, ch.y);
+  const rm   = rooms.find(r => r.id === ch.roomId);
+  document.getElementById('card-name').textContent     = ch.name;
+  document.getElementById('card-location').textContent = rm ? rm.name : 'Somewhere';
   document.getElementById('card-mood-dot').style.background = mood.color;
   document.getElementById('card-mood-text').textContent = mood.emoji + ' ' + mood.label;
-
-  const animEl = document.getElementById('card-anim');
-  animEl.innerHTML = ch.animData
-    ? `<img src="${ch.animData}" alt="${ch.name} animation" />`
+  document.getElementById('card-anim').innerHTML = ch.animData
+    ? '<img src="' + ch.animData + '" alt="' + esc(ch.name) + '" />'
     : '<div class="placeholder">🧸</div>';
-
-  const photoEl = document.getElementById('card-photo');
-  photoEl.innerHTML = ch.photoData ? `<img src="${ch.photoData}" alt="${ch.name}" />` : '';
-
   const itemsList = document.getElementById('card-items-list');
   itemsList.innerHTML = '';
   (ch.items || []).forEach(it => {
     const chip = document.createElement('span');
-    chip.className = 'item-chip';
-    chip.textContent = it;
+    chip.className = 'item-chip'; chip.textContent = it;
     itemsList.appendChild(chip);
   });
-
-  // Render dialogue passages
-  const passageList = document.getElementById('card-passage-list');
-  passageList.innerHTML = '';
+  const pl = document.getElementById('card-passage-list');
+  pl.innerHTML = '';
   const passages = ch.passages || {};
   const hasAny = PROMPT_TYPES.some(pt => passages[pt.key] && passages[pt.key].trim());
   if (!hasAny) {
-    if (ch.dialogue) {
-      const block = document.createElement('div');
-      block.className = 'dialogue-block';
-      block.innerHTML = `<div class="passage-type">Says</div><div class="passage-text">${escHtml(ch.dialogue)}</div>`;
-      passageList.appendChild(block);
-    } else {
-      passageList.innerHTML = '<div style="font-size:12px;color:var(--text-muted)">No dialogue yet.</div>';
-    }
+    pl.innerHTML = ch.dialogue
+      ? '<div class="dialogue-block"><div class="passage-type">Says</div><div class="passage-text">' + esc(ch.dialogue) + '</div></div>'
+      : '<div style="font-size:12px;color:var(--text-muted)">No dialogue yet.</div>';
   } else {
     PROMPT_TYPES.forEach(pt => {
-      const text = (passages[pt.key] || '').trim();
-      if (!text) return;
-      const block = document.createElement('div');
-      block.className = 'dialogue-block';
-      block.innerHTML = `<div class="passage-type">${pt.label}</div><div class="passage-text">${escHtml(text)}</div>`;
-      passageList.appendChild(block);
+      const txt = (passages[pt.key] || '').trim();
+      if (!txt) return;
+      const b = document.createElement('div');
+      b.className = 'dialogue-block';
+      b.innerHTML = '<div class="passage-type">' + pt.label + '</div><div class="passage-text">' + esc(txt) + '</div>';
+      pl.appendChild(b);
     });
   }
-
   document.getElementById('card').classList.add('open');
 }
 
 function closeCard() {
   document.getElementById('card').classList.remove('open');
-  selectedId = null;
-  document.querySelectorAll('.pin').forEach(p => p.classList.remove('selected'));
+  selectedCharId = null;
 }
 
-function nearestZone(x, y) {
-  let best = null, bestD = Infinity;
-  ZONES.forEach(z => {
-    const d = Math.hypot(x - z.x, y - z.y);
-    if (d < bestD) { bestD = d; best = z.name; }
+function editSelectedChar()  { if (selectedCharId) openCharModal(selectedCharId); }
+function deleteSelectedChar() {
+  if (!selectedCharId) return;
+  if (!confirm('Remove this character?')) return;
+  characters = characters.filter(c => c.id !== selectedCharId);
+  save(); closeCard();
+  if (activeRoomId) openRoom(activeRoomId); // re-render room
+}
+
+/* ════════════════════════════════════════════════════════
+   ROOM MODAL
+════════════════════════════════════════════════════════ */
+let roomPickerMap = null, roomPickerMarker = null;
+
+function openRoomModal(id) {
+  editingRoomId = id;
+  document.getElementById('room-modal-title').textContent = id ? 'Edit Room' : 'Add a Room';
+  const rm = id ? rooms.find(r => r.id === id) : null;
+  document.getElementById('rf-name').value    = rm ? rm.name    : '';
+  document.getElementById('rf-lede').value    = rm ? rm.lede    : '';
+  document.getElementById('rf-radius').value  = rm ? rm.radius  : 30;
+  document.getElementById('rf-lat').value     = rm ? rm.lat     : '';
+  document.getElementById('rf-lng').value     = rm ? rm.lng     : '';
+  document.getElementById('rf-backdrop').value= rm ? rm.backdrop: 'stone';
+  document.getElementById('room-modal-overlay').classList.add('open');
+  setTimeout(() => {
+    if (!roomPickerMap) {
+      roomPickerMap = L.map('room-latlng-map').setView(
+        rm ? [rm.lat, rm.lng] : DEFAULT_CENTER, 16
+      );
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(roomPickerMap);
+      roomPickerMap.on('click', e => {
+        document.getElementById('rf-lat').value = e.latlng.lat.toFixed(6);
+        document.getElementById('rf-lng').value = e.latlng.lng.toFixed(6);
+        if (roomPickerMarker) roomPickerMarker.setLatLng(e.latlng);
+        else roomPickerMarker = L.marker(e.latlng).addTo(roomPickerMap);
+      });
+    } else {
+      roomPickerMap.invalidateSize();
+    }
+    if (rm) {
+      const ll = [rm.lat, rm.lng];
+      roomPickerMap.setView(ll, 17);
+      if (roomPickerMarker) roomPickerMarker.setLatLng(ll);
+      else roomPickerMarker = L.marker(ll).addTo(roomPickerMap);
+    }
+  }, 50);
+}
+
+function closeRoomModal() {
+  document.getElementById('room-modal-overlay').classList.remove('open');
+}
+
+function saveRoom() {
+  const name    = document.getElementById('rf-name').value.trim();
+  const lat     = parseFloat(document.getElementById('rf-lat').value);
+  const lng     = parseFloat(document.getElementById('rf-lng').value);
+  const radius  = parseInt(document.getElementById('rf-radius').value) || 30;
+  const lede    = document.getElementById('rf-lede').value.trim();
+  const backdrop= document.getElementById('rf-backdrop').value;
+  if (!name)         { alert('Please give the room a name.'); return; }
+  if (isNaN(lat) || isNaN(lng)) { alert('Please click the map to place the room.'); return; }
+  if (editingRoomId) {
+    const rm = rooms.find(r => r.id === editingRoomId);
+    Object.assign(rm, { name, lat, lng, radius, lede, backdrop });
+  } else {
+    rooms.push({ id: Date.now() + '_r', name, lat, lng, radius, lede, backdrop });
+  }
+  save(); renderRoomsOnMap(); populateRoomSelect(); closeRoomModal();
+}
+
+/* ════════════════════════════════════════════════════════
+   CHARACTER MODAL
+════════════════════════════════════════════════════════ */
+function openCharModal(id) {
+  editingCharId = id;
+  tempPhotoData = null; tempAnimData = null;
+  document.getElementById('char-modal-title').textContent = id ? 'Edit Character' : 'Add a Character';
+  populateRoomSelect();
+  if (id) {
+    const ch = characters.find(c => c.id === id);
+    document.getElementById('cf-name').value  = ch.name;
+    document.getElementById('cf-items').value = (ch.items || []).join(', ');
+    document.getElementById('cf-room').value  = ch.roomId || '';
+    activeMood = ch.mood || MOODS[0].label;
+    document.querySelectorAll('.mood-opt').forEach(b => b.classList.toggle('active', b.textContent.includes(activeMood)));
+    tempPhotoData = ch.photoData || null;
+    tempAnimData  = ch.animData  || null;
+    if (ch.photoData) { document.getElementById('cf-photo-preview').src = ch.photoData; document.getElementById('cf-photo-preview').style.display = ''; }
+    if (ch.animData)  { document.getElementById('cf-anim-preview').src  = ch.animData;  document.getElementById('cf-anim-preview').style.display  = ''; }
+    populateDialogueBuilder(ch.passages || {});
+  } else {
+    document.getElementById('cf-name').value  = '';
+    document.getElementById('cf-items').value = '';
+    document.getElementById('cf-room').value  = activeRoomId || '';
+    document.getElementById('cf-photo-preview').style.display = 'none';
+    document.getElementById('cf-anim-preview').style.display  = 'none';
+    activeMood = MOODS[0].label;
+    document.querySelectorAll('.mood-opt').forEach((b,i) => b.classList.toggle('active', i===0));
+    populateDialogueBuilder({});
+  }
+  document.getElementById('char-modal-overlay').classList.add('open');
+}
+
+function closeCharModal() {
+  document.getElementById('char-modal-overlay').classList.remove('open');
+}
+
+function saveCharacter() {
+  const name   = document.getElementById('cf-name').value.trim();
+  const roomId = document.getElementById('cf-room').value || null;
+  const items  = document.getElementById('cf-items').value.split(',').map(s=>s.trim()).filter(Boolean);
+  const passages = getDialogueFromBuilder();
+  const dialogue = passages.hello || Object.values(passages).find(v=>v) || '';
+  if (!name) { alert('Please give this character a name.'); return; }
+  if (editingCharId) {
+    const ch = characters.find(c => c.id === editingCharId);
+    Object.assign(ch, { name, roomId, items, dialogue, passages, mood: activeMood });
+    if (tempPhotoData) ch.photoData = tempPhotoData;
+    if (tempAnimData)  ch.animData  = tempAnimData;
+  } else {
+    characters.push({ id: Date.now()+'', name, mood: activeMood, roomId, items, dialogue, passages, photoData: tempPhotoData, animData: tempAnimData });
+  }
+  save(); closeCharModal();
+  if (activeRoomId) openRoom(activeRoomId);
+  else if (editingCharId) selectCharacter(editingCharId);
+}
+
+function populateRoomSelect() {
+  const sel = document.getElementById('cf-room');
+  const val = sel.value;
+  sel.innerHTML = '<option value="">— choose a room —</option>';
+  rooms.forEach(rm => {
+    const opt = document.createElement('option');
+    opt.value = rm.id; opt.textContent = rm.name;
+    sel.appendChild(opt);
   });
-  return best || 'The World';
+  sel.value = val;
 }
 
-function escHtml(str) {
-  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
-
-/* ═══════════════════════════════════════
-   TOOLTIP
-═══════════════════════════════════════ */
-const tt = document.getElementById('tooltip');
-function showTooltip(e, ch) {
-  const mood = MOODS.find(m => m.label === ch.mood) || MOODS[0];
-  document.getElementById('tt-name').textContent = ch.name;
-  document.getElementById('tt-loc').textContent = nearestZone(ch.x, ch.y);
-  document.getElementById('tt-mood').textContent = mood.emoji + ' ' + mood.label;
-  tt.classList.add('show');
-  moveTooltip(e);
-}
-function moveTooltip(e) {
-  tt.style.left = (e.clientX + 14) + 'px';
-  tt.style.top = (e.clientY - 20) + 'px';
-}
-function hideTooltip() { tt.classList.remove('show'); }
-
-/* ═══════════════════════════════════════
+/* ════════════════════════════════════════════════════════
    MOOD PICKER
-═══════════════════════════════════════ */
+════════════════════════════════════════════════════════ */
 function buildMoodPicker() {
   const picker = document.getElementById('mood-picker');
   MOODS.forEach(m => {
@@ -1269,336 +947,309 @@ function buildMoodPicker() {
   });
 }
 
-/* ═══════════════════════════════════════
+/* ════════════════════════════════════════════════════════
    DIALOGUE BUILDER
-═══════════════════════════════════════ */
+════════════════════════════════════════════════════════ */
 function buildDialogueBuilder() {
-  const builder = document.getElementById('dialogue-builder');
-  builder.innerHTML = '';
+  const el = document.getElementById('dialogue-builder');
+  el.innerHTML = '';
   PROMPT_TYPES.forEach(pt => {
     const row = document.createElement('div');
     row.className = 'prompt-row';
-
     const pill = document.createElement('span');
-    pill.className = 'prompt-pill';
-    pill.textContent = pt.label;
-    pill.title = pt.hint;
+    pill.className = 'prompt-pill'; pill.textContent = pt.label;
     pill.dataset.key = pt.key;
     pill.onclick = () => pill.classList.toggle('active');
-
     const ta = document.createElement('textarea');
-    ta.className = 'prompt-input';
-    ta.id = 'prompt-' + pt.key;
-    ta.placeholder = pt.placeholder;
-    ta.rows = 2;
-    ta.addEventListener('input', () => {
-      if (ta.value.trim()) pill.classList.add('active');
-      else pill.classList.remove('active');
-    });
-
-    row.appendChild(pill);
-    row.appendChild(ta);
-    builder.appendChild(row);
-
+    ta.className = 'prompt-input'; ta.id = 'prompt-' + pt.key;
+    ta.placeholder = pt.placeholder; ta.rows = 2;
+    ta.addEventListener('input', () => pill.classList.toggle('active', !!ta.value.trim()));
+    row.appendChild(pill); row.appendChild(ta);
+    el.appendChild(row);
     const hint = document.createElement('div');
-    hint.className = 'prompt-hint';
-    hint.textContent = pt.hint;
-    builder.appendChild(hint);
+    hint.className = 'prompt-hint'; hint.textContent = pt.hint;
+    el.appendChild(hint);
   });
 }
 
 function getDialogueFromBuilder() {
-  const passages = {};
-  PROMPT_TYPES.forEach(pt => {
-    const val = (document.getElementById('prompt-' + pt.key) || {}).value || '';
-    passages[pt.key] = val.trim();
-  });
-  return passages;
+  const p = {};
+  PROMPT_TYPES.forEach(pt => { p[pt.key] = (document.getElementById('prompt-' + pt.key)||{}).value?.trim() || ''; });
+  return p;
 }
 
 function populateDialogueBuilder(passages) {
-  passages = passages || {};
   PROMPT_TYPES.forEach(pt => {
-    const ta = document.getElementById('prompt-' + pt.key);
-    const pill = document.querySelector(`.prompt-pill[data-key="${pt.key}"]`);
+    const ta   = document.getElementById('prompt-' + pt.key);
+    const pill = document.querySelector('.prompt-pill[data-key="' + pt.key + '"]');
     if (ta) {
-      ta.value = passages[pt.key] || '';
-      if (pill) pill.classList.toggle('active', !!(passages[pt.key] && passages[pt.key].trim()));
+      ta.value = (passages[pt.key] || '');
+      if (pill) pill.classList.toggle('active', !!(passages[pt.key]||'').trim());
     }
   });
 }
 
-/* ═══════════════════════════════════════
-   MODAL OPEN / CLOSE
-═══════════════════════════════════════ */
-function openModal(id) {
-  editingId = id;
-  tempPhotoData = null;
-  tempAnimData = null;
-  lpX = null; lpY = null;
-  document.getElementById('modal-title').textContent = id ? 'Edit Character' : 'Add a Character';
-  if (id) {
-    const ch = characters.find(c => c.id === id);
-    document.getElementById('f-name').value = ch.name;
-    document.getElementById('f-items').value = (ch.items || []).join(', ');
-    activeMood = ch.mood || MOODS[0].label;
-    document.querySelectorAll('.mood-opt').forEach(b => {
-      b.classList.toggle('active', b.textContent.includes(activeMood));
-    });
-    if (ch.photoData) {
-      document.getElementById('f-photo-preview').src = ch.photoData;
-      document.getElementById('f-photo-preview').style.display = '';
-      tempPhotoData = ch.photoData;
+/* ════════════════════════════════════════════════════════
+   TWEE PIPELINE (unchanged from previous commit)
+════════════════════════════════════════════════════════ */
+const lc = {};
+
+lc.parse = function(text) {
+  const lines = text.split('\n');
+  const meta = { x:null, y:null, lat:null, lng:null, radius:30, mood:null, zone:null, room:null, lede:'', items:[], after:null, then:null };
+  const body = [];
+  lines.forEach(l => {
+    const t = l.trim();
+    if      (t.startsWith('@char '))    { const p=t.slice(6).split(',').map(v=>parseFloat(v)); meta.x=p[0]; meta.y=p[1]; }
+    else if (t.startsWith('@room '))   {
+      // @room lat,lng  OR  @room RoomName
+      const v = t.slice(6).trim();
+      const nums = v.split(',').map(Number);
+      if (nums.length === 2 && !isNaN(nums[0]) && !isNaN(nums[1])) { meta.lat=nums[0]; meta.lng=nums[1]; }
+      else meta.room = v;
     }
-    if (ch.animData) {
-      document.getElementById('f-anim-preview').src = ch.animData;
-      document.getElementById('f-anim-preview').style.display = '';
-      tempAnimData = ch.animData;
-    }
-    lpX = ch.x; lpY = ch.y;
-    updateLocLabel(); updateLPCrosshair();
-    populateDialogueBuilder(ch.passages || {});
-  } else {
-    document.getElementById('f-name').value = '';
-    document.getElementById('f-items').value = '';
-    document.getElementById('f-photo-preview').style.display = 'none';
-    document.getElementById('f-anim-preview').style.display = 'none';
-    activeMood = MOODS[0].label;
-    document.querySelectorAll('.mood-opt').forEach((b, i) => b.classList.toggle('active', i === 0));
-    document.getElementById('f-loc-label').textContent = 'Click the map above to choose a spot.';
-    document.getElementById('lp-crosshair').style.display = 'none';
-    populateDialogueBuilder({});
+    else if (t.startsWith('@radius ')) { meta.radius = Number(t.slice(8).trim()); }
+    else if (t.startsWith('@mood '))   { meta.mood = t.slice(6).trim(); }
+    else if (t.startsWith('@zone '))   { meta.zone = t.slice(6).trim(); }
+    else if (t.startsWith('@items '))  { meta.items = t.slice(7).split(',').map(s=>s.trim()).filter(Boolean); }
+    else if (t.startsWith('@lede '))   { meta.lede = t.slice(6).trim(); }
+    else if (t.startsWith('@after '))  { meta.after = Number(t.slice(7)); }
+    else if (t.startsWith('@then '))   { meta.then = t.slice(6).trim(); }
+    else { body.push(l); }
+  });
+  meta.body = body.join('\n').trim();
+  return meta;
+};
+
+lc.getLinkedTargets = function(text) {
+  const targets=[], seen={};
+  let m, re=/\[\[(.+?)\]\]/g;
+  while((m=re.exec(text))!==null){
+    let raw=m[1].trim(), target=raw;
+    if(raw.includes('->')) target=raw.split('->')[1].trim();
+    else if(raw.includes('<-')) target=raw.split('<-')[0].trim();
+    else if(raw.includes('|')) target=raw.split('|')[1].trim();
+    else if(raw.includes('→')) target=raw.split('→')[1].trim();
+    else if(raw.includes('←')) target=raw.split('←')[0].trim();
+    if(target&&!seen[target]){seen[target]=true;targets.push(target);}
   }
-  document.getElementById('modal-overlay').classList.add('open');
-}
+  return targets;
+};
 
-function closeModal() {
-  document.getElementById('modal-overlay').classList.remove('open');
-}
+lc.parseTweeSource = function(src) {
+  const re=/^::\s*(.+?)(?:\s*\[([^\]]*)\])?\s*$/m;
+  return src.split(/^(?=::)/m).filter(s=>s.trim()).map(section=>{
+    const fl=section.split('\n')[0], m=fl.match(re);
+    if(!m) return null;
+    return { name:m[1].trim(), tags:(m[2]?m[2].split(/\s+/).filter(Boolean):[]), text:section.slice(fl.length+1).trimEnd() };
+  }).filter(Boolean);
+};
 
-function previewFile(inputId, previewId, dataKey) {
-  const file = document.getElementById(inputId).files[0];
-  if (!file) return;
+lc.roomsFromPassages = function(passages) {
+  const byName={}; passages.forEach(p=>{byName[p.name]=p;});
+  return passages.filter(p=>p.tags.includes('room')||(p.text.includes('@room ')&&p.text.split('\n').some(l=>l.trim().startsWith('@room ')&&l.trim().split(',').length===2&&!isNaN(Number(l.trim().split(',')[1]))))) .map((p,i)=>{
+    const meta=lc.parse(p.text);
+    if(meta.lat===null) return null;
+    return { id:'room_twee_'+i, name:p.name.replace(/_/g,' '), lat:meta.lat, lng:meta.lng, radius:meta.radius||30, lede:meta.lede||'', backdrop:'stone' };
+  }).filter(Boolean);
+};
+
+lc.charactersFromPassages = function(passages) {
+  const byName={}; passages.forEach(p=>{byName[p.name]=p;});
+  const roots=passages.filter(p=>p.tags.includes('char')||p.text.indexOf('@char ')!==-1);
+  return roots.map((root,idx)=>{
+    const meta=lc.parse(root.text);
+    const moodLabel=meta.mood?MOODS.find(m=>m.label.toLowerCase()===meta.mood.toLowerCase())?.label||MOODS[0].label:MOODS[0].label;
+    const passDat={};
+    PROMPT_TYPES.forEach(pt=>{
+      const c=byName[root.name+'-'+pt.key]||byName[root.name.replace(/\s/g,'_')+'-'+pt.key];
+      if(c){const sm=lc.parse(c.text);passDat[pt.key]=sm.body||c.text.trim();}
+      else passDat[pt.key]='';
+    });
+    if(!passDat.hello&&meta.body) passDat.hello=meta.body;
+    // Find roomId by name
+    const roomByName = meta.room ? rooms.find(r=>r.name===meta.room||r.name===meta.room.replace(/_/g,' ')) : null;
+    return { id:Date.now()+'_c'+idx, name:root.name.replace(/_/g,' '), mood:moodLabel, roomId:roomByName?roomByName.id:null, items:meta.items, lede:meta.lede, dialogue:passDat.hello||'', passages:passDat, photoData:null, animData:null };
+  });
+};
+
+lc.buildTweeSource = function(rms, chars) {
+  const lines=[];
+  lines.push(':: StoryTitle'); lines.push('Living Characters'); lines.push('');
+  lines.push(':: StoryData');
+  lines.push(JSON.stringify({ifid:'LC-'+Date.now(),format:'SugarCube','format-version':'2.36.1',start:'Start'},null,2));
+  lines.push('');
+  lines.push(':: Start');
+  lines.push('Rooms in this world:'); lines.push('');
+  rms.forEach(rm=>lines.push('[['+rm.name+'→'+rm.name.replace(/\s/g,'_')+'_room]]'));
+  lines.push('');
+
+  // Room passages
+  rms.forEach(rm=>{
+    const safe=rm.name.replace(/\s/g,'_');
+    lines.push(':: '+safe+'_room [room]');
+    lines.push('@room '+rm.lat.toFixed(6)+','+rm.lng.toFixed(6));
+    lines.push('@radius '+rm.radius);
+    if(rm.lede) lines.push('@lede '+rm.lede);
+    lines.push('');
+    const roomChars=chars.filter(c=>c.roomId===rm.id);
+    roomChars.forEach(ch=>lines.push('[['+ch.name+'→'+ch.name.replace(/\s/g,'_')+']]'));
+    lines.push('');
+  });
+
+  // Character passages
+  chars.forEach(ch=>{
+    const safe=ch.name.replace(/\s/g,'_');
+    const rm=rms.find(r=>r.id===ch.roomId);
+    const mood=MOODS.find(m=>m.label===ch.mood)||MOODS[0];
+    lines.push(':: '+safe+' [char]');
+    if(rm) lines.push('@room '+rm.name);
+    lines.push('@mood '+ch.mood);
+    if(ch.items&&ch.items.length) lines.push('@items '+ch.items.join(', '));
+    if(ch.lede) lines.push('@lede '+ch.lede);
+    lines.push('');
+    const filled=PROMPT_TYPES.filter(pt=>ch.passages&&ch.passages[pt.key]&&ch.passages[pt.key].trim());
+    if(filled.length>0) filled.forEach(pt=>lines.push('[['+pt.label+'→'+safe+'-'+pt.key+']]'));
+    else if(ch.dialogue) lines.push(ch.dialogue);
+    lines.push('');
+    PROMPT_TYPES.forEach(pt=>{
+      const txt=(ch.passages&&ch.passages[pt.key])||'';
+      if(!txt.trim()) return;
+      lines.push(':: '+safe+'-'+pt.key);
+      lines.push(txt.trim()); lines.push('');
+      lines.push('[[← Back→'+safe+']]'); lines.push('');
+    });
+    if(ch.items&&ch.items.length>0){
+      ch.items.forEach(item=>{
+        const si=item.replace(/\s+/g,'-').replace(/[^a-zA-Z0-9-]/g,'').toLowerCase();
+        lines.push(':: '+safe+'-item-'+si);
+        lines.push(ch.name+' holds the '+item+'.'); lines.push('');
+        lines.push('[[← Back→'+safe+']]'); lines.push('');
+      });
+    }
+  });
+  return lines.join('\n');
+};
+
+/* ════════════════════════════════════════════════════════
+   IMPORT / EXPORT
+════════════════════════════════════════════════════════ */
+let _exportSource = '';
+
+function previewTwee() {
+  _exportSource = lc.buildTweeSource(rooms, characters);
+  document.getElementById('twee-source').textContent = _exportSource;
+  document.getElementById('twee-preview-overlay').classList.add('open');
+}
+function closeTweePreview() { document.getElementById('twee-preview-overlay').classList.remove('open'); }
+function downloadTwee() {
+  if (!_exportSource) return;
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([_exportSource],{type:'text/plain'}));
+  a.download = 'living-characters.twee'; a.click();
+}
+function triggerImport() { document.getElementById('twee-import-input').value=''; document.getElementById('twee-import-input').click(); }
+function handleImportFile(evt) {
+  const file = evt.target.files[0]; if(!file) return;
   const reader = new FileReader();
-  reader.onload = (e) => {
+  reader.onload = e => importTweeSource(e.target.result);
+  reader.readAsText(file);
+}
+function importTweeSource(src) {
+  try {
+    const passages = lc.parseTweeSource(src);
+    const importedRooms = lc.roomsFromPassages(passages);
+    const importedChars = lc.charactersFromPassages(passages);
+    const merge = importedRooms.length + importedChars.length > 0
+      ? confirm('Import '+importedRooms.length+' room(s) and '+importedChars.length+' character(s)?\n\nMerge? (Cancel = replace all)')
+      : false;
+    if (!merge) { rooms = importedRooms; characters = importedChars; }
+    else {
+      importedRooms.forEach(ir => { const x=rooms.findIndex(r=>r.name===ir.name); if(x>=0) rooms[x]=ir; else rooms.push(ir); });
+      importedChars.forEach(ic => { const x=characters.findIndex(c=>c.name===ic.name); if(x>=0){ic.photoData=characters[x].photoData;ic.animData=characters[x].animData;characters[x]=ic;}else characters.push(ic); });
+    }
+    save(); renderRoomsOnMap(); populateRoomSelect();
+    alert('✓ Imported ' + importedRooms.length + ' room(s) and ' + importedChars.length + ' character(s).');
+  } catch(err) { alert('Import failed: '+err.message); }
+}
+
+document.addEventListener('dragover', e => { if([...e.dataTransfer.items].some(i=>i.kind==='file')){e.preventDefault();document.getElementById('drop-overlay').classList.add('active');} });
+document.addEventListener('dragleave', e => { if(!e.relatedTarget||e.relatedTarget===document.documentElement) document.getElementById('drop-overlay').classList.remove('active'); });
+document.addEventListener('drop', e => { e.preventDefault(); document.getElementById('drop-overlay').classList.remove('active'); const f=e.dataTransfer.files[0]; if(!f) return; const r=new FileReader(); r.onload=ev=>importTweeSource(ev.target.result); r.readAsText(f); });
+
+/* ════════════════════════════════════════════════════════
+   TOOLTIP
+════════════════════════════════════════════════════════ */
+const ttEl = document.getElementById('tooltip');
+function showTooltip(e,ch) {
+  const mood=MOODS.find(m=>m.label===ch.mood)||MOODS[0];
+  const rm=rooms.find(r=>r.id===ch.roomId);
+  document.getElementById('tt-name').textContent = ch.name;
+  document.getElementById('tt-loc').textContent  = rm?rm.name:'?';
+  document.getElementById('tt-mood').textContent = mood.emoji+' '+mood.label;
+  ttEl.classList.add('show'); moveTooltip(e);
+}
+function moveTooltip(e) { ttEl.style.left=(e.clientX+14)+'px'; ttEl.style.top=(e.clientY-20)+'px'; }
+function hideTooltip()  { ttEl.classList.remove('show'); }
+
+/* ════════════════════════════════════════════════════════
+   UTILS
+════════════════════════════════════════════════════════ */
+function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function previewFile(inputId, previewId, dataKey) {
+  const file = document.getElementById(inputId).files[0]; if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
     const data = e.target.result;
-    if (dataKey === 'photoData') tempPhotoData = data;
-    else tempAnimData = data;
-    const img = document.getElementById(previewId);
-    img.src = data; img.style.display = '';
+    if(dataKey==='photoData') tempPhotoData=data; else tempAnimData=data;
+    const img = document.getElementById(previewId); img.src=data; img.style.display='';
   };
   reader.readAsDataURL(file);
 }
-
-function saveCharacter() {
-  const name = document.getElementById('f-name').value.trim();
-  if (!name) { alert('Please give this character a name.'); return; }
-  if (lpX === null) { alert('Please click the map to choose a location.'); return; }
-  const items = document.getElementById('f-items').value.split(',').map(s => s.trim()).filter(Boolean);
-  const passages = getDialogueFromBuilder();
-  const dialogue = passages.hello || Object.values(passages).find(v => v) || '';
-
-  if (editingId) {
-    const ch = characters.find(c => c.id === editingId);
-    ch.name = name; ch.items = items; ch.dialogue = dialogue;
-    ch.mood = activeMood; ch.x = lpX; ch.y = lpY;
-    ch.passages = passages;
-    if (tempPhotoData) ch.photoData = tempPhotoData;
-    if (tempAnimData) ch.animData = tempAnimData;
-  } else {
-    characters.push({
-      id: Date.now() + '', name, mood: activeMood,
-      x: lpX, y: lpY, items, dialogue, passages,
-      photoData: tempPhotoData, animData: tempAnimData
-    });
-  }
-  save(); renderAll(); closeModal();
-  if (editingId) selectCharacter(editingId);
+function save() {
+  localStorage.setItem('lc_rooms',  JSON.stringify(rooms));
+  localStorage.setItem('lc_chars',  JSON.stringify(characters));
 }
 
-function editSelected() { if (selectedId) openModal(selectedId); }
-
-function deleteSelected() {
-  if (!selectedId) return;
-  if (!confirm('Remove this character from the world?')) return;
-  characters = characters.filter(c => c.id !== selectedId);
-  save(); renderAll(); closeCard();
-}
-
-function save() { localStorage.setItem('lc_chars', JSON.stringify(characters)); }
-
-/* ═══════════════════════════════════════
-   LOCATION PICKER (mini-map in modal)
-═══════════════════════════════════════ */
-function buildLocPickerZones() {
-  const lpm = document.getElementById('loc-picker-map');
-  ZONES.forEach(z => {
-    const lbl = document.createElement('div');
-    lbl.className = 'lp-zone-label';
-    lbl.textContent = z.name;
-    lbl.style.left = (z.x * 100) + '%';
-    lbl.style.top = (z.y * 100) + '%';
-    lpm.appendChild(lbl);
-  });
-  lpm.addEventListener('click', (e) => {
-    const rect = lpm.getBoundingClientRect();
-    lpX = (e.clientX - rect.left) / rect.width;
-    lpY = (e.clientY - rect.top) / rect.height;
-    updateLPCrosshair();
-    updateLocLabel();
-  });
-}
-
-function updateLPCrosshair() {
-  if (lpX === null) return;
-  const lpm = document.getElementById('loc-picker-map');
-  const ch = document.getElementById('lp-crosshair');
-  ch.style.display = '';
-  ch.style.left = (lpX * lpm.clientWidth) + 'px';
-  ch.style.top = (lpY * lpm.clientHeight) + 'px';
-}
-
-function updateLocLabel() {
-  if (lpX === null) return;
-  document.getElementById('f-loc-label').textContent = '📍 ' + nearestZone(lpX, lpY);
-}
-
-/* ═══════════════════════════════════════
-   MAP PAN / ZOOM
-═══════════════════════════════════════ */
-function applyTransform() {
-  document.getElementById('map-canvas').style.transform = `translate(${panX}px,${panY}px) scale(${scale})`;
-}
-
-function initMapInteraction() {
-  const wrap = document.getElementById('map-wrap');
-
-  wrap.addEventListener('mousedown', (e) => {
-    if (e.target.closest('.pin')) return;
-    dragging = true; wrap.classList.add('dragging');
-    dragStart = { x: e.clientX, y: e.clientY };
-    panStart = { x: panX, y: panY };
-  });
-  window.addEventListener('mousemove', (e) => {
-    if (!dragging) return;
-    panX = panStart.x + (e.clientX - dragStart.x);
-    panY = panStart.y + (e.clientY - dragStart.y);
-    applyTransform();
-  });
-  window.addEventListener('mouseup', () => { dragging = false; wrap.classList.remove('dragging'); });
-
-  wrap.addEventListener('wheel', (e) => {
-    e.preventDefault();
-    const rect = wrap.getBoundingClientRect();
-    const mx = e.clientX - rect.left, my = e.clientY - rect.top;
-    const oldScale = scale;
-    scale = Math.max(0.25, Math.min(2.0, scale - e.deltaY * 0.001));
-    panX += (mx - panX) * (1 - scale / oldScale);
-    panY += (my - panY) * (1 - scale / oldScale);
-    applyTransform();
-  }, { passive: false });
-
-  let lastTouch = null;
-  wrap.addEventListener('touchstart', (e) => {
-    if (e.touches.length === 1) lastTouch = { x: e.touches[0].clientX, y: e.touches[0].clientY, px: panX, py: panY };
-  });
-  wrap.addEventListener('touchmove', (e) => {
-    if (e.touches.length === 1 && lastTouch) {
-      e.preventDefault();
-      panX = lastTouch.px + (e.touches[0].clientX - lastTouch.x);
-      panY = lastTouch.py + (e.touches[0].clientY - lastTouch.y);
-      applyTransform();
-    }
-  }, { passive: false });
-
-  wrap.addEventListener('click', (e) => {
-    if (!e.target.closest('.pin')) closeCard();
-  });
-}
-
-/* ═══════════════════════════════════════
-   PROJECTOR / FACILITATOR TOGGLE
-═══════════════════════════════════════ */
+/* ════════════════════════════════════════════════════════
+   PROJECTOR TOGGLE
+════════════════════════════════════════════════════════ */
 let projectorMode = false;
 function toggleMode() {
   projectorMode = !projectorMode;
-  document.body.classList.toggle('projector', projectorMode);
-  document.getElementById('mode-label').textContent = projectorMode ? 'Projector mode' : 'Facilitator mode';
-  document.querySelector('.hbtn.toggle-mode').textContent = projectorMode ? 'Switch to Facilitator View' : 'Switch to Projector View';
-  if (projectorMode) closeCard();
+  document.getElementById('mode-label').textContent = projectorMode ? 'Projector' : 'Facilitator';
+  // In projector mode, hide add/edit buttons
+  document.querySelectorAll('.hbtn.add-char,.hbtn.add-room,.hbtn.import-btn').forEach(b => b.style.display = projectorMode ? 'none' : '');
 }
 
-/* ═══════════════════════════════════════
-   NETSCAPECORE TOGGLE
-═══════════════════════════════════════ */
-let netscapeMode = false;
-function toggleNetscape() {
-  netscapeMode = !netscapeMode;
-  document.body.classList.toggle('netscape', netscapeMode);
-  const btn = document.querySelector('.hbtn.netscape-toggle');
-  btn.textContent = netscapeMode ? '🌙 Dark Mode' : '🪟 Style';
-  localStorage.setItem('lc_netscape', netscapeMode ? '1' : '');
-}
-
-/* ═══════════════════════════════════════
-   SEED DEMO CHARACTERS (first visit)
-═══════════════════════════════════════ */
-if (characters.length === 0) {
+/* ════════════════════════════════════════════════════════
+   SEED DEMO DATA (first visit)
+════════════════════════════════════════════════════════ */
+if (rooms.length === 0 && characters.length === 0) {
+  rooms = [
+    { id:'r1', name:'The Garden',  lat:44.6488, lng:-63.5752, radius:30, lede:'Sun-warm stones and overgrown paths.',  backdrop:'grass'  },
+    { id:'r2', name:'The Library', lat:44.6476, lng:-63.5728, radius:25, lede:'Shelves made of stacked stones.',       backdrop:'wood'   },
+    { id:'r3', name:'The Kitchen', lat:44.6464, lng:-63.5699, radius:20, lede:'Always something good on the stove.',  backdrop:'stone'  },
+  ];
   characters = [
-    {
-      id: '1', name: 'Mop', mood: 'Sleepy', x: 0.22, y: 0.30,
-      lede: 'Lives near the mossy wall.',
-      items: ['small hat', 'acorn'],
-      dialogue: 'I just need five more minutes...',
-      passages: {
-        hello: 'I just need five more minutes...',
-        question: 'Do you ever wonder why pillows are so soft?',
-        secret: 'I have a secret napping spot behind the big fern.',
-        reaction: 'When it gets too loud, I pull my hat down over my eyes.',
-        item: 'This acorn is from a very important tree. I found it on a Tuesday.'
-      },
-      photoData: null, animData: null
-    },
-    {
-      id: '2', name: 'Gravel', mood: 'Curious', x: 0.52, y: 0.20,
-      lede: 'Always watching. Always noting.',
-      items: ['magnifying glass', 'notebook'],
-      dialogue: 'Have you seen anything unusual today?',
-      passages: {
-        hello: 'Have you seen anything unusual today?',
-        question: 'What do you think is at the bottom of the garden?',
-        secret: 'I saw something move in the library last Thursday.',
-        reaction: 'Every new thing I find goes straight in the notebook.',
-        item: 'This magnifying glass belonged to someone very small. The lens is barely bigger than my thumb.'
-      },
-      photoData: null, animData: null
-    },
-    {
-      id: '3', name: 'Biscuit', mood: 'Happy', x: 0.78, y: 0.55,
-      lede: 'Resident optimist.',
-      items: ['lucky pebble'],
-      dialogue: 'Everything is going to be okay!',
-      passages: {
-        hello: 'Everything is going to be okay!',
-        question: '',
-        secret: '',
-        reaction: 'When the sun comes out I do a little spin. Just one.',
-        item: 'My lucky pebble is warm no matter what the weather is.'
-      },
-      photoData: null, animData: null
-    },
+    { id:'c1', name:'Mop',    mood:'Sleepy',  roomId:'r1', items:['small hat','acorn'],        dialogue:'I just need five more minutes…', passages:{hello:'I just need five more minutes…',question:'Do you ever wonder why pillows are so soft?',secret:'I have a secret napping spot.',reaction:'When it gets too loud I pull my hat down.',item:'This acorn is from a very important tree.'}, photoData:null, animData:null },
+    { id:'c2', name:'Gravel', mood:'Curious', roomId:'r2', items:['magnifying glass','notebook'],dialogue:'Have you seen anything unusual?',    passages:{hello:'Have you seen anything unusual?',question:'What is at the bottom of the garden?',secret:'I saw something move in the library.',reaction:'Every new thing goes straight in the notebook.',item:'This magnifying glass belonged to someone very small.'}, photoData:null, animData:null },
+    { id:'c3', name:'Biscuit',mood:'Happy',   roomId:'r3', items:['lucky pebble'],             dialogue:'Everything is going to be okay!',   passages:{hello:'Everything is going to be okay!',question:'',secret:'',reaction:'When the sun comes out I do a little spin.',item:'My lucky pebble is warm no matter the weather.'}, photoData:null, animData:null },
   ];
   save();
 }
 
-// Restore netscape preference
-if (localStorage.getItem('lc_netscape') === '1') {
-  netscapeMode = true;
-  document.body.classList.add('netscape');
-  document.querySelector('.hbtn.netscape-toggle').textContent = '🌙 Dark Mode';
+/* ════════════════════════════════════════════════════════
+   INIT
+════════════════════════════════════════════════════════ */
+buildMoodPicker();
+buildDialogueBuilder();
+renderRoomsOnMap();
+renderCompass();
+// Pan map to first room if any
+if (rooms.length > 0) {
+  leafletMap.setView([rooms[0].lat, rooms[0].lng], DEFAULT_ZOOM);
 }
-
-window.addEventListener('load', init);
 </script>
 </body>
 </html>
