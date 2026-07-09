@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Living Characters — Virtual World</title>
   <style>
+    /* ── THEME VARS ── */
     :root {
       --bg: #1a1a2e;
       --surface: #16213e;
@@ -15,7 +16,104 @@
       --text-muted: #a0a0b0;
       --pin-size: 52px;
       --radius: 12px;
+      --border: #ffffff18;
     }
+    /* ── NETSCAPECORE THEME ── */
+    body.netscape {
+      --bg: #c0c0c0;
+      --surface: #d4d0c8;
+      --surface2: #a0a098;
+      --accent: #000080;
+      --accent2: #800000;
+      --text: #000000;
+      --text-muted: #444444;
+      --border: #808080;
+      font-family: 'MS Sans Serif', 'Segoe UI', Tahoma, sans-serif !important;
+    }
+    body.netscape #header {
+      background: linear-gradient(90deg, #000080 0%, #1084d0 100%) !important;
+      border-bottom: 2px solid #808080 !important;
+      color: white;
+    }
+    body.netscape #header h1 { color: white !important; font-size: 13px; }
+    body.netscape .hbtn {
+      background: #d4d0c8 !important; color: #000 !important;
+      border: 2px solid !important;
+      border-color: #ffffff #808080 #808080 #ffffff !important;
+      border-radius: 0 !important; font-size: 11px !important;
+    }
+    body.netscape .hbtn:active {
+      border-color: #808080 #ffffff #ffffff #808080 !important;
+    }
+    body.netscape .hbtn.add { background: #d4d0c8 !important; color: #000080 !important; font-weight: bold !important; }
+    body.netscape #card {
+      border-left: 2px solid #808080 !important;
+      background: #d4d0c8 !important;
+    }
+    body.netscape #card-body blockquote {
+      border-left: 3px solid #000080 !important;
+      background: #ffffff !important;
+    }
+    body.netscape #modal {
+      border: 2px solid !important;
+      border-color: #ffffff #808080 #808080 #ffffff !important;
+      border-radius: 0 !important;
+      background: #d4d0c8 !important;
+    }
+    body.netscape #modal h2 {
+      background: linear-gradient(90deg, #000080, #1084d0);
+      color: white;
+      margin: -24px -24px 12px -24px;
+      padding: 4px 8px;
+      font-size: 12px;
+      font-weight: bold;
+    }
+    body.netscape .field input,
+    body.netscape .field select,
+    body.netscape .field textarea {
+      background: #ffffff !important;
+      border: 2px inset #808080 !important;
+      border-radius: 0 !important;
+      color: #000 !important;
+    }
+    body.netscape .mbtn, body.netscape .card-btn {
+      background: #d4d0c8 !important; color: #000 !important;
+      border: 2px solid !important;
+      border-color: #ffffff #808080 #808080 #ffffff !important;
+      border-radius: 0 !important;
+    }
+    body.netscape .mbtn.save { color: #000080 !important; font-weight: bold !important; }
+    body.netscape .mbtn:active, body.netscape .card-btn:active {
+      border-color: #808080 #ffffff #ffffff #808080 !important;
+    }
+    body.netscape .dialogue-block {
+      background: #ffffff !important;
+      border: 2px inset #808080 !important;
+      border-radius: 0 !important;
+    }
+    body.netscape .prompt-pill {
+      border-radius: 0 !important;
+      background: #d4d0c8 !important; color: #000 !important;
+      border: 2px solid !important;
+      border-color: #ffffff #808080 #808080 #ffffff !important;
+    }
+    body.netscape .prompt-pill.active {
+      border-color: #808080 #ffffff #ffffff #808080 !important;
+      background: #a0a8d0 !important;
+    }
+    body.netscape #map-canvas {
+      background: #87CEEB !important;
+    }
+    body.netscape .loc-label { color: #000080 !important; }
+    body.netscape .pin { border-color: #000080 !important; background: #fff !important; }
+    body.netscape .pin-label { background: #ffffcc !important; color: #000 !important; border: 1px solid #808080; }
+    body.netscape #tooltip {
+      background: #ffffcc !important; color: #000 !important;
+      border: 1px solid #808080 !important;
+      border-radius: 0 !important;
+    }
+    body.netscape .item-chip { background: #fff !important; border: 1px solid #808080 !important; border-radius: 0 !important; }
+
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html, body { height: 100%; background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; overflow: hidden; }
 
@@ -23,7 +121,7 @@
     #header {
       position: fixed; top: 0; left: 0; right: 0; z-index: 200;
       background: linear-gradient(90deg, #0f3460 0%, #16213e 100%);
-      border-bottom: 1px solid #ffffff18;
+      border-bottom: 1px solid var(--border);
       display: flex; align-items: center; justify-content: space-between;
       padding: 0 16px; height: 48px;
     }
@@ -38,6 +136,9 @@
     .hbtn.add { background: var(--accent); color: #fff; }
     .hbtn.toggle-mode { background: #ffffff18; color: var(--text); }
     .hbtn.fullscreen { background: #ffffff10; color: var(--text-muted); }
+    .hbtn.netscape-toggle { background: #ffffff10; color: var(--text-muted); }
+    .hbtn.export-twee { background: #2d5a27; color: #90ee90; }
+    body.netscape .hbtn.export-twee { background: #d4d0c8 !important; color: #006400 !important; }
     #mode-label { font-size: 11px; color: var(--text-muted); margin-right: 6px; }
 
     /* ── MAP CANVAS ── */
@@ -53,8 +154,6 @@
       transform-origin: 0 0;
       user-select: none;
     }
-
-    /* map grid lines (subtle) */
     #map-canvas::before {
       content: '';
       position: absolute; inset: 0;
@@ -62,6 +161,11 @@
         linear-gradient(rgba(255,255,255,.03) 1px, transparent 1px),
         linear-gradient(90deg, rgba(255,255,255,.03) 1px, transparent 1px);
       background-size: 80px 80px;
+    }
+    body.netscape #map-canvas::before {
+      background-image:
+        linear-gradient(rgba(0,0,128,.08) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,0,128,.08) 1px, transparent 1px);
     }
 
     /* ── LOCATION LABELS ── */
@@ -80,6 +184,7 @@
       pointer-events: none;
       transform: translate(-50%, -50%);
     }
+    body.netscape .loc-zone { border-color: rgba(0,0,128,.2) !important; }
 
     /* ── PINS ── */
     .pin {
@@ -124,9 +229,9 @@
     /* ── CHARACTER CARD (sidebar) ── */
     #card {
       position: fixed; right: 0; top: 48px; bottom: 0;
-      width: 320px; max-width: 100vw;
+      width: 340px; max-width: 100vw;
       background: var(--surface);
-      border-left: 1px solid #ffffff14;
+      border-left: 1px solid var(--border);
       display: flex; flex-direction: column;
       transform: translateX(100%);
       transition: transform .28s cubic-bezier(.16,1,.3,1);
@@ -145,6 +250,7 @@
       display: flex; align-items: center; justify-content: center;
       overflow: hidden; flex-shrink: 0;
     }
+    body.netscape #card-anim { background: #ffffff; border-bottom: 2px solid #808080; }
     #card-anim img { max-width: 100%; max-height: 100%; object-fit: contain; }
     #card-anim .placeholder { font-size: 64px; line-height: 1; }
     #card-body { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
@@ -159,14 +265,20 @@
       background: rgba(255,255,255,.08); border-radius: 20px;
       padding: 4px 10px; font-size: 12px;
     }
-    #card-dialogue blockquote {
+    /* dialogue passages in card */
+    #card-dialogue .passage-list { display: flex; flex-direction: column; gap: 8px; }
+    .dialogue-block {
       border-left: 3px solid var(--accent);
       padding: 8px 12px;
       background: rgba(255,255,255,.04);
       border-radius: 0 8px 8px 0;
-      font-style: italic; font-size: 13px; line-height: 1.6;
-      color: var(--text-muted);
+      font-size: 13px; line-height: 1.6;
     }
+    .dialogue-block .passage-type {
+      font-size: 10px; text-transform: uppercase; letter-spacing: .08em;
+      color: var(--accent2); font-weight: 700; margin-bottom: 3px;
+    }
+    .dialogue-block .passage-text { color: var(--text-muted); font-style: italic; }
     #card-photo {
       width: 100%; aspect-ratio: 4/3;
       background: #0a0f1e;
@@ -194,25 +306,30 @@
     #modal-overlay.open { opacity: 1; pointer-events: all; }
     #modal {
       background: var(--surface);
-      border: 1px solid #ffffff18;
+      border: 1px solid var(--border);
       border-radius: var(--radius);
       padding: 24px;
-      width: 420px; max-width: calc(100vw - 32px);
+      width: 480px; max-width: calc(100vw - 32px);
       max-height: calc(100vh - 64px);
       overflow-y: auto;
       display: flex; flex-direction: column; gap: 14px;
     }
     #modal h2 { font-size: 16px; font-weight: 800; }
+    .modal-section-title {
+      font-size: 10px; text-transform: uppercase; letter-spacing: .1em;
+      color: var(--accent2); font-weight: 700;
+      border-bottom: 1px solid var(--border); padding-bottom: 6px; margin-top: 4px;
+    }
     .field { display: flex; flex-direction: column; gap: 5px; }
     .field label { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); }
     .field input, .field select, .field textarea {
-      background: rgba(255,255,255,.06); border: 1px solid #ffffff18;
+      background: rgba(255,255,255,.06); border: 1px solid var(--border);
       border-radius: 8px; padding: 9px 12px;
       color: var(--text); font-size: 13px; font-family: inherit;
       outline: none; transition: border-color .15s;
     }
     .field input:focus, .field select:focus, .field textarea:focus { border-color: var(--accent); }
-    .field textarea { resize: vertical; min-height: 64px; }
+    .field textarea { resize: vertical; min-height: 52px; }
     .field select option { background: #16213e; }
     .file-row { display: flex; gap: 8px; align-items: center; }
     .file-preview { width: 52px; height: 52px; border-radius: 8px; object-fit: cover; background: #0a0f1e; flex-shrink: 0; }
@@ -240,6 +357,31 @@
     }
     .mood-opt.active { border-color: var(--accent2); background: rgba(245,166,35,.15); }
 
+    /* ── DIALOGUE BUILDER ── */
+    #dialogue-builder { display: flex; flex-direction: column; gap: 10px; }
+    .prompt-row { display: flex; gap: 6px; align-items: flex-start; }
+    .prompt-pill {
+      flex-shrink: 0; padding: 5px 10px; border-radius: 20px;
+      font-size: 11px; font-weight: 700; cursor: pointer;
+      background: rgba(255,255,255,.08); border: 1px solid var(--border);
+      color: var(--text-muted); white-space: nowrap;
+      transition: background .12s, color .12s;
+    }
+    .prompt-pill.active { background: rgba(245,166,35,.2); color: var(--accent2); border-color: var(--accent2); }
+    .prompt-input {
+      flex: 1; background: rgba(255,255,255,.06); border: 1px solid var(--border);
+      border-radius: 8px; padding: 7px 10px;
+      color: var(--text); font-size: 12px; font-family: inherit;
+      outline: none; resize: none; min-height: 36px;
+      transition: border-color .15s;
+    }
+    .prompt-input:focus { border-color: var(--accent); }
+    .prompt-hint { font-size: 10px; color: var(--text-muted); margin-top: -6px; margin-left: 2px; }
+    body.netscape .prompt-input {
+      background: #ffffff; border: 2px inset #808080; border-radius: 0;
+      color: #000;
+    }
+
     /* ── PROJECTOR MODE ── */
     body.projector #card { display: none; }
     body.projector #header .hbtn.add { display: none; }
@@ -248,7 +390,7 @@
     #tooltip {
       position: fixed; z-index: 500;
       background: rgba(10,15,30,.92); backdrop-filter: blur(8px);
-      border: 1px solid #ffffff18; border-radius: 10px;
+      border: 1px solid var(--border); border-radius: 10px;
       padding: 10px 14px; pointer-events: none;
       opacity: 0; transition: opacity .12s;
       max-width: 220px;
@@ -263,9 +405,10 @@
     #loc-picker-map {
       width: 100%; height: 160px;
       background: radial-gradient(ellipse at 30% 40%, #1a3a5c, #0a0f1e);
-      border-radius: 8px; border: 1px solid #ffffff18;
+      border-radius: 8px; border: 1px solid var(--border);
       position: relative; overflow: hidden; cursor: crosshair;
     }
+    body.netscape #loc-picker-map { background: #87CEEB; border: 2px inset #808080; border-radius: 0; }
     #loc-picker-map .lp-grid {
       position: absolute; inset: 0;
       background-image:
@@ -278,6 +421,7 @@
       text-transform: uppercase; letter-spacing: .06em; pointer-events: none;
       transform: translateX(-50%);
     }
+    body.netscape .lp-zone-label { color: rgba(0,0,128,.5); }
     #lp-crosshair {
       position: absolute; width: 16px; height: 16px;
       border: 2px solid var(--accent); border-radius: 50%;
@@ -298,6 +442,8 @@
   <h1>🏠 Living Characters — Virtual World</h1>
   <div style="display:flex;align-items:center;gap:8px;">
     <span id="mode-label">Facilitator mode</span>
+    <button class="hbtn netscape-toggle" onclick="toggleNetscape()" title="Toggle Netscapecore style">🪟 Style</button>
+    <button class="hbtn export-twee" onclick="exportTwee()">⬇ Export .twee</button>
     <button class="hbtn toggle-mode" onclick="toggleMode()">Switch to Projector View</button>
     <button class="hbtn add" onclick="openModal(null)">+ Add Character</button>
   </div>
@@ -305,7 +451,7 @@
 
 <!-- MAP -->
 <div id="map-wrap">
-  <div id="map-canvas" id="map-canvas">
+  <div id="map-canvas">
     <!-- Zones and labels rendered by JS -->
   </div>
 </div>
@@ -328,8 +474,8 @@
       <div id="card-items-list"></div>
     </div>
     <div id="card-dialogue">
-      <h3>Says</h3>
-      <blockquote id="card-quote"></blockquote>
+      <h3>Dialogue</h3>
+      <div class="passage-list" id="card-passage-list"></div>
     </div>
     <div id="card-photo"></div>
   </div>
@@ -343,6 +489,8 @@
 <div id="modal-overlay">
   <div id="modal">
     <h2 id="modal-title">Add a Character</h2>
+
+    <div class="modal-section-title">👤 Who are they?</div>
 
     <div class="field">
       <label>Character name</label>
@@ -370,16 +518,13 @@
 
     <div class="field">
       <label>Mood</label>
-      <div class="mood-picker" id="mood-picker">
-        <!-- rendered by JS -->
-      </div>
+      <div class="mood-picker" id="mood-picker"><!-- rendered by JS --></div>
     </div>
 
     <div class="field">
       <label>Location on the map — click to place</label>
       <div id="loc-picker-map">
         <div class="lp-grid"></div>
-        <!-- zone labels + crosshair rendered by JS -->
         <div id="lp-crosshair" style="display:none"></div>
       </div>
       <input id="f-loc-x" type="hidden" />
@@ -392,10 +537,10 @@
       <input id="f-items" type="text" placeholder="e.g. small hat, acorn, lucky pebble" />
     </div>
 
-    <div class="field">
-      <label>What does this character say?</label>
-      <textarea id="f-dialogue" placeholder="A short line of dialogue or a thought..."></textarea>
-    </div>
+    <div class="modal-section-title">💬 What do they say?</div>
+    <p style="font-size:11px;color:var(--text-muted);margin-top:-6px;">Fill in one or more. Each becomes a dialogue passage in the story.</p>
+
+    <div id="dialogue-builder"><!-- rendered by JS --></div>
 
     <div class="modal-actions">
       <button class="mbtn cancel" onclick="closeModal()">Cancel</button>
@@ -416,23 +561,32 @@
    DATA
 ═══════════════════════════════════════ */
 const MOODS = [
-  { label: 'Happy', color: '#4ade80', emoji: '😊' },
-  { label: 'Sleepy', color: '#818cf8', emoji: '😴' },
-  { label: 'Hungry', color: '#fb923c', emoji: '🍽️' },
-  { label: 'Grumpy', color: '#f87171', emoji: '😤' },
+  { label: 'Happy',   color: '#4ade80', emoji: '😊' },
+  { label: 'Sleepy',  color: '#818cf8', emoji: '😴' },
+  { label: 'Hungry',  color: '#fb923c', emoji: '🍽️' },
+  { label: 'Grumpy',  color: '#f87171', emoji: '😤' },
   { label: 'Curious', color: '#38bdf8', emoji: '🔍' },
-  { label: 'Shy', color: '#e879f9', emoji: '🫣' },
+  { label: 'Shy',     color: '#e879f9', emoji: '🫣' },
   { label: 'Excited', color: '#fbbf24', emoji: '⚡' },
-  { label: 'Cozy', color: '#a78bfa', emoji: '🌙' },
+  { label: 'Cozy',    color: '#a78bfa', emoji: '🌙' },
+];
+
+// Dialogue prompt types — kid-friendly labels → Twee passage suffix
+const PROMPT_TYPES = [
+  { key: 'hello',    label: '👋 Hello',    hint: 'What does this character say when you first meet them?',     placeholder: 'Hi! I\'m Mop. I live near the mossy wall.' },
+  { key: 'question', label: '❓ Question',  hint: 'Something they wonder about or want to know.',              placeholder: 'Do you think clouds have names?' },
+  { key: 'secret',   label: '🤫 Secret',   hint: 'Something only you know if you ask nicely.',                placeholder: 'I found a tiny door once. I never told anyone.' },
+  { key: 'reaction', label: '😮 Reaction', hint: 'How they feel about something happening in the world.',      placeholder: 'When it rains, I feel like dancing.' },
+  { key: 'item',     label: '🎒 Item',     hint: 'What they say about one of their items (name the item!).',  placeholder: 'This acorn is from a very important tree.' },
 ];
 
 const ZONES = [
-  { name: 'The Lobby', x: 0.22, y: 0.30, r: 0.10 },
-  { name: 'The Kitchen', x: 0.52, y: 0.20, r: 0.09 },
-  { name: 'The Garden', x: 0.78, y: 0.55, r: 0.11 },
+  { name: 'The Lobby',    x: 0.22, y: 0.30, r: 0.10 },
+  { name: 'The Kitchen',  x: 0.52, y: 0.20, r: 0.09 },
+  { name: 'The Garden',   x: 0.78, y: 0.55, r: 0.11 },
   { name: 'The Workshop', x: 0.20, y: 0.68, r: 0.10 },
-  { name: 'The Rooftop', x: 0.60, y: 0.75, r: 0.09 },
-  { name: 'The Library', x: 0.42, y: 0.50, r: 0.08 },
+  { name: 'The Rooftop',  x: 0.60, y: 0.75, r: 0.09 },
+  { name: 'The Library',  x: 0.42, y: 0.50, r: 0.08 },
 ];
 
 let characters = JSON.parse(localStorage.getItem('lc_chars') || '[]');
@@ -456,9 +610,9 @@ function init() {
   buildMapZones();
   buildMoodPicker();
   buildLocPickerZones();
+  buildDialogueBuilder();
   renderAll();
   initMapInteraction();
-  // center map
   const wrap = document.getElementById('map-wrap');
   panX = (wrap.clientWidth - MAP_W * scale) / 2;
   panY = (wrap.clientHeight - MAP_H * scale) / 2;
@@ -473,12 +627,10 @@ function buildMapZones() {
   ZONES.forEach(z => {
     const px = z.x * MAP_W, py = z.y * MAP_H;
     const rw = z.r * MAP_W, rh = z.r * MAP_H;
-    // zone ring
     const ring = document.createElement('div');
     ring.className = 'loc-zone';
     ring.style.cssText = `left:${px}px;top:${py}px;width:${rw*2}px;height:${rh*2}px;`;
     canvas.appendChild(ring);
-    // label
     const lbl = document.createElement('div');
     lbl.className = 'loc-label';
     lbl.textContent = z.name;
@@ -491,7 +643,6 @@ function buildMapZones() {
    RENDER PINS
 ═══════════════════════════════════════ */
 function renderAll() {
-  // remove old pins
   document.querySelectorAll('.pin-wrap').forEach(p => p.remove());
   characters.forEach(ch => renderPin(ch));
 }
@@ -516,14 +667,10 @@ function renderPin(ch) {
     img.alt = ch.name;
     pin.appendChild(img);
   } else {
-    pin.style.display = 'flex';
-    pin.style.alignItems = 'center';
-    pin.style.justifyContent = 'center';
-    pin.style.fontSize = '24px';
+    pin.style.cssText += 'display:flex;align-items:center;justify-content:center;font-size:24px;';
     pin.textContent = '🧸';
   }
 
-  // mood ring
   const ring = document.createElement('div');
   ring.className = 'mood-ring';
   ring.style.borderColor = mood.color;
@@ -534,13 +681,9 @@ function renderPin(ch) {
   pin.addEventListener('mouseleave', hideTooltip);
   pin.addEventListener('mousemove', (e) => moveTooltip(e));
 
-  // label
   const lbl = document.createElement('div');
   lbl.className = 'pin-label';
-  lbl.style.position = 'absolute';
-  lbl.style.bottom = 'calc(26px + 6px)';
-  lbl.style.left = '50%';
-  lbl.style.transform = 'translateX(-50%)';
+  lbl.style.cssText = 'position:absolute;bottom:calc(26px + 6px);left:50%;transform:translateX(-50%);';
   lbl.textContent = ch.name;
 
   wrap.appendChild(pin);
@@ -555,31 +698,24 @@ function selectCharacter(id) {
   selectedId = id;
   const ch = characters.find(c => c.id === id);
   if (!ch) return;
-  // highlight
   document.querySelectorAll('.pin').forEach(p => p.classList.remove('selected'));
   const pin = document.querySelector(`.pin[data-id="${id}"]`);
   if (pin) pin.classList.add('selected');
-  // fill card
+
   const mood = MOODS.find(m => m.label === ch.mood) || MOODS[0];
   document.getElementById('card-name').textContent = ch.name;
   document.getElementById('card-location').textContent = nearestZone(ch.x, ch.y);
   document.getElementById('card-mood-dot').style.background = mood.color;
   document.getElementById('card-mood-text').textContent = mood.emoji + ' ' + mood.label;
-  // animation
+
   const animEl = document.getElementById('card-anim');
-  if (ch.animData) {
-    animEl.innerHTML = `<img src="${ch.animData}" alt="${ch.name} animation" />`;
-  } else {
-    animEl.innerHTML = '<div class="placeholder">🧸</div>';
-  }
-  // photo
+  animEl.innerHTML = ch.animData
+    ? `<img src="${ch.animData}" alt="${ch.name} animation" />`
+    : '<div class="placeholder">🧸</div>';
+
   const photoEl = document.getElementById('card-photo');
-  if (ch.photoData) {
-    photoEl.innerHTML = `<img src="${ch.photoData}" alt="${ch.name}" />`;
-  } else {
-    photoEl.innerHTML = '';
-  }
-  // items
+  photoEl.innerHTML = ch.photoData ? `<img src="${ch.photoData}" alt="${ch.name}" />` : '';
+
   const itemsList = document.getElementById('card-items-list');
   itemsList.innerHTML = '';
   (ch.items || []).forEach(it => {
@@ -588,8 +724,33 @@ function selectCharacter(id) {
     chip.textContent = it;
     itemsList.appendChild(chip);
   });
-  // dialogue
-  document.getElementById('card-quote').textContent = ch.dialogue || '...';
+
+  // Render dialogue passages
+  const passageList = document.getElementById('card-passage-list');
+  passageList.innerHTML = '';
+  const passages = ch.passages || {};
+  const hasAny = PROMPT_TYPES.some(pt => passages[pt.key] && passages[pt.key].trim());
+  if (!hasAny) {
+    // legacy single dialogue
+    if (ch.dialogue) {
+      const block = document.createElement('div');
+      block.className = 'dialogue-block';
+      block.innerHTML = `<div class="passage-type">Says</div><div class="passage-text">${escHtml(ch.dialogue)}</div>`;
+      passageList.appendChild(block);
+    } else {
+      passageList.innerHTML = '<div style="font-size:12px;color:var(--text-muted)">No dialogue yet.</div>';
+    }
+  } else {
+    PROMPT_TYPES.forEach(pt => {
+      const text = (passages[pt.key] || '').trim();
+      if (!text) return;
+      const block = document.createElement('div');
+      block.className = 'dialogue-block';
+      block.innerHTML = `<div class="passage-type">${pt.label}</div><div class="passage-text">${escHtml(text)}</div>`;
+      passageList.appendChild(block);
+    });
+  }
+
   document.getElementById('card').classList.add('open');
 }
 
@@ -606,6 +767,10 @@ function nearestZone(x, y) {
     if (d < bestD) { bestD = d; best = z.name; }
   });
   return best || 'The World';
+}
+
+function escHtml(str) {
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
 /* ═══════════════════════════════════════
@@ -627,7 +792,7 @@ function moveTooltip(e) {
 function hideTooltip() { tt.classList.remove('show'); }
 
 /* ═══════════════════════════════════════
-   MODAL
+   MOOD PICKER
 ═══════════════════════════════════════ */
 function buildMoodPicker() {
   const picker = document.getElementById('mood-picker');
@@ -645,6 +810,68 @@ function buildMoodPicker() {
   });
 }
 
+/* ═══════════════════════════════════════
+   DIALOGUE BUILDER
+═══════════════════════════════════════ */
+function buildDialogueBuilder() {
+  const builder = document.getElementById('dialogue-builder');
+  builder.innerHTML = '';
+  PROMPT_TYPES.forEach(pt => {
+    const row = document.createElement('div');
+    row.className = 'prompt-row';
+
+    const pill = document.createElement('span');
+    pill.className = 'prompt-pill';
+    pill.textContent = pt.label;
+    pill.title = pt.hint;
+    pill.dataset.key = pt.key;
+    pill.onclick = () => pill.classList.toggle('active');
+
+    const ta = document.createElement('textarea');
+    ta.className = 'prompt-input';
+    ta.id = 'prompt-' + pt.key;
+    ta.placeholder = pt.placeholder;
+    ta.rows = 2;
+    ta.addEventListener('input', () => {
+      if (ta.value.trim()) pill.classList.add('active');
+      else pill.classList.remove('active');
+    });
+
+    row.appendChild(pill);
+    row.appendChild(ta);
+    builder.appendChild(row);
+
+    const hint = document.createElement('div');
+    hint.className = 'prompt-hint';
+    hint.textContent = pt.hint;
+    builder.appendChild(hint);
+  });
+}
+
+function getDialogueFromBuilder() {
+  const passages = {};
+  PROMPT_TYPES.forEach(pt => {
+    const val = (document.getElementById('prompt-' + pt.key) || {}).value || '';
+    passages[pt.key] = val.trim();
+  });
+  return passages;
+}
+
+function populateDialogueBuilder(passages) {
+  passages = passages || {};
+  PROMPT_TYPES.forEach(pt => {
+    const ta = document.getElementById('prompt-' + pt.key);
+    const pill = document.querySelector(`.prompt-pill[data-key="${pt.key}"]`);
+    if (ta) {
+      ta.value = passages[pt.key] || '';
+      if (pill) pill.classList.toggle('active', !!(passages[pt.key] && passages[pt.key].trim()));
+    }
+  });
+}
+
+/* ═══════════════════════════════════════
+   MODAL OPEN / CLOSE
+═══════════════════════════════════════ */
 function openModal(id) {
   editingId = id;
   tempPhotoData = null;
@@ -655,26 +882,33 @@ function openModal(id) {
     const ch = characters.find(c => c.id === id);
     document.getElementById('f-name').value = ch.name;
     document.getElementById('f-items').value = (ch.items || []).join(', ');
-    document.getElementById('f-dialogue').value = ch.dialogue || '';
     activeMood = ch.mood || MOODS[0].label;
     document.querySelectorAll('.mood-opt').forEach(b => {
       b.classList.toggle('active', b.textContent.includes(activeMood));
     });
-    if (ch.photoData) { document.getElementById('f-photo-preview').src = ch.photoData; document.getElementById('f-photo-preview').style.display = ''; tempPhotoData = ch.photoData; }
-    if (ch.animData) { document.getElementById('f-anim-preview').src = ch.animData; document.getElementById('f-anim-preview').style.display = ''; tempAnimData = ch.animData; }
+    if (ch.photoData) {
+      document.getElementById('f-photo-preview').src = ch.photoData;
+      document.getElementById('f-photo-preview').style.display = '';
+      tempPhotoData = ch.photoData;
+    }
+    if (ch.animData) {
+      document.getElementById('f-anim-preview').src = ch.animData;
+      document.getElementById('f-anim-preview').style.display = '';
+      tempAnimData = ch.animData;
+    }
     lpX = ch.x; lpY = ch.y;
-    updateLocLabel();
-    updateLPCrosshair();
+    updateLocLabel(); updateLPCrosshair();
+    populateDialogueBuilder(ch.passages || {});
   } else {
     document.getElementById('f-name').value = '';
     document.getElementById('f-items').value = '';
-    document.getElementById('f-dialogue').value = '';
     document.getElementById('f-photo-preview').style.display = 'none';
     document.getElementById('f-anim-preview').style.display = 'none';
     activeMood = MOODS[0].label;
     document.querySelectorAll('.mood-opt').forEach((b, i) => b.classList.toggle('active', i === 0));
     document.getElementById('f-loc-label').textContent = 'Click the map above to choose a spot.';
     document.getElementById('lp-crosshair').style.display = 'none';
+    populateDialogueBuilder({});
   }
   document.getElementById('modal-overlay').classList.add('open');
 }
@@ -702,20 +936,25 @@ function saveCharacter() {
   if (!name) { alert('Please give this character a name.'); return; }
   if (lpX === null) { alert('Please click the map to choose a location.'); return; }
   const items = document.getElementById('f-items').value.split(',').map(s => s.trim()).filter(Boolean);
-  const dialogue = document.getElementById('f-dialogue').value.trim();
+  const passages = getDialogueFromBuilder();
+  // legacy dialogue field — use hello passage as fallback display text
+  const dialogue = passages.hello || Object.values(passages).find(v => v) || '';
 
   if (editingId) {
     const ch = characters.find(c => c.id === editingId);
     ch.name = name; ch.items = items; ch.dialogue = dialogue;
     ch.mood = activeMood; ch.x = lpX; ch.y = lpY;
+    ch.passages = passages;
     if (tempPhotoData) ch.photoData = tempPhotoData;
     if (tempAnimData) ch.animData = tempAnimData;
   } else {
-    characters.push({ id: Date.now() + '', name, mood: activeMood, x: lpX, y: lpY, items, dialogue, photoData: tempPhotoData, animData: tempAnimData });
+    characters.push({
+      id: Date.now() + '', name, mood: activeMood,
+      x: lpX, y: lpY, items, dialogue, passages,
+      photoData: tempPhotoData, animData: tempAnimData
+    });
   }
-  save();
-  renderAll();
-  closeModal();
+  save(); renderAll(); closeModal();
   if (editingId) selectCharacter(editingId);
 }
 
@@ -729,6 +968,75 @@ function deleteSelected() {
 }
 
 function save() { localStorage.setItem('lc_chars', JSON.stringify(characters)); }
+
+/* ═══════════════════════════════════════
+   TWEE EXPORT
+═══════════════════════════════════════ */
+function exportTwee() {
+  if (characters.length === 0) {
+    alert('No characters to export yet!');
+    return;
+  }
+  const lines = [];
+  lines.push(':: StoryTitle');
+  lines.push('Living Characters — Virtual World');
+  lines.push('');
+  lines.push(':: StoryData');
+  lines.push('{}');
+  lines.push('');
+
+  characters.forEach(ch => {
+    const safeName = ch.name.replace(/\s+/g, '_');
+    const mood = MOODS.find(m => m.label === ch.mood) || MOODS[0];
+    const zone = nearestZone(ch.x, ch.y);
+    const items = (ch.items || []).join(', ') || 'nothing in particular';
+
+    // Root passage
+    lines.push(`:: ${safeName}`);
+    lines.push(`[mood: ${mood.emoji} ${ch.mood}] [location: ${zone}] [items: ${items}]`);
+    lines.push('');
+    const linkedPassages = PROMPT_TYPES.filter(pt => ch.passages && ch.passages[pt.key] && ch.passages[pt.key].trim());
+    if (linkedPassages.length > 0) {
+      linkedPassages.forEach(pt => {
+        lines.push(`[[${pt.label} → ${safeName}-${pt.key}]]`);
+      });
+    } else if (ch.dialogue) {
+      lines.push(ch.dialogue);
+    }
+    lines.push('');
+
+    // Passage per dialogue type
+    PROMPT_TYPES.forEach(pt => {
+      const text = ch.passages && ch.passages[pt.key] ? ch.passages[pt.key].trim() : '';
+      if (!text) return;
+      lines.push(`:: ${safeName}-${pt.key}`);
+      lines.push(text);
+      lines.push('');
+      lines.push(`[[← Back to ${ch.name} → ${safeName}]]`);
+      lines.push('');
+    });
+
+    // Item passage if items exist
+    if (ch.items && ch.items.length > 0) {
+      ch.items.forEach(item => {
+        const safeItem = item.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9-]/g, '').toLowerCase();
+        lines.push(`:: ${safeName}-item-${safeItem}`);
+        lines.push(`${ch.name} holds the ${item} carefully.`);
+        lines.push('');
+        lines.push(`[[← Back to ${ch.name} → ${safeName}]]`);
+        lines.push('');
+      });
+    }
+  });
+
+  const blob = new Blob([lines.join('\n')], { type: 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'living-characters.twee';
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 /* ═══════════════════════════════════════
    LOCATION PICKER (mini-map in modal)
@@ -801,7 +1109,6 @@ function initMapInteraction() {
     applyTransform();
   }, { passive: false });
 
-  // touch pan
   let lastTouch = null;
   wrap.addEventListener('touchstart', (e) => {
     if (e.touches.length === 1) lastTouch = { x: e.touches[0].clientX, y: e.touches[0].clientY, px: panX, py: panY };
@@ -815,7 +1122,6 @@ function initMapInteraction() {
     }
   }, { passive: false });
 
-  // click on blank map closes card
   wrap.addEventListener('click', (e) => {
     if (!e.target.closest('.pin')) closeCard();
   });
@@ -834,15 +1140,70 @@ function toggleMode() {
 }
 
 /* ═══════════════════════════════════════
+   NETSCAPECORE TOGGLE
+═══════════════════════════════════════ */
+let netscapeMode = false;
+function toggleNetscape() {
+  netscapeMode = !netscapeMode;
+  document.body.classList.toggle('netscape', netscapeMode);
+  const btn = document.querySelector('.hbtn.netscape-toggle');
+  btn.textContent = netscapeMode ? '🌙 Dark Mode' : '🪟 Style';
+  localStorage.setItem('lc_netscape', netscapeMode ? '1' : '');
+}
+
+/* ═══════════════════════════════════════
    SEED DEMO CHARACTERS (first visit)
 ═══════════════════════════════════════ */
 if (characters.length === 0) {
   characters = [
-    { id: '1', name: 'Mop', mood: 'Sleepy', x: 0.22, y: 0.30, items: ['small hat', 'acorn'], dialogue: 'I just need five more minutes...', photoData: null, animData: null },
-    { id: '2', name: 'Gravel', mood: 'Curious', x: 0.52, y: 0.20, items: ['magnifying glass', 'notebook'], dialogue: 'Have you seen anything unusual today?', photoData: null, animData: null },
-    { id: '3', name: 'Biscuit', mood: 'Happy', x: 0.78, y: 0.55, items: ['lucky pebble'], dialogue: 'Everything is going to be okay!', photoData: null, animData: null },
+    {
+      id: '1', name: 'Mop', mood: 'Sleepy', x: 0.22, y: 0.30,
+      items: ['small hat', 'acorn'],
+      dialogue: 'I just need five more minutes...',
+      passages: {
+        hello: 'I just need five more minutes...',
+        question: 'Do you ever wonder why pillows are so soft?',
+        secret: 'I have a secret napping spot behind the big fern.',
+        reaction: 'When it gets too loud, I pull my hat down over my eyes.',
+        item: 'This acorn is from a very important tree. I found it on a Tuesday.'
+      },
+      photoData: null, animData: null
+    },
+    {
+      id: '2', name: 'Gravel', mood: 'Curious', x: 0.52, y: 0.20,
+      items: ['magnifying glass', 'notebook'],
+      dialogue: 'Have you seen anything unusual today?',
+      passages: {
+        hello: 'Have you seen anything unusual today?',
+        question: 'What do you think is at the bottom of the garden?',
+        secret: 'I saw something move in the library last Thursday.',
+        reaction: 'Every new thing I find goes straight in the notebook.',
+        item: 'This magnifying glass belonged to someone very small. The lens is barely bigger than my thumb.'
+      },
+      photoData: null, animData: null
+    },
+    {
+      id: '3', name: 'Biscuit', mood: 'Happy', x: 0.78, y: 0.55,
+      items: ['lucky pebble'],
+      dialogue: 'Everything is going to be okay!',
+      passages: {
+        hello: 'Everything is going to be okay!',
+        question: '',
+        secret: '',
+        reaction: 'When the sun comes out I do a little spin. Just one.',
+        item: 'My lucky pebble is warm no matter what the weather is.'
+      },
+      photoData: null, animData: null
+    },
   ];
   save();
+}
+
+// Restore netscape preference
+if (localStorage.getItem('lc_netscape') === '1') {
+  netscapeMode = true;
+  document.body.classList.add('netscape');
+  document.querySelector('.hbtn.netscape-toggle').textContent = '🌙 Dark Mode';
 }
 
 window.addEventListener('load', init);
