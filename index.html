@@ -29,27 +29,57 @@
       background: linear-gradient(90deg, #0f3460, #16213e);
       border-bottom: 1px solid var(--border);
       display: flex; align-items: center; justify-content: space-between;
-      padding: 0 16px; height: 48px;
+      padding: 0 16px; height: 48px; gap: 8px; flex-wrap: nowrap;
     }
-    #header h1 { font-size: 15px; font-weight: 700; letter-spacing: .04em; }
-    #header .btns { display: flex; gap: 6px; align-items: center; }
+    #header h1 { font-size: 15px; font-weight: 700; letter-spacing: .04em; flex-shrink: 0; }
+    #header .btns { display: flex; gap: 5px; align-items: center; flex-wrap: nowrap; overflow-x: auto; }
     .hbtn {
-      font-size: 11px; padding: 5px 10px; border-radius: 6px; border: none; cursor: pointer;
-      font-family: inherit; font-weight: 600; transition: opacity .15s;
+      font-size: 11px; padding: 5px 9px; border-radius: 6px; border: none; cursor: pointer;
+      font-family: inherit; font-weight: 600; transition: opacity .15s; white-space: nowrap; flex-shrink: 0;
     }
     .hbtn:hover { opacity: .8; }
-    .hbtn.add-char  { background: var(--accent); color: #fff; }
-    .hbtn.add-room  { background: #2d5a27; color: #90ee90; }
-    .hbtn.gps-btn   { background: #1a3a5c; color: #90caf9; }
-    .hbtn.sim-btn   { background: #3a2d5c; color: #c9b8ff; }
-    .hbtn.export-btn{ background: #2d5a27; color: #90ee90; }
-    .hbtn.import-btn{ background: #1a3a5c; color: #90caf9; }
-    .hbtn.toggle-mode { background: #ffffff18; color: var(--text); }
+    .hbtn.add-char   { background: var(--accent); color: #fff; }
+    .hbtn.add-room   { background: #2d5a27; color: #90ee90; }
+    .hbtn.test-room  { background: #3a4f1a; color: #c8f08a; border: 1px solid #7ab828; }
+    .hbtn.gps-btn    { background: #1a3a5c; color: #90caf9; }
+    .hbtn.sim-btn    { background: #3a2d5c; color: #c9b8ff; }
+    .hbtn.export-btn { background: #2d5a27; color: #90ee90; }
+    .hbtn.import-btn { background: #1a3a5c; color: #90caf9; }
+    .hbtn.gh-load    { background: #1c3a2a; color: #6fcf97; }
+    .hbtn.gh-save    { background: #3a2007; color: #f5a623; }
+    .hbtn.toggle-mode{ background: #ffffff18; color: var(--text); }
     #mode-label { font-size: 10px; color: var(--text-muted); }
-    #gps-status { font-size: 10px; color: #90caf9; max-width: 180px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #gps-status { font-size: 10px; color: #90caf9; max-width: 160px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 0; }
+
+    /* ── GitHub token bar (below header) ── */
+    #gh-bar {
+      position: fixed; top: 48px; left: 0; right: 0; z-index: 1090;
+      background: #0a1520; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 8px; padding: 6px 14px;
+      height: 38px;
+    }
+    #gh-bar label { font-size: 10px; color: var(--text-muted); white-space: nowrap; flex-shrink: 0; }
+    #gh-token-input {
+      flex: 1; max-width: 340px; background: rgba(255,255,255,.06);
+      border: 1px solid var(--border); border-radius: 6px;
+      padding: 4px 10px; color: var(--text); font-size: 12px;
+      font-family: monospace; outline: none;
+    }
+    #gh-token-input:focus { border-color: var(--accent2); }
+    #gh-token-input::placeholder { font-family: inherit; font-size: 11px; color: var(--text-muted); }
+    #gh-commit-input {
+      flex: 1; max-width: 220px; background: rgba(255,255,255,.06);
+      border: 1px solid var(--border); border-radius: 6px;
+      padding: 4px 10px; color: var(--text); font-size: 12px;
+      font-family: inherit; outline: none;
+    }
+    #gh-commit-input::placeholder { font-size: 11px; color: var(--text-muted); }
+    #gh-status { font-size: 10px; color: var(--text-muted); white-space: nowrap; flex-shrink: 0; }
+    #gh-status.ok  { color: #6fcf97; }
+    #gh-status.err { color: var(--accent); }
 
     /* ── MAP ── */
-    #map { position: fixed; top: 48px; left: 0; right: 0; bottom: 0; z-index: 1; }
+    #map { position: fixed; top: 86px; left: 0; right: 0; bottom: 0; z-index: 1; }
 
     /* ── COMPASS PANEL ── */
     #compass-panel {
@@ -87,7 +117,7 @@
 
     /* ── ROOM VIEW overlay ── */
     #room-view {
-      position: fixed; inset: 48px 0 0 0; z-index: 1200;
+      position: fixed; inset: 86px 0 0 0; z-index: 1200;
       background: var(--bg); display: flex; flex-direction: column;
       transform: translateY(100%); transition: transform .35s cubic-bezier(.16,1,.3,1);
     }
@@ -102,13 +132,11 @@
     #room-title { font-size: 14px; font-weight: 800; }
     #room-lede  { font-size: 11px; color: var(--text-muted); margin-left: auto; }
 
-    /* Three.js canvas fills the stage */
     #room-stage {
       flex: 1; position: relative; overflow: hidden; background: #0a0f1e;
     }
     #room-stage canvas { display: block; width: 100% !important; height: 100% !important; }
 
-    /* Name labels floating over canvas */
     .char-label {
       position: absolute; pointer-events: none;
       background: rgba(10,15,30,.85); color: var(--text);
@@ -120,7 +148,7 @@
 
     /* ── CHARACTER CARD sidebar ── */
     #card {
-      position: fixed; right: 0; top: 48px; bottom: 0;
+      position: fixed; right: 0; top: 86px; bottom: 0;
       width: 340px; max-width: 100vw;
       background: var(--surface); border-left: 1px solid var(--border);
       display: flex; flex-direction: column;
@@ -219,15 +247,28 @@
   <h1>🏠 Living Characters</h1>
   <div class="btns">
     <span id="gps-status">GPS: off</span>
-    <button class="hbtn gps-btn"  onclick="startGPS()">📍 GPS</button>
-    <button class="hbtn sim-btn"  onclick="startSim()">🚶 Simulate</button>
-    <button class="hbtn add-room" onclick="openRoomModal(null)">+ Room</button>
-    <button class="hbtn add-char" onclick="openCharModal(null)">+ Character</button>
+    <button class="hbtn gps-btn"   onclick="startGPS()">📍 GPS</button>
+    <button class="hbtn sim-btn"   onclick="startSim()">🚶 Simulate</button>
+    <button class="hbtn test-room" onclick="spawnTestRoom()">🧪 Test Room</button>
+    <button class="hbtn add-room"  onclick="openRoomModal(null)">+ Room</button>
+    <button class="hbtn add-char"  onclick="openCharModal(null)">+ Character</button>
     <button class="hbtn import-btn" onclick="triggerImport()">⬆ .twee</button>
     <button class="hbtn export-btn" onclick="previewTwee()">⬇ .twee</button>
+    <button class="hbtn gh-load"   onclick="ghLoad()">☁ Load</button>
+    <button class="hbtn gh-save"   onclick="ghSave()">☁ Save</button>
     <button class="hbtn toggle-mode" onclick="toggleMode()">Projector</button>
     <span id="mode-label">Facilitator</span>
   </div>
+</div>
+
+<!-- GITHUB TOKEN BAR -->
+<div id="gh-bar">
+  <label for="gh-token-input">🔑 GitHub token:</label>
+  <input id="gh-token-input" type="password" placeholder="ghp_… (saved locally once entered)"
+         autocomplete="current-password" spellcheck="false"
+         oninput="onTokenInput()" />
+  <input id="gh-commit-input" type="text" placeholder="Commit message (optional)" />
+  <span id="gh-status">not connected</span>
 </div>
 
 <!-- MAP -->
@@ -367,6 +408,87 @@
 
 <script>
 /* ════════════════════════════════════════════════════════
+   GITHUB CONFIG
+════════════════════════════════════════════════════════ */
+const GH_OWNER  = 'jonathaniscarroll';
+const GH_REPO   = 'living-characters';
+const GH_PATH   = 'story/main.twee';
+const GH_BRANCH = 'main';
+let ghFileSha = null;
+
+/* ── Token persistence ── */
+function getToken() {
+  return document.getElementById('gh-token-input').value.trim()
+    || localStorage.getItem('lc_gh_token') || '';
+}
+function onTokenInput() {
+  const t = document.getElementById('gh-token-input').value.trim();
+  if (t) {
+    localStorage.setItem('lc_gh_token', t);
+    setGhStatus('token saved ✓', 'ok');
+  }
+}
+function setGhStatus(msg, cls) {
+  const el = document.getElementById('gh-status');
+  el.textContent = msg; el.className = cls || '';
+}
+
+/* Load saved token on startup */
+window.addEventListener('DOMContentLoaded', () => {
+  const saved = localStorage.getItem('lc_gh_token');
+  if (saved) {
+    document.getElementById('gh-token-input').value = saved;
+    setGhStatus('token loaded ✓', 'ok');
+  }
+});
+
+async function ghLoad() {
+  const token = getToken();
+  if (!token) { setGhStatus('Enter a GitHub token first', 'err'); return; }
+  setGhStatus('Loading…');
+  try {
+    const res = await fetch(
+      `https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/contents/${GH_PATH}?ref=${GH_BRANCH}`,
+      { headers: { Authorization: 'token ' + token, Accept: 'application/vnd.github.v3+json' } }
+    );
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    ghFileSha = data.sha;
+    const src = decodeBase64Unicode(data.content.replace(/\n/g, ''));
+    importTweeSource(src, /*silent=*/true);
+    setGhStatus('Loaded ✓  (' + rooms.length + ' rooms, ' + characters.length + ' chars)', 'ok');
+  } catch(e) { setGhStatus('Load failed: ' + e.message, 'err'); }
+}
+
+async function ghSave() {
+  const token = getToken();
+  if (!token) { setGhStatus('Enter a GitHub token first', 'err'); return; }
+  const src = lc.buildTweeSource(rooms, characters);
+  const encoded = btoa(unescape(encodeURIComponent(src)));
+  const msg = document.getElementById('gh-commit-input').value.trim()
+    || 'Update living-characters world via tool';
+  setGhStatus('Saving…');
+  try {
+    const body = { message: msg, content: encoded, branch: GH_BRANCH };
+    if (ghFileSha) body.sha = ghFileSha;
+    const res = await fetch(
+      `https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/contents/${GH_PATH}`,
+      { method: 'PUT',
+        headers: { Authorization: 'token ' + token, Accept: 'application/vnd.github.v3+json', 'Content-Type': 'application/json' },
+        body: JSON.stringify(body) }
+    );
+    if (!res.ok) { const e = await res.json(); throw new Error(e.message || 'HTTP ' + res.status); }
+    const data = await res.json();
+    ghFileSha = data.content.sha;
+    setGhStatus('Saved ✓  ' + data.commit.sha.slice(0,7), 'ok');
+  } catch(e) { setGhStatus('Save failed: ' + e.message, 'err'); }
+}
+
+function decodeBase64Unicode(b64) {
+  return decodeURIComponent(atob(b64).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
+}
+
+/* ════════════════════════════════════════════════════════
    DATA
 ════════════════════════════════════════════════════════ */
 const MOODS = [
@@ -388,762 +510,4 @@ const PROMPT_TYPES = [
   { key:'item',     label:'🎒 Item',     hint:'What they say about one of their items.',       placeholder:'This acorn is from a very important tree.' },
 ];
 
-// Floor colours per backdrop
-const FLOOR_COLORS = {
-  forest: 0x1a3d1a,
-  stone:  0x2e2e3a,
-  water:  0x0d3a5c,
-  wood:   0x4a2e10,
-  grass:  0x2a5a1a,
-  dark:   0x120820,
-};
-const SKY_COLORS = {
-  forest: 0x0d1e0d,
-  stone:  0x1e1e2a,
-  water:  0x061e36,
-  wood:   0x2a1a08,
-  grass:  0x0e2a0e,
-  dark:   0x0d0516,
-};
-
-let rooms      = JSON.parse(localStorage.getItem('lc_rooms')  || '[]');
-let characters = JSON.parse(localStorage.getItem('lc_chars')  || '[]');
-let selectedCharId = null;
-let editingCharId  = null;
-let editingRoomId  = null;
-let activeMood     = MOODS[0].label;
-let tempPhotoData  = null;
-let tempAnimData   = null;
-let activeRoomId   = null;
-
-/* ════════════════════════════════════════════════════════
-   GPS ENGINE
-════════════════════════════════════════════════════════ */
-const geo = { watchId: null, current: null, heading: null, mode: 'off' };
-
-function haversineMeters(aLat, aLng, bLat, bLng) {
-  const R = 6371000, r = d => d * Math.PI / 180;
-  const dLat = r(bLat-aLat), dLng = r(bLng-aLng);
-  const q = Math.sin(dLat/2)**2 + Math.cos(r(aLat)) * Math.cos(r(bLat)) * Math.sin(dLng/2)**2;
-  return 2 * R * Math.atan2(Math.sqrt(q), Math.sqrt(1-q));
-}
-function bearingDegrees(aLat, aLng, bLat, bLng) {
-  const r = d => d * Math.PI / 180;
-  const φ1=r(aLat), φ2=r(bLat), λ1=r(aLng), λ2=r(bLng);
-  const y = Math.sin(λ2-λ1)*Math.cos(φ2);
-  const x = Math.cos(φ1)*Math.sin(φ2) - Math.sin(φ1)*Math.cos(φ2)*Math.cos(λ2-λ1);
-  return ((Math.atan2(y,x)*180/Math.PI)%360+360)%360;
-}
-function startGPS() {
-  if (!navigator.geolocation) { setGPSStatus('Not supported'); return; }
-  geo.mode = 'live'; setGPSStatus('Requesting…');
-  if (geo.watchId !== null) navigator.geolocation.clearWatch(geo.watchId);
-  geo.watchId = navigator.geolocation.watchPosition(
-    pos => { geo.current={lat:pos.coords.latitude,lng:pos.coords.longitude}; setGPSStatus(geo.current.lat.toFixed(4)+', '+geo.current.lng.toFixed(4)); onPositionUpdate(); },
-    err => setGPSStatus('Error: '+err.message),
-    { enableHighAccuracy:true, maximumAge:5000, timeout:10000 }
-  );
-  enableCompass();
-}
-async function enableCompass() {
-  try {
-    if (typeof DeviceOrientationEvent!=='undefined' && typeof DeviceOrientationEvent.requestPermission==='function') {
-      const r = await DeviceOrientationEvent.requestPermission(); if(r!=='granted') return;
-    }
-    window.addEventListener('deviceorientation', e => {
-      const h = typeof e.webkitCompassHeading==='number' ? e.webkitCompassHeading : typeof e.alpha==='number' ? ((360-e.alpha)%360+360)%360 : null;
-      if(h===null) return; geo.heading=h; renderCompass();
-    }, true);
-  } catch(_) {}
-}
-function startSim() {
-  geo.mode='sim';
-  if(rooms.length===0){setGPSStatus('Add rooms first to simulate!');return;}
-  setGPSStatus('Simulating…');
-  const path=[];
-  rooms.forEach(rm=>{
-    path.push({lat:rm.lat+0.0003,lng:rm.lng+0.0003,heading:200});
-    path.push({lat:rm.lat,lng:rm.lng,heading:200});
-    path.push({lat:rm.lat-0.0002,lng:rm.lng-0.0002,heading:200});
-  });
-  let i=0; geo.current={lat:path[0].lat,lng:path[0].lng}; geo.heading=path[0].heading; onPositionUpdate();
-  const t=setInterval(()=>{i++;if(i>=path.length){clearInterval(t);setGPSStatus('Sim done');return;}geo.current={lat:path[i].lat,lng:path[i].lng};geo.heading=path[i].heading;setGPSStatus('Sim: '+path[i].lat.toFixed(4)+', '+path[i].lng.toFixed(4));onPositionUpdate();},1800);
-}
-function setGPSStatus(msg){document.getElementById('gps-status').textContent='GPS: '+msg;}
-function onPositionUpdate(){
-  if(geo.current){
-    if(!posMarker){posMarker=L.circleMarker([geo.current.lat,geo.current.lng],{radius:8,fillColor:'#4ade80',color:'#fff',weight:2,fillOpacity:1}).addTo(leafletMap);}
-    else{posMarker.setLatLng([geo.current.lat,geo.current.lng]);}
-    if(geo.mode==='live'&&!geo._panned){leafletMap.setView([geo.current.lat,geo.current.lng],17);geo._panned=true;}
-  }
-  renderCompass(); checkProximity();
-}
-function checkProximity(){
-  if(!geo.current||rooms.length===0) return;
-  const ranked=rooms.map(rm=>({...rm,dist:haversineMeters(geo.current.lat,geo.current.lng,rm.lat,rm.lng)})).sort((a,b)=>a.dist-b.dist);
-  const inside=ranked.find(rm=>rm.dist<=rm.radius);
-  if(inside&&inside.id!==activeRoomId) openRoom(inside.id);
-}
-function renderCompass(){
-  document.getElementById('heading-needle').style.transform='rotate('+(geo.heading||0)+'deg)';
-  const rose=document.getElementById('compass-rose');
-  rose.querySelectorAll('.room-marker-compass').forEach(el=>el.remove());
-  const list=document.getElementById('compass-list'); list.innerHTML='';
-  if(!geo.current||rooms.length===0) return;
-  const annotated=rooms.map(rm=>{
-    const dist=haversineMeters(geo.current.lat,geo.current.lng,rm.lat,rm.lng);
-    const bearing=bearingDegrees(geo.current.lat,geo.current.lng,rm.lat,rm.lng);
-    const relative=((bearing-(geo.heading||0))%360+360)%360;
-    return{...rm,dist,bearing,relative};
-  }).sort((a,b)=>a.dist-b.dist);
-  annotated.forEach((rm,i)=>{
-    const marker=document.createElement('div'); marker.className='room-marker-compass'+(i===0?' nearest':'');
-    marker.style.transform='rotate('+rm.relative+'deg)'; marker.innerHTML='<div class="dot" title="'+rm.name+'"></div>'; rose.appendChild(marker);
-    const li=document.createElement('div'); li.className='compass-list-item'+(rm.dist<=rm.radius?' inside':'');
-    li.innerHTML='<span class="room-name">'+rm.name+'</span><span>'+Math.round(rm.dist)+' m</span>'; list.appendChild(li);
-  });
-}
-
-/* ════════════════════════════════════════════════════════
-   LEAFLET MAP
-════════════════════════════════════════════════════════ */
-const DEFAULT_CENTER=[44.6488,-63.5752], DEFAULT_ZOOM=16;
-const leafletMap=L.map('map').setView(DEFAULT_CENTER,DEFAULT_ZOOM);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap contributors',maxZoom:19}).addTo(leafletMap);
-let posMarker=null; const roomLayers={};
-function renderRoomsOnMap(){
-  Object.values(roomLayers).forEach(l=>{l.circle.remove();l.marker.remove();}); Object.keys(roomLayers).forEach(k=>delete roomLayers[k]);
-  rooms.forEach(rm=>{
-    const circle=L.circle([rm.lat,rm.lng],{radius:rm.radius,color:'#f5a623',fillColor:'#f5a623',fillOpacity:0.08,weight:2}).addTo(leafletMap);
-    const icon=L.divIcon({className:'',html:'<div style="background:#0f3460;border:2px solid #f5a623;border-radius:8px;padding:4px 8px;color:#f5a623;font-size:11px;font-weight:700;white-space:nowrap;backdrop-filter:blur(4px)">'+rm.name+'</div>',iconAnchor:[0,0]});
-    const marker=L.marker([rm.lat,rm.lng],{icon}).addTo(leafletMap);
-    marker.on('click',()=>openRoom(rm.id)); roomLayers[rm.id]={circle,marker};
-  });
-}
-
-/* ════════════════════════════════════════════════════════
-   THREE.JS ISO SCENE
-════════════════════════════════════════════════════════ */
-let threeRenderer=null, threeScene=null, threeCamera=null, threeAnimMixer=null;
-let threeRAF=null, threeClock=null;
-let threeCharMeshes=[]; // {mesh, charId, labelEl}
-const gltfLoader = new THREE.GLTFLoader ? new THREE.GLTFLoader() : null;
-
-const ISO_ANGLE = Math.PI / 4;   // 45° around Y
-const ELEV_ANGLE = Math.atan(1 / Math.sqrt(2)); // true isometric elevation ~35.26°
-
-function buildIsoCamera(w, h) {
-  const aspect = w / h;
-  const s = 5;
-  const cam = new THREE.OrthographicCamera(-s*aspect, s*aspect, s, -s, 0.1, 200);
-  // Position at isometric angle: look down 45° from a raised diagonal
-  cam.position.set(10, 10, 10);
-  cam.lookAt(0, 0, 0);
-  cam.updateProjectionMatrix();
-  return cam;
-}
-
-function disposeThreeScene() {
-  if (threeRAF) { cancelAnimationFrame(threeRAF); threeRAF = null; }
-  if (threeRenderer) { threeRenderer.dispose(); threeRenderer.domElement.remove(); threeRenderer = null; }
-  threeScene = null; threeCamera = null; threeAnimMixer = null; threeClock = null;
-  threeCharMeshes = [];
-}
-
-function backdropFloorColor(backdrop) {
-  return FLOOR_COLORS[backdrop] || FLOOR_COLORS.stone;
-}
-
-function makeCheckerTexture(colorA, colorB, size=8) {
-  const c = document.createElement('canvas'); c.width=c.height=size*2;
-  const ctx = c.getContext('2d');
-  ctx.fillStyle = '#'+colorA.toString(16).padStart(6,'0'); ctx.fillRect(0,0,size*2,size*2);
-  ctx.fillStyle = '#'+colorB.toString(16).padStart(6,'0');
-  ctx.fillRect(0,0,size,size); ctx.fillRect(size,size,size,size);
-  const tex = new THREE.CanvasTexture(c);
-  tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(6,6);
-  return tex;
-}
-
-function makeWallMesh(color, x, z, rx, rz, w, h) {
-  const geo = new THREE.PlaneGeometry(w, h);
-  const mat = new THREE.MeshLambertMaterial({color, side:THREE.FrontSide});
-  const mesh = new THREE.Mesh(geo, mat);
-  mesh.position.set(x, h/2, z);
-  if (rx) mesh.rotation.x = rx;
-  if (rz) mesh.rotation.z = rz;
-  return mesh;
-}
-
-function loadSpriteFromDataURL(dataURL) {
-  return new Promise(resolve => {
-    const img = new Image(); img.onload = () => {
-      const tex = new THREE.Texture(img); tex.needsUpdate = true;
-      resolve(tex);
-    }; img.src = dataURL;
-  });
-}
-
-async function buildThreeRoom(roomId) {
-  disposeThreeScene();
-
-  const stage = document.getElementById('room-stage');
-  stage.innerHTML = '';
-
-  const rm = rooms.find(r => r.id === roomId);
-  const backdrop = (rm && rm.backdrop) || 'stone';
-  const floorCol = backdropFloorColor(backdrop);
-  const skyCol   = SKY_COLORS[backdrop] || SKY_COLORS.stone;
-  const wallCol  = Math.max(0, floorCol - 0x0a0a0a);
-
-  const W = stage.clientWidth  || window.innerWidth;
-  const H = stage.clientHeight || (window.innerHeight - 92);
-
-  // Renderer
-  threeRenderer = new THREE.WebGLRenderer({ antialias: true });
-  threeRenderer.setPixelRatio(window.devicePixelRatio);
-  threeRenderer.setSize(W, H);
-  threeRenderer.setClearColor(skyCol);
-  stage.appendChild(threeRenderer.domElement);
-
-  // Scene
-  threeScene = new THREE.Scene();
-  threeClock  = new THREE.Clock();
-
-  // Camera
-  threeCamera = buildIsoCamera(W, H);
-
-  // Lights
-  const ambient = new THREE.AmbientLight(0xffffff, 0.55);
-  threeScene.add(ambient);
-  const sun = new THREE.DirectionalLight(0xfff4e0, 0.9);
-  sun.position.set(8, 12, 6);
-  threeScene.add(sun);
-
-  // Floor
-  const floorGeo = new THREE.PlaneGeometry(10, 10);
-  const floorTex = makeCheckerTexture(floorCol, Math.max(0, floorCol - 0x080808));
-  const floorMat = new THREE.MeshLambertMaterial({ map: floorTex });
-  const floor = new THREE.Mesh(floorGeo, floorMat);
-  floor.rotation.x = -Math.PI / 2;
-  threeScene.add(floor);
-
-  // Back walls (two planes meeting at corner)
-  const backWallL = makeWallMesh(wallCol, -5, 0, 0, 0, 0.05, 6);
-  backWallL.position.set(0, 3, -5);
-  backWallL.rotation.x = 0;
-  const wallGeoB = new THREE.PlaneGeometry(10, 6);
-  const wallMatB = new THREE.MeshLambertMaterial({color: wallCol, side: THREE.FrontSide});
-  const wallB = new THREE.Mesh(wallGeoB, wallMatB);
-  wallB.position.set(0, 3, -5);
-  threeScene.add(wallB);
-
-  const wallGeoL = new THREE.PlaneGeometry(10, 6);
-  const wallMatL = new THREE.MeshLambertMaterial({color: Math.max(0, wallCol - 0x050505), side: THREE.FrontSide});
-  const wallL = new THREE.Mesh(wallGeoL, wallMatL);
-  wallL.position.set(-5, 3, 0);
-  wallL.rotation.y = Math.PI / 2;
-  threeScene.add(wallL);
-
-  // Characters
-  threeCharMeshes = [];
-  const roomChars = characters.filter(ch => ch.roomId === roomId);
-  const count = roomChars.length;
-
-  for (let i = 0; i < roomChars.length; i++) {
-    const ch = roomChars[i];
-    const angle = (i / Math.max(count, 1)) * Math.PI * 1.2 - Math.PI * 0.6;
-    const rx = Math.cos(angle) * 3.2;
-    const rz = Math.sin(angle) * 2.2;
-
-    const glbUrl = ch.glbUrl || '';
-    const isGLB = glbUrl && glbUrl.toLowerCase().endsWith('.glb') && gltfLoader;
-
-    if (isGLB) {
-      // Load GLB model
-      gltfLoader.load(glbUrl, (gltf) => {
-        const model = gltf.scene;
-        model.position.set(rx, 0, rz);
-        // Scale to fit ~2 units tall
-        const box = new THREE.Box3().setFromObject(model);
-        const size = box.getSize(new THREE.Vector3());
-        const scale = 1.8 / Math.max(size.y, 0.1);
-        model.scale.setScalar(scale);
-        model.userData.charId = ch.id;
-        threeScene.add(model);
-        if (gltf.animations && gltf.animations.length > 0) {
-          if (!threeAnimMixer) threeAnimMixer = new THREE.AnimationMixer(model);
-          gltf.animations.forEach(clip => threeAnimMixer.clipAction(clip).play());
-        }
-        threeCharMeshes.push({ mesh: model, charId: ch.id, pos: new THREE.Vector3(rx, 1, rz) });
-      }, undefined, (err) => console.warn('GLB load error', err));
-    } else {
-      // Billboard sprite from photo or emoji fallback
-      let tex = null;
-      if (ch.photoData) {
-        tex = await loadSpriteFromDataURL(ch.photoData);
-      } else {
-        // Draw emoji onto canvas
-        const cv = document.createElement('canvas'); cv.width=cv.height=256;
-        const ctx = cv.getContext('2d');
-        ctx.clearRect(0,0,256,256);
-        const mood = MOODS.find(m=>m.label===ch.mood)||MOODS[0];
-        ctx.fillStyle = mood.color + '33';
-        ctx.beginPath(); ctx.arc(128,128,120,0,Math.PI*2); ctx.fill();
-        ctx.font='120px serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
-        ctx.fillText(mood.emoji, 128, 138);
-        tex = new THREE.CanvasTexture(cv);
-      }
-
-      const spGeo = new THREE.PlaneGeometry(1.4, 1.8);
-      const spMat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, alphaTest: 0.05, side: THREE.DoubleSide });
-      const sprite = new THREE.Mesh(spGeo, spMat);
-      sprite.position.set(rx, 0.9, rz);
-      sprite.userData.charId = ch.id;
-      threeScene.add(sprite);
-
-      // Mood-ring circle on the floor
-      const ringGeo = new THREE.RingGeometry(0.55, 0.72, 32);
-      const mood = MOODS.find(m=>m.label===ch.mood)||MOODS[0];
-      const ringMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(mood.color), side: THREE.DoubleSide, transparent: true, opacity: 0.7 });
-      const ring = new THREE.Mesh(ringGeo, ringMat);
-      ring.rotation.x = -Math.PI/2; ring.position.set(rx, 0.01, rz);
-      threeScene.add(ring);
-
-      threeCharMeshes.push({ mesh: sprite, charId: ch.id, pos: new THREE.Vector3(rx, 1.9, rz) });
-    }
-
-    // HTML name label
-    const label = document.createElement('div');
-    label.className = 'char-label';
-    label.textContent = ch.name;
-    label.dataset.charId = ch.id;
-    stage.appendChild(label);
-  }
-
-  // Empty room message
-  if (roomChars.length === 0) {
-    const canvas2d = document.createElement('div');
-    canvas2d.style.cssText = 'position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:rgba(255,255,255,.3);font-size:14px;text-align:center;pointer-events:none';
-    canvas2d.innerHTML = 'No characters in this room yet.<br><small>Add one with + Character</small>';
-    stage.appendChild(canvas2d);
-  }
-
-  // Raycaster click
-  threeRenderer.domElement.addEventListener('click', onSceneClick);
-
-  // Resize observer
-  const ro = new ResizeObserver(() => {
-    const nW = stage.clientWidth, nH = stage.clientHeight;
-    if (!threeRenderer) return;
-    threeRenderer.setSize(nW, nH);
-    const aspect = nW/nH, s=5;
-    threeCamera.left=-s*aspect; threeCamera.right=s*aspect;
-    threeCamera.updateProjectionMatrix();
-  });
-  ro.observe(stage);
-
-  // Animate
-  function animate() {
-    threeRAF = requestAnimationFrame(animate);
-    const dt = threeClock.getDelta();
-    if (threeAnimMixer) threeAnimMixer.update(dt);
-
-    // Billboard: rotate sprites to always face camera
-    threeCharMeshes.forEach(({ mesh }) => {
-      if (mesh.userData.charId !== undefined && mesh.type === 'Mesh') {
-        mesh.quaternion.copy(threeCamera.quaternion);
-      }
-    });
-
-    // Update label positions
-    threeCharMeshes.forEach(({ pos, charId }) => {
-      const label = stage.querySelector('.char-label[data-char-id="'+charId+'"]');
-      if (!label) return;
-      const v = pos.clone().project(threeCamera);
-      const x = (v.x * 0.5 + 0.5) * stage.clientWidth;
-      const y = (-v.y * 0.5 + 0.5) * stage.clientHeight;
-      label.style.left = x + 'px';
-      label.style.top  = (y + 4) + 'px';
-    });
-
-    threeRenderer.render(threeScene, threeCamera);
-  }
-  animate();
-}
-
-function onSceneClick(evt) {
-  if (!threeCamera || !threeScene) return;
-  const stage = document.getElementById('room-stage');
-  const rect = threeRenderer.domElement.getBoundingClientRect();
-  const mouse = new THREE.Vector2(
-    ((evt.clientX - rect.left) / rect.width)  * 2 - 1,
-   -((evt.clientY - rect.top)  / rect.height) * 2 + 1
-  );
-  const raycaster = new THREE.Raycaster();
-  raycaster.setFromCamera(mouse, threeCamera);
-  const meshes = threeCharMeshes.map(e => e.mesh);
-  const hits = raycaster.intersectObjects(meshes, true);
-  if (hits.length > 0) {
-    let obj = hits[0].object;
-    while (obj && obj.userData.charId === undefined) obj = obj.parent;
-    if (obj && obj.userData.charId) selectCharacter(obj.userData.charId);
-  }
-}
-
-/* ════════════════════════════════════════════════════════
-   ROOM VIEW
-════════════════════════════════════════════════════════ */
-function openRoom(roomId) {
-  const rm = rooms.find(r => r.id === roomId);
-  if (!rm) return;
-  activeRoomId = roomId;
-  document.getElementById('room-title').textContent = rm.name;
-  document.getElementById('room-lede').textContent  = rm.lede || '';
-  document.getElementById('room-view').classList.add('open');
-  // Wait one frame for layout so stage has dimensions
-  requestAnimationFrame(() => buildThreeRoom(roomId));
-}
-
-function closeRoom() {
-  document.getElementById('room-view').classList.remove('open');
-  disposeThreeScene();
-  closeCard();
-  activeRoomId = null;
-}
-
-/* ════════════════════════════════════════════════════════
-   CHARACTER CARD
-════════════════════════════════════════════════════════ */
-function selectCharacter(id) {
-  selectedCharId = id;
-  const ch = characters.find(c => c.id === id); if (!ch) return;
-  const mood = MOODS.find(m => m.label === ch.mood) || MOODS[0];
-  const rm   = rooms.find(r => r.id === ch.roomId);
-  document.getElementById('card-name').textContent     = ch.name;
-  document.getElementById('card-location').textContent = rm ? rm.name : 'Somewhere';
-  document.getElementById('card-mood-dot').style.background = mood.color;
-  document.getElementById('card-mood-text').textContent = mood.emoji + ' ' + mood.label;
-  document.getElementById('card-anim').innerHTML = ch.animData
-    ? '<img src="' + ch.animData + '" alt="' + esc(ch.name) + '" />'
-    : '<div class="placeholder">🧸</div>';
-  const itemsList = document.getElementById('card-items-list'); itemsList.innerHTML = '';
-  (ch.items || []).forEach(it => { const chip = document.createElement('span'); chip.className='item-chip'; chip.textContent=it; itemsList.appendChild(chip); });
-  const pl = document.getElementById('card-passage-list'); pl.innerHTML = '';
-  const passages = ch.passages || {};
-  const hasAny = PROMPT_TYPES.some(pt => passages[pt.key] && passages[pt.key].trim());
-  if (!hasAny) {
-    pl.innerHTML = ch.dialogue
-      ? '<div class="dialogue-block"><div class="passage-type">Says</div><div class="passage-text">'+esc(ch.dialogue)+'</div></div>'
-      : '<div style="font-size:12px;color:var(--text-muted)">No dialogue yet.</div>';
-  } else {
-    PROMPT_TYPES.forEach(pt => {
-      const txt = (passages[pt.key]||'').trim(); if(!txt) return;
-      const b = document.createElement('div'); b.className='dialogue-block';
-      b.innerHTML='<div class="passage-type">'+pt.label+'</div><div class="passage-text">'+esc(txt)+'</div>';
-      pl.appendChild(b);
-    });
-  }
-  document.getElementById('card').classList.add('open');
-}
-function closeCard() { document.getElementById('card').classList.remove('open'); selectedCharId=null; }
-function editSelectedChar()  { if(selectedCharId) openCharModal(selectedCharId); }
-function deleteSelectedChar() {
-  if(!selectedCharId) return; if(!confirm('Remove this character?')) return;
-  characters=characters.filter(c=>c.id!==selectedCharId); save(); closeCard();
-  if(activeRoomId) openRoom(activeRoomId);
-}
-
-/* ════════════════════════════════════════════════════════
-   ROOM MODAL
-════════════════════════════════════════════════════════ */
-let roomPickerMap=null, roomPickerMarker=null;
-function openRoomModal(id) {
-  editingRoomId=id;
-  document.getElementById('room-modal-title').textContent=id?'Edit Room':'Add a Room';
-  const rm=id?rooms.find(r=>r.id===id):null;
-  document.getElementById('rf-name').value=rm?rm.name:'';
-  document.getElementById('rf-lede').value=rm?rm.lede:'';
-  document.getElementById('rf-radius').value=rm?rm.radius:30;
-  document.getElementById('rf-lat').value=rm?rm.lat:'';
-  document.getElementById('rf-lng').value=rm?rm.lng:'';
-  document.getElementById('rf-backdrop').value=rm?rm.backdrop:'stone';
-  document.getElementById('room-modal-overlay').classList.add('open');
-  setTimeout(()=>{
-    if(!roomPickerMap){
-      roomPickerMap=L.map('room-latlng-map').setView(rm?[rm.lat,rm.lng]:DEFAULT_CENTER,16);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(roomPickerMap);
-      roomPickerMap.on('click',e=>{
-        document.getElementById('rf-lat').value=e.latlng.lat.toFixed(6);
-        document.getElementById('rf-lng').value=e.latlng.lng.toFixed(6);
-        if(roomPickerMarker) roomPickerMarker.setLatLng(e.latlng);
-        else roomPickerMarker=L.marker(e.latlng).addTo(roomPickerMap);
-      });
-    } else { roomPickerMap.invalidateSize(); }
-    if(rm){const ll=[rm.lat,rm.lng];roomPickerMap.setView(ll,17);if(roomPickerMarker)roomPickerMarker.setLatLng(ll);else roomPickerMarker=L.marker(ll).addTo(roomPickerMap);}
-  },50);
-}
-function closeRoomModal(){document.getElementById('room-modal-overlay').classList.remove('open');}
-function saveRoom(){
-  const name=document.getElementById('rf-name').value.trim();
-  const lat=parseFloat(document.getElementById('rf-lat').value);
-  const lng=parseFloat(document.getElementById('rf-lng').value);
-  const radius=parseInt(document.getElementById('rf-radius').value)||30;
-  const lede=document.getElementById('rf-lede').value.trim();
-  const backdrop=document.getElementById('rf-backdrop').value;
-  if(!name){alert('Please give the room a name.');return;}
-  if(isNaN(lat)||isNaN(lng)){alert('Please click the map to place the room.');return;}
-  if(editingRoomId){const rm=rooms.find(r=>r.id===editingRoomId);Object.assign(rm,{name,lat,lng,radius,lede,backdrop});}
-  else{rooms.push({id:Date.now()+'_r',name,lat,lng,radius,lede,backdrop});}
-  save();renderRoomsOnMap();populateRoomSelect();closeRoomModal();
-}
-
-/* ════════════════════════════════════════════════════════
-   CHARACTER MODAL
-════════════════════════════════════════════════════════ */
-function openCharModal(id) {
-  editingCharId=id; tempPhotoData=null; tempAnimData=null;
-  document.getElementById('char-modal-title').textContent=id?'Edit Character':'Add a Character';
-  populateRoomSelect();
-  document.getElementById('cf-glb-url').value='';
-  if(id){
-    const ch=characters.find(c=>c.id===id);
-    document.getElementById('cf-name').value=ch.name;
-    document.getElementById('cf-items').value=(ch.items||[]).join(', ');
-    document.getElementById('cf-room').value=ch.roomId||'';
-    document.getElementById('cf-glb-url').value=ch.glbUrl||'';
-    activeMood=ch.mood||MOODS[0].label;
-    document.querySelectorAll('.mood-opt').forEach(b=>b.classList.toggle('active',b.textContent.includes(activeMood)));
-    tempPhotoData=ch.photoData||null; tempAnimData=ch.animData||null;
-    if(ch.photoData){document.getElementById('cf-photo-preview').src=ch.photoData;document.getElementById('cf-photo-preview').style.display='';}
-    if(ch.animData) {document.getElementById('cf-anim-preview').src=ch.animData; document.getElementById('cf-anim-preview').style.display='';}
-    populateDialogueBuilder(ch.passages||{});
-  } else {
-    document.getElementById('cf-name').value=''; document.getElementById('cf-items').value='';
-    document.getElementById('cf-room').value=activeRoomId||'';
-    document.getElementById('cf-photo-preview').style.display='none';
-    document.getElementById('cf-anim-preview').style.display='none';
-    activeMood=MOODS[0].label;
-    document.querySelectorAll('.mood-opt').forEach((b,i)=>b.classList.toggle('active',i===0));
-    populateDialogueBuilder({});
-  }
-  document.getElementById('char-modal-overlay').classList.add('open');
-}
-function closeCharModal(){document.getElementById('char-modal-overlay').classList.remove('open');}
-function saveCharacter(){
-  const name=document.getElementById('cf-name').value.trim();
-  const roomId=document.getElementById('cf-room').value||null;
-  const items=document.getElementById('cf-items').value.split(',').map(s=>s.trim()).filter(Boolean);
-  const glbUrl=document.getElementById('cf-glb-url').value.trim();
-  const passages=getDialogueFromBuilder();
-  const dialogue=passages.hello||Object.values(passages).find(v=>v)||'';
-  if(!name){alert('Please give this character a name.');return;}
-  if(editingCharId){
-    const ch=characters.find(c=>c.id===editingCharId);
-    Object.assign(ch,{name,roomId,items,dialogue,passages,mood:activeMood,glbUrl});
-    if(tempPhotoData) ch.photoData=tempPhotoData;
-    if(tempAnimData)  ch.animData=tempAnimData;
-  } else {
-    characters.push({id:Date.now()+'',name,mood:activeMood,roomId,items,dialogue,passages,photoData:tempPhotoData,animData:tempAnimData,glbUrl});
-  }
-  save(); closeCharModal();
-  if(activeRoomId) openRoom(activeRoomId);
-  else if(editingCharId) selectCharacter(editingCharId);
-}
-function populateRoomSelect(){
-  const sel=document.getElementById('cf-room'); const val=sel.value;
-  sel.innerHTML='<option value="">— choose a room —</option>';
-  rooms.forEach(rm=>{const opt=document.createElement('option');opt.value=rm.id;opt.textContent=rm.name;sel.appendChild(opt);});
-  sel.value=val;
-}
-
-/* ════════════════════════════════════════════════════════
-   MOOD PICKER
-════════════════════════════════════════════════════════ */
-function buildMoodPicker(){
-  const picker=document.getElementById('mood-picker');
-  MOODS.forEach(m=>{
-    const btn=document.createElement('button'); btn.className='mood-opt'+(m.label===activeMood?' active':'');
-    btn.textContent=m.emoji+' '+m.label; btn.style.borderColor=m.color;
-    btn.onclick=()=>{activeMood=m.label;document.querySelectorAll('.mood-opt').forEach(b=>b.classList.remove('active'));btn.classList.add('active');};
-    picker.appendChild(btn);
-  });
-}
-
-/* ════════════════════════════════════════════════════════
-   DIALOGUE BUILDER
-════════════════════════════════════════════════════════ */
-function buildDialogueBuilder(){
-  const el=document.getElementById('dialogue-builder'); el.innerHTML='';
-  PROMPT_TYPES.forEach(pt=>{
-    const row=document.createElement('div'); row.className='prompt-row';
-    const pill=document.createElement('span'); pill.className='prompt-pill'; pill.textContent=pt.label; pill.dataset.key=pt.key;
-    pill.onclick=()=>pill.classList.toggle('active');
-    const ta=document.createElement('textarea'); ta.className='prompt-input'; ta.id='prompt-'+pt.key; ta.placeholder=pt.placeholder; ta.rows=2;
-    ta.addEventListener('input',()=>pill.classList.toggle('active',!!ta.value.trim()));
-    row.appendChild(pill); row.appendChild(ta); el.appendChild(row);
-    const hint=document.createElement('div'); hint.className='prompt-hint'; hint.textContent=pt.hint; el.appendChild(hint);
-  });
-}
-function getDialogueFromBuilder(){
-  const p={};
-  PROMPT_TYPES.forEach(pt=>{p[pt.key]=(document.getElementById('prompt-'+pt.key)||{}).value?.trim()||'';});
-  return p;
-}
-function populateDialogueBuilder(passages){
-  PROMPT_TYPES.forEach(pt=>{
-    const ta=document.getElementById('prompt-'+pt.key);
-    const pill=document.querySelector('.prompt-pill[data-key="'+pt.key+'"]');
-    if(ta){ta.value=(passages[pt.key]||'');if(pill)pill.classList.toggle('active',!!(passages[pt.key]||'').trim());}
-  });
-}
-
-/* ════════════════════════════════════════════════════════
-   TWEE PIPELINE
-════════════════════════════════════════════════════════ */
-const lc={};
-lc.parse=function(text){
-  const lines=text.split('\n');
-  const meta={x:null,y:null,lat:null,lng:null,radius:30,mood:null,zone:null,room:null,lede:'',items:[],after:null,then:null};
-  const body=[];
-  lines.forEach(l=>{
-    const t=l.trim();
-    if(t.startsWith('@char ')){const p=t.slice(6).split(',').map(v=>parseFloat(v));meta.x=p[0];meta.y=p[1];}
-    else if(t.startsWith('@room ')){const v=t.slice(6).trim();const nums=v.split(',').map(Number);if(nums.length===2&&!isNaN(nums[0])&&!isNaN(nums[1])){meta.lat=nums[0];meta.lng=nums[1];}else meta.room=v;}
-    else if(t.startsWith('@radius ')){meta.radius=Number(t.slice(8).trim());}
-    else if(t.startsWith('@mood ')){meta.mood=t.slice(6).trim();}
-    else if(t.startsWith('@zone ')){meta.zone=t.slice(6).trim();}
-    else if(t.startsWith('@items ')){meta.items=t.slice(7).split(',').map(s=>s.trim()).filter(Boolean);}
-    else if(t.startsWith('@lede ')){meta.lede=t.slice(6).trim();}
-    else if(t.startsWith('@after ')){meta.after=Number(t.slice(7));}
-    else if(t.startsWith('@then ')){meta.then=t.slice(6).trim();}
-    else{body.push(l);}
-  });
-  meta.body=body.join('\n').trim(); return meta;
-};
-lc.getLinkedTargets=function(text){
-  const targets=[],seen={};let m,re=/\[\[(.+?)\]\]/g;
-  while((m=re.exec(text))!==null){let raw=m[1].trim(),target=raw;if(raw.includes('->')){target=raw.split('->')[1].trim();}else if(raw.includes('<-')){target=raw.split('<-')[0].trim();}else if(raw.includes('|')){target=raw.split('|')[1].trim();}else if(raw.includes('→')){target=raw.split('→')[1].trim();}else if(raw.includes('←')){target=raw.split('←')[0].trim();}if(target&&!seen[target]){seen[target]=true;targets.push(target);}}return targets;
-};
-lc.parseTweeSource=function(src){
-  const re=/^::\s*(.+?)(?:\s*\[([^\]]*)\])?\s*$/m;
-  return src.split(/^(?=::)/m).filter(s=>s.trim()).map(section=>{const fl=section.split('\n')[0],m=fl.match(re);if(!m)return null;return{name:m[1].trim(),tags:(m[2]?m[2].split(/\s+/).filter(Boolean):[]),text:section.slice(fl.length+1).trimEnd()};}).filter(Boolean);
-};
-lc.roomsFromPassages=function(passages){
-  const byName={}; passages.forEach(p=>{byName[p.name]=p;});
-  return passages.filter(p=>p.tags.includes('room')||(p.text.includes('@room ')&&p.text.split('\n').some(l=>l.trim().startsWith('@room ')&&l.trim().split(',').length===2&&!isNaN(Number(l.trim().split(',')[1]))))).map((p,i)=>{
-    const meta=lc.parse(p.text); if(meta.lat===null) return null;
-    return{id:'room_twee_'+i,name:p.name.replace(/_/g,' '),lat:meta.lat,lng:meta.lng,radius:meta.radius||30,lede:meta.lede||'',backdrop:'stone'};
-  }).filter(Boolean);
-};
-lc.charactersFromPassages=function(passages){
-  const byName={}; passages.forEach(p=>{byName[p.name]=p;});
-  const roots=passages.filter(p=>p.tags.includes('char')||p.text.indexOf('@char ')!==-1);
-  return roots.map((root,idx)=>{
-    const meta=lc.parse(root.text);
-    const moodLabel=meta.mood?MOODS.find(m=>m.label.toLowerCase()===meta.mood.toLowerCase())?.label||MOODS[0].label:MOODS[0].label;
-    const passDat={};
-    PROMPT_TYPES.forEach(pt=>{const c=byName[root.name+'-'+pt.key]||byName[root.name.replace(/\s/g,'_')+'-'+pt.key];if(c){const sm=lc.parse(c.text);passDat[pt.key]=sm.body||c.text.trim();}else passDat[pt.key]='';});
-    if(!passDat.hello&&meta.body) passDat.hello=meta.body;
-    const roomByName=meta.room?rooms.find(r=>r.name===meta.room||r.name===meta.room.replace(/_/g,' ')):null;
-    return{id:Date.now()+'_c'+idx,name:root.name.replace(/_/g,' '),mood:moodLabel,roomId:roomByName?roomByName.id:null,items:meta.items,lede:meta.lede,dialogue:passDat.hello||'',passages:passDat,photoData:null,animData:null,glbUrl:''};
-  });
-};
-lc.buildTweeSource=function(rms,chars){
-  const lines=[];
-  lines.push(':: StoryTitle');lines.push('Living Characters');lines.push('');
-  lines.push(':: StoryData');lines.push(JSON.stringify({ifid:'LC-'+Date.now(),format:'SugarCube','format-version':'2.36.1',start:'Start'},null,2));lines.push('');
-  lines.push(':: Start');lines.push('Rooms in this world:');lines.push('');
-  rms.forEach(rm=>lines.push('[['+rm.name+'→'+rm.name.replace(/\s/g,'_')+'_room]]'));lines.push('');
-  rms.forEach(rm=>{
-    const safe=rm.name.replace(/\s/g,'_');
-    lines.push(':: '+safe+'_room [room]');lines.push('@room '+rm.lat.toFixed(6)+','+rm.lng.toFixed(6));lines.push('@radius '+rm.radius);if(rm.lede)lines.push('@lede '+rm.lede);lines.push('');
-    const roomChars=chars.filter(c=>c.roomId===rm.id);roomChars.forEach(ch=>lines.push('[['+ch.name+'→'+ch.name.replace(/\s/g,'_')+']]'));lines.push('');
-  });
-  chars.forEach(ch=>{
-    const safe=ch.name.replace(/\s/g,'_');const rm=rms.find(r=>r.id===ch.roomId);
-    lines.push(':: '+safe+' [char]');if(rm)lines.push('@room '+rm.name);lines.push('@mood '+ch.mood);if(ch.items&&ch.items.length)lines.push('@items '+ch.items.join(', '));if(ch.lede)lines.push('@lede '+ch.lede);if(ch.glbUrl)lines.push('@glb '+ch.glbUrl);lines.push('');
-    const filled=PROMPT_TYPES.filter(pt=>ch.passages&&ch.passages[pt.key]&&ch.passages[pt.key].trim());
-    if(filled.length>0)filled.forEach(pt=>lines.push('[['+pt.label+'→'+safe+'-'+pt.key+']]'));else if(ch.dialogue)lines.push(ch.dialogue);lines.push('');
-    PROMPT_TYPES.forEach(pt=>{const txt=(ch.passages&&ch.passages[pt.key])||'';if(!txt.trim())return;lines.push(':: '+safe+'-'+pt.key);lines.push(txt.trim());lines.push('');lines.push('[[← Back→'+safe+']]');lines.push('');});
-    if(ch.items&&ch.items.length>0){ch.items.forEach(item=>{const si=item.replace(/\s+/g,'-').replace(/[^a-zA-Z0-9-]/g,'').toLowerCase();lines.push(':: '+safe+'-item-'+si);lines.push(ch.name+' holds the '+item+'.');lines.push('');lines.push('[[← Back→'+safe+']]');lines.push('');});}
-  });
-  return lines.join('\n');
-};
-
-/* ════════════════════════════════════════════════════════
-   IMPORT / EXPORT
-════════════════════════════════════════════════════════ */
-let _exportSource='';
-function previewTwee(){_exportSource=lc.buildTweeSource(rooms,characters);document.getElementById('twee-source').textContent=_exportSource;document.getElementById('twee-preview-overlay').classList.add('open');}
-function closeTweePreview(){document.getElementById('twee-preview-overlay').classList.remove('open');}
-function downloadTwee(){if(!_exportSource)return;const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([_exportSource],{type:'text/plain'}));a.download='living-characters.twee';a.click();}
-function triggerImport(){document.getElementById('twee-import-input').value='';document.getElementById('twee-import-input').click();}
-function handleImportFile(evt){const file=evt.target.files[0];if(!file)return;const reader=new FileReader();reader.onload=e=>importTweeSource(e.target.result);reader.readAsText(file);}
-function importTweeSource(src){
-  try{
-    const passages=lc.parseTweeSource(src);
-    const importedRooms=lc.roomsFromPassages(passages);const importedChars=lc.charactersFromPassages(passages);
-    const merge=importedRooms.length+importedChars.length>0?confirm('Import '+importedRooms.length+' room(s) and '+importedChars.length+' character(s)?\n\nMerge? (Cancel = replace all)'):false;
-    if(!merge){rooms=importedRooms;characters=importedChars;}
-    else{importedRooms.forEach(ir=>{const x=rooms.findIndex(r=>r.name===ir.name);if(x>=0)rooms[x]=ir;else rooms.push(ir);});importedChars.forEach(ic=>{const x=characters.findIndex(c=>c.name===ic.name);if(x>=0){ic.photoData=characters[x].photoData;ic.animData=characters[x].animData;characters[x]=ic;}else characters.push(ic);});}
-    save();renderRoomsOnMap();populateRoomSelect();
-    alert('✓ Imported '+importedRooms.length+' room(s) and '+importedChars.length+' character(s).');
-  }catch(err){alert('Import failed: '+err.message);}
-}
-document.addEventListener('dragover',e=>{if([...e.dataTransfer.items].some(i=>i.kind==='file')){e.preventDefault();document.getElementById('drop-overlay').classList.add('active');}});
-document.addEventListener('dragleave',e=>{if(!e.relatedTarget||e.relatedTarget===document.documentElement)document.getElementById('drop-overlay').classList.remove('active');});
-document.addEventListener('drop',e=>{e.preventDefault();document.getElementById('drop-overlay').classList.remove('active');const f=e.dataTransfer.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>importTweeSource(ev.target.result);r.readAsText(f);});
-
-/* ════════════════════════════════════════════════════════
-   TOOLTIP
-════════════════════════════════════════════════════════ */
-const ttEl=document.getElementById('tooltip');
-function showTooltip(e,ch){const mood=MOODS.find(m=>m.label===ch.mood)||MOODS[0];const rm=rooms.find(r=>r.id===ch.roomId);document.getElementById('tt-name').textContent=ch.name;document.getElementById('tt-loc').textContent=rm?rm.name:'?';document.getElementById('tt-mood').textContent=mood.emoji+' '+mood.label;ttEl.classList.add('show');moveTooltip(e);}
-function moveTooltip(e){ttEl.style.left=(e.clientX+14)+'px';ttEl.style.top=(e.clientY-20)+'px';}
-function hideTooltip(){ttEl.classList.remove('show');}
-
-/* ════════════════════════════════════════════════════════
-   UTILS
-════════════════════════════════════════════════════════ */
-function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
-function previewFile(inputId,previewId,dataKey){
-  const file=document.getElementById(inputId).files[0];if(!file)return;
-  const reader=new FileReader();reader.onload=e=>{const data=e.target.result;if(dataKey==='photoData')tempPhotoData=data;else tempAnimData=data;const img=document.getElementById(previewId);img.src=data;img.style.display='';};reader.readAsDataURL(file);
-}
-function save(){localStorage.setItem('lc_rooms',JSON.stringify(rooms));localStorage.setItem('lc_chars',JSON.stringify(characters));}
-
-/* ════════════════════════════════════════════════════════
-   PROJECTOR TOGGLE
-════════════════════════════════════════════════════════ */
-let projectorMode=false;
-function toggleMode(){projectorMode=!projectorMode;document.getElementById('mode-label').textContent=projectorMode?'Projector':'Facilitator';document.querySelectorAll('.hbtn.add-char,.hbtn.add-room,.hbtn.import-btn').forEach(b=>b.style.display=projectorMode?'none':'');}
-
-/* ════════════════════════════════════════════════════════
-   SEED DEMO DATA
-════════════════════════════════════════════════════════ */
-if(rooms.length===0&&characters.length===0){
-  rooms=[
-    {id:'r1',name:'The Garden', lat:44.6488,lng:-63.5752,radius:30,lede:'Sun-warm stones and overgrown paths.',backdrop:'grass'},
-    {id:'r2',name:'The Library',lat:44.6476,lng:-63.5728,radius:25,lede:'Shelves made of stacked stones.',      backdrop:'wood'},
-    {id:'r3',name:'The Kitchen',lat:44.6464,lng:-63.5699,radius:20,lede:'Always something good on the stove.',  backdrop:'stone'},
-  ];
-  characters=[
-    {id:'c1',name:'Mop',    mood:'Sleepy', roomId:'r1',items:['small hat','acorn'],       dialogue:'I just need five more minutes…',passages:{hello:'I just need five more minutes…',question:'Do you ever wonder why pillows are so soft?',secret:'I have a secret napping spot.',reaction:'When it gets too loud I pull my hat down.',item:'This acorn is from a very important tree.'},photoData:null,animData:null,glbUrl:''},
-    {id:'c2',name:'Gravel',mood:'Curious',roomId:'r2',items:['magnifying glass','notebook'],dialogue:'Have you seen anything unusual?',   passages:{hello:'Have you seen anything unusual?',question:'What is at the bottom of the garden?',secret:'I saw something move in the library.',reaction:'Every new thing goes straight in the notebook.',item:'This magnifying glass belonged to someone very small.'},photoData:null,animData:null,glbUrl:''},
-    {id:'c3',name:'Biscuit',mood:'Happy', roomId:'r3',items:['lucky pebble'],             dialogue:'Everything is going to be okay!',  passages:{hello:'Everything is going to be okay!',question:'',secret:'',reaction:'When the sun comes out I do a little spin.',item:'My lucky pebble is warm no matter the weather.'},photoData:null,animData:null,glbUrl:''},
-  ];
-  save();
-}
-
-/* ════════════════════════════════════════════════════════
-   INIT
-════════════════════════════════════════════════════════ */
-buildMoodPicker();
-buildDialogueBuilder();
-renderRoomsOnMap();
-renderCompass();
-if(rooms.length>0) leafletMap.setView([rooms[0].lat,rooms[0].lng],DEFAULT_ZOOM);
-</script>
-</body>
-</html>
+const FLO
