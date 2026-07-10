@@ -3,7 +3,7 @@ Welcome to the Living Characters world.
 
 Choose a room to explore:
 
-<< if rooms.length > 0 >>
+<<if rooms.length > 0>>
   <<for _i to 0; _i lt rooms.length; _i++>>
     [[<<= rooms[_i].name >>]]
   <</for>>
@@ -30,6 +30,7 @@ Use it to:
 :: The Garden [room]
 @room 44.648800,−63.575200
 @radius 30
+@bg garden.png
 @lede Sun-warm stones and overgrown paths.
 
 Characters here:
@@ -41,6 +42,7 @@ Characters here:
 :: The Library [room]
 @room 44.647600,−63.572800
 @radius 25
+@bg library.png
 @lede Shelves made of stacked stones.
 
 Characters here:
@@ -52,6 +54,7 @@ Characters here:
 :: The Kitchen [room]
 @room 44.646400,−63.569900
 @radius 20
+@bg kitchen.png
 @lede Always something good on the stove.
 
 Characters here:

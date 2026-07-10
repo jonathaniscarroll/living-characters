@@ -32,6 +32,12 @@
       <marquee behavior="scroll" direction="left">LIVING CHARACTERS :: CLICK A CHARACTER TO VISIT THEM :: LEAVE A NOTE FOR YOUR FRIENDS :: OUR WORLD GROWS ALL WEEK</marquee>
     </div>
 
+    <!-- ISOMETRIC ROOM STAGE -->
+    <div class="room-stage" id="roomStage" style="display:none;">
+      <img id="roomStageImg" src="" alt="">
+      <div class="room-stage-label" id="roomStageLabel"></div>
+    </div>
+
     <table class="core">
       <tr>
         <td width="62%">
@@ -156,6 +162,60 @@ a { color: #0000cc; }
 
 .layout { padding: 12px; }
 
+/* ── ISOMETRIC ROOM STAGE ──────────────────────────────────────────────────────── */
+
+/*
+  The room stage renders the isometric background image full-width
+  in a 16:9 aspect-ratio box, flush against the layout edges,
+  sitting between the toolbar/marquee and the character content table.
+  Images should be drawn on the 2400×1600px orthographic 45° template.
+*/
+.room-stage {
+  position: relative;
+  width: 100%;
+  /* 16:9 aspect ratio maintained via padding trick */
+  padding-bottom: 42%;  /* ~2.4:1 to suit isometric proportions */
+  overflow: hidden;
+  border: 2px inset #808080;
+  margin-bottom: 10px;
+  background: #1a1a2e;  /* deep fallback while image loads */
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+
+.room-stage.visible {
+  opacity: 1;
+}
+
+.room-stage img {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;         /* crops to fill; isometric template is wider than tall */
+  object-position: center top; /* anchor to top so floor is always visible */
+  image-rendering: pixelated; /* crisp pixel art if desired; remove for photo realism */
+  display: block;
+}
+
+/* Room name badge, bottom-left corner, Win95 style */
+.room-stage-label {
+  position: absolute;
+  bottom: 0; left: 0;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 12px;
+  font-weight: bold;
+  background: #800080;
+  color: #fff;
+  padding: 3px 8px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.92;
+  pointer-events: none;
+}
+
+/* ───────────────────────────────────────────────────────────────────────── */
+
 table.core {
   width: 100%;
   border-collapse: collapse;
@@ -223,7 +283,6 @@ table.core td {
   object-fit: cover;
 }
 
-/* 3D canvas portrait — enlarged */
 .char-portrait.portrait-3d {
   width: 160px;
   height: 160px;
@@ -237,7 +296,6 @@ table.core td {
   display: block;
 }
 
-/* Mixamo-inspired CSS animation stubs (fallback when no model/gif) */
 @keyframes char-wave  { 0%,100%{transform:rotate(0)}  25%{transform:rotate(-15deg)} 75%{transform:rotate(15deg)} }
 @keyframes char-idle  { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-4px)} }
 @keyframes char-dance { 0%,100%{transform:rotate(0) scale(1)} 25%{transform:rotate(-10deg) scale(1.05)} 75%{transform:rotate(10deg) scale(1.05)} }
@@ -256,8 +314,6 @@ table.core td {
 .anim-sleep { animation: char-sleep 3.0s ease-in-out infinite; }
 .anim-point { animation: char-point 1.8s ease-in-out infinite; }
 
-/* ── Mood ring ─── */
-
 .mood-ring {
   height: 6px;
   border-radius: 3px;
@@ -271,8 +327,6 @@ table.core td {
 .mood-sleepy  { background: #9060b0; }
 .mood-shy     { background: #f080a0; }
 .mood-grumpy  { background: #c03020; }
-
-/* ── Character list (sidebar) ─── */
 
 .char-list-box {
   background: #f0e8f8;
@@ -291,13 +345,7 @@ table.core td {
 }
 
 .char-list li { margin-bottom: 10px; line-height: 1.4; }
-
-.char-list a {
-  color: #800080;
-  font-weight: bold;
-  text-decoration: none;
-}
-
+.char-list a { color: #800080; font-weight: bold; text-decoration: none; }
 .char-list a:hover { text-decoration: underline; }
 
 .char-lede-preview {
@@ -306,8 +354,6 @@ table.core td {
   color: #555;
   font-style: italic;
 }
-
-/* ── Items box ─── */
 
 .items-box {
   background: #fff8f0;
@@ -318,14 +364,7 @@ table.core td {
   font-size: 13px;
 }
 
-/* ── Friends list ─── */
-
-.friends-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  padding: 6px 0;
-}
+.friends-list { display: flex; flex-wrap: wrap; gap: 6px; padding: 6px 0; }
 
 .friend-btn {
   font-family: Arial, Helvetica, sans-serif;
@@ -341,10 +380,7 @@ table.core td {
   text-decoration: none;
   display: inline-block;
 }
-
 .friend-btn:hover { background: #c8c4bc; }
-
-/* ── Comments ─── */
 
 .comment-list {
   font-family: Arial, Helvetica, sans-serif;
@@ -385,8 +421,6 @@ table.core td {
   color: #800080;
 }
 
-/* ── Button95 ─── */
-
 .button95 {
   font-family: Arial, Helvetica, sans-serif;
   font-size: 13px;
@@ -400,7 +434,6 @@ table.core td {
   min-height: 30px;
   cursor: pointer;
 }
-
 .button95:active {
   border-top: 2px solid #404040;
   border-left: 2px solid #404040;
@@ -425,6 +458,7 @@ table.core td {
   .bodycopy { font-size: 16px; }
   .token-input { max-width: 100%; font-size: 16px; }
   .char-portrait.portrait-3d { width: 120px; height: 120px; }
+  .room-stage { padding-bottom: 56%; } /* taller crop on mobile */
 }
 
 :: Story JavaScript [script]
@@ -434,33 +468,36 @@ setup.world  = setup.world  || {};
 
 /* ─────────────────────────────────────────────────────────────────────────
    DIRECTIVE PARSER
-   Parses @directives from passage text.
-   New in this version: @model <file.glb>  and  @gif <file.gif>
-   Priority for portrait: 3D model > GIF > static image > CSS-animated emoji
+   Handles all @directives used in both [room] and [char] passages.
+   @bg <file>  — isometric room background image (new)
 ───────────────────────────────────────────────────────────────────────── */
 setup.world.parse = function (passageText) {
   var lines = passageText.split(/\n/);
   var meta  = {
-    image:     null,   // @image filename.png  — static photo
+    bg:        null,   // @bg    room-bg.png  — isometric room image
+    image:     null,   // @image filename.png  — character static photo
     gif:       null,   // @gif   filename.gif  — Mixamo animation
     model:     null,   // @model filename.glb  — photogrammetric scan
     lede:      '',
-    animation: 'idle', // CSS fallback animation name
+    animation: 'idle',
     mood:      '',
     room:      null,
+    radius:    null,
     items:     [],
     body:      [],
     links:     []
   };
   lines.forEach(function (line) {
     var t = line.trim();
-    if      (t.indexOf('@model ')     === 0) { meta.model     = t.slice(7).trim(); }
+    if      (t.indexOf('@bg ')        === 0) { meta.bg        = t.slice(4).trim(); }
+    else if (t.indexOf('@model ')     === 0) { meta.model     = t.slice(7).trim(); }
     else if (t.indexOf('@gif ')       === 0) { meta.gif       = t.slice(5).trim(); }
     else if (t.indexOf('@image ')     === 0) { meta.image     = t.slice(7).trim(); }
     else if (t.indexOf('@lede ')      === 0) { meta.lede      = t.slice(6).trim(); }
     else if (t.indexOf('@animation ') === 0) { meta.animation = t.slice(11).trim(); }
     else if (t.indexOf('@mood ')      === 0) { meta.mood      = t.slice(6).trim(); }
     else if (t.indexOf('@room ')      === 0) { meta.room      = t.slice(6).trim(); }
+    else if (t.indexOf('@radius ')    === 0) { meta.radius    = t.slice(8).trim(); }
     else if (t.indexOf('@items ')     === 0) { meta.items     = t.slice(7).split(',').map(function(s){return s.trim();}).filter(Boolean); }
     else {
       var linkMatch = t.match(/^\[\[(.+?)\]\]$/);
@@ -473,11 +510,27 @@ setup.world.parse = function (passageText) {
 };
 
 /* ─────────────────────────────────────────────────────────────────────────
+   ROOM REGISTRY
+   Looks up [room]-tagged passages and parses their directives.
+───────────────────────────────────────────────────────────────────────── */
+setup.world.rooms = function () {
+  return Story.lookup('tags', 'room').map(function (p) {
+    var parsed = setup.world.parse(p.text);
+    return {
+      name:   p.title,
+      bg:     parsed.bg,
+      lede:   parsed.lede,
+      coords: parsed.room,
+      radius: parsed.radius
+    };
+  });
+};
+
+/* ─────────────────────────────────────────────────────────────────────────
    CHARACTER REGISTRY
-   Looks up [character] OR [char] tagged passages
 ───────────────────────────────────────────────────────────────────────── */
 setup.world.characters = function () {
-  var byChar = Story.lookup('tags', 'character');
+  var byChar  = Story.lookup('tags', 'character');
   var byChar2 = Story.lookup('tags', 'char');
   var all = byChar.concat(byChar2.filter(function(p){
     return !byChar.some(function(q){ return q.title === p.title; });
@@ -501,20 +554,52 @@ setup.world.characters = function () {
 };
 
 /* ─────────────────────────────────────────────────────────────────────────
-   3D PORTRAIT RENDERER
-   Lazy-loads Three.js r160 from CDN only when a .glb model is needed.
-   Falls back to GIF → image → CSS-animated emoji.
+   ROOM STAGE RENDERER
+   Finds the room this character lives in, looks up its @bg,
+   and updates the room stage panel above the content table.
 ───────────────────────────────────────────────────────────────────────── */
-setup.world._threeReady  = false;
+setup.world.renderRoomStage = function (charRoomName) {
+  var stage     = document.getElementById('roomStage');
+  var stageImg  = document.getElementById('roomStageImg');
+  var stageLabel = document.getElementById('roomStageLabel');
+  if (!stage || !stageImg) { return; }
+
+  if (!charRoomName) {
+    stage.classList.remove('visible');
+    setTimeout(function(){ stage.style.display = 'none'; }, 420);
+    return;
+  }
+
+  var room = setup.world.rooms().find(function(r){ return r.name === charRoomName; });
+
+  if (!room || !room.bg) {
+    stage.classList.remove('visible');
+    setTimeout(function(){ stage.style.display = 'none'; }, 420);
+    return;
+  }
+
+  stageImg.src = 'media/' + room.bg;
+  stageImg.alt = room.name;
+  if (stageLabel) { stageLabel.textContent = room.name; }
+
+  stage.style.display = '';
+  // Force reflow so the CSS transition fires
+  stage.offsetHeight;
+  stage.classList.add('visible');
+};
+
+/* ─────────────────────────────────────────────────────────────────────────
+   3D PORTRAIT RENDERER
+───────────────────────────────────────────────────────────────────────── */
+setup.world._threeReady   = false;
 setup.world._threeLoading = false;
-setup.world._threeQueue  = [];
+setup.world._threeQueue   = [];
 
 setup.world.loadThree = function (callback) {
   if (setup.world._threeReady) { callback(); return; }
   setup.world._threeQueue.push(callback);
   if (setup.world._threeLoading) { return; }
   setup.world._threeLoading = true;
-
   var scripts = [
     'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js',
     'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/js/loaders/GLTFLoader.js',
@@ -527,7 +612,7 @@ setup.world.loadThree = function (callback) {
     el.onload = function () {
       loaded++;
       if (loaded === scripts.length) {
-        setup.world._threeReady  = true;
+        setup.world._threeReady   = true;
         setup.world._threeLoading = false;
         setup.world._threeQueue.forEach(function(fn){ fn(); });
         setup.world._threeQueue = [];
@@ -540,71 +625,48 @@ setup.world.loadThree = function (callback) {
 setup.world._activeRenderer = null;
 
 setup.world.mountModel = function (container, modelFile) {
-  // Tear down any existing renderer
   if (setup.world._activeRenderer) {
     try { setup.world._activeRenderer.dispose(); } catch(e){}
     setup.world._activeRenderer = null;
   }
-
   container.innerHTML = '';
   container.className = 'char-portrait portrait-3d';
-
   var w = container.offsetWidth  || 160;
   var h = container.offsetHeight || 160;
-
   var renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.setSize(w, h);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   container.appendChild(renderer.domElement);
   setup.world._activeRenderer = renderer;
-
   var scene  = new THREE.Scene();
   var camera = new THREE.PerspectiveCamera(45, w / h, 0.01, 100);
   camera.position.set(0, 0.8, 2.2);
-
-  // Lighting
   scene.add(new THREE.AmbientLight(0xffffff, 0.7));
   var dir = new THREE.DirectionalLight(0xffffff, 1.2);
   dir.position.set(1, 2, 3);
   scene.add(dir);
-
-  // OrbitControls — gentle mouse/touch rotate
   var controls = new THREE.OrbitControls(camera, renderer.domElement);
-  controls.enableZoom    = false;
-  controls.enablePan     = false;
-  controls.autoRotate    = true;
-  controls.autoRotateSpeed = 1.4;
-  controls.target.set(0, 0.5, 0);
-  controls.update();
-
-  // Load the .glb
+  controls.enableZoom = false; controls.enablePan = false;
+  controls.autoRotate = true; controls.autoRotateSpeed = 1.4;
+  controls.target.set(0, 0.5, 0); controls.update();
   var loader = new THREE.GLTFLoader();
-  loader.load(
-    'media/' + modelFile,
-    function (gltf) {
-      var model = gltf.scene;
-      // Centre and normalise model
-      var box    = new THREE.Box3().setFromObject(model);
-      var centre = box.getCenter(new THREE.Vector3());
-      var size   = box.getSize(new THREE.Vector3());
-      var maxDim = Math.max(size.x, size.y, size.z);
-      model.position.sub(centre);
-      model.scale.setScalar(1.6 / maxDim);
-      model.position.y += size.y * (0.8 / maxDim);
-      scene.add(model);
-    },
-    null,
-    function (err) {
-      console.warn('GLB load failed:', err);
-      // Degrade to emoji on error
-      container.className  = 'char-portrait';
-      container.innerHTML  = '\uD83E\uDDF8';
-      renderer.dispose();
-    }
-  );
-
-  // Render loop
+  loader.load('media/' + modelFile, function (gltf) {
+    var model  = gltf.scene;
+    var box    = new THREE.Box3().setFromObject(model);
+    var centre = box.getCenter(new THREE.Vector3());
+    var size   = box.getSize(new THREE.Vector3());
+    var maxDim = Math.max(size.x, size.y, size.z);
+    model.position.sub(centre);
+    model.scale.setScalar(1.6 / maxDim);
+    model.position.y += size.y * (0.8 / maxDim);
+    scene.add(model);
+  }, null, function (err) {
+    console.warn('GLB load failed:', err);
+    container.className = 'char-portrait';
+    container.innerHTML = '\uD83E\uDDF8';
+    renderer.dispose();
+  });
   var alive = true;
   (function loop() {
     if (!alive || !document.contains(container)) { renderer.dispose(); return; }
@@ -612,56 +674,32 @@ setup.world.mountModel = function (container, modelFile) {
     controls.update();
     renderer.render(scene, camera);
   })();
-
-  // Clean up if the portrait is replaced
   var obs = new MutationObserver(function(){
     if (!document.contains(container)) { alive = false; obs.disconnect(); }
   });
   obs.observe(document.body, { childList: true, subtree: true });
 };
 
-/* ─────────────────────────────────────────────────────────────────────────
-   PORTRAIT RENDER — tiered fallback
-   1. @model  → Three.js GLTFLoader turntable
-   2. @gif    → <img> animated GIF (Mixamo export)
-   3. @image  → <img> static photo
-   4. CSS anim + emoji (original behaviour)
-───────────────────────────────────────────────────────────────────────── */
 setup.world.renderPortrait = function (portrait, ch) {
   portrait.innerHTML = '';
   portrait.className = 'char-portrait';
-
   if (ch.model) {
-    // --- 3D model path ---
-    setup.world.loadThree(function () {
-      setup.world.mountModel(portrait, ch.model);
-    });
-    // Show a spinner while Three.js loads
+    setup.world.loadThree(function () { setup.world.mountModel(portrait, ch.model); });
     portrait.innerHTML = '<div style="font-size:11px;color:#800080;text-align:center;padding-top:28px;">loading 3D…</div>';
     return;
   }
-
   if (ch.gif) {
-    // --- Mixamo GIF path ---
     var gif = document.createElement('img');
-    gif.src = 'media/' + ch.gif;
-    gif.alt = ch.name;
+    gif.src = 'media/' + ch.gif; gif.alt = ch.name;
     gif.style.cssText = 'width:100%;height:100%;object-fit:cover;';
-    portrait.appendChild(gif);
-    return;
+    portrait.appendChild(gif); return;
   }
-
   if (ch.image) {
-    // --- Static photo path ---
     var img = document.createElement('img');
-    img.src = 'media/' + ch.image;
-    img.alt = ch.name;
+    img.src = 'media/' + ch.image; img.alt = ch.name;
     portrait.appendChild(img);
-    portrait.classList.add('anim-' + (ch.animation || 'idle'));
-    return;
+    portrait.classList.add('anim-' + (ch.animation || 'idle')); return;
   }
-
-  // --- CSS animation + emoji fallback ---
   portrait.textContent = '\uD83E\uDDF8';
   portrait.classList.add('anim-' + (ch.animation || 'idle'));
 };
@@ -696,40 +734,33 @@ setup.world.render = function (ch) {
   if (ledeEl)  { ledeEl.textContent  = ch.lede; }
   if (bodyEl)  { bodyEl.textContent  = ch.body; }
 
-  if (moodEl) {
-    moodEl.className = 'mood-ring' + (ch.mood ? ' mood-' + ch.mood : '');
-  }
+  if (moodEl) { moodEl.className = 'mood-ring' + (ch.mood ? ' mood-' + ch.mood : ''); }
 
-  // Portrait — tiered 3D/GIF/image/emoji
   if (portrait) { setup.world.renderPortrait(portrait, ch); }
 
-  // Large image below body (only for @image, not for 3D/GIF)
+  // Room stage — look up room by name from character's @room directive
+  setup.world.renderRoomStage(ch.room || null);
+
   if (imageWrap && imageEl) {
     if (ch.image && !ch.model && !ch.gif) {
-      imageEl.src = 'media/' + ch.image;
-      imageEl.alt = ch.name;
+      imageEl.src = 'media/' + ch.image; imageEl.alt = ch.name;
       imageWrap.style.display = '';
     } else {
-      imageWrap.style.display = 'none';
-      imageEl.src = '';
+      imageWrap.style.display = 'none'; imageEl.src = '';
     }
   }
 
-  // Friends / connected characters
   if (friendsP && friendsL) {
     if (ch.links && ch.links.length > 0) {
       friendsL.innerHTML = '';
       ch.links.forEach(function (linkName) {
         var btn = document.createElement('button');
-        btn.className   = 'friend-btn';
-        btn.textContent = linkName;
+        btn.className = 'friend-btn'; btn.textContent = linkName;
         btn.addEventListener('click', function () { setup.world.visit(linkName); });
         friendsL.appendChild(btn);
       });
       friendsP.style.display = '';
-    } else {
-      friendsP.style.display = 'none';
-    }
+    } else { friendsP.style.display = 'none'; }
   }
 };
 
@@ -744,7 +775,7 @@ setup.world.renderCharList = function () {
     var li   = document.createElement('li');
     var a    = document.createElement('a');
     var lede = document.createElement('span');
-    a.href    = 'javascript:void(0)';
+    a.href = 'javascript:void(0)';
     a.textContent = ch.name;
     a.addEventListener('click', function () { setup.world.visit(ch.name); });
     lede.className   = 'char-lede-preview';
@@ -777,21 +808,15 @@ setup.world.comments.load = function (charName) {
   .then(function(issues){
     list.innerHTML = '';
     if (!Array.isArray(issues) || issues.length === 0) {
-      list.innerHTML = '<div class="comment-empty">No notes yet. Be the first!</div>';
-      return;
+      list.innerHTML = '<div class="comment-empty">No notes yet. Be the first!</div>'; return;
     }
     issues.forEach(function(issue){
-      var item = document.createElement('div');
-      item.className = 'comment-item';
-      var meta = document.createElement('div');
-      meta.className   = 'comment-meta';
+      var item = document.createElement('div'); item.className = 'comment-item';
+      var meta = document.createElement('div'); meta.className = 'comment-meta';
       meta.textContent = (issue.user ? issue.user.login : 'someone') + ' — ' + (issue.created_at || '').slice(0,10);
-      var body = document.createElement('div');
-      body.className   = 'comment-body';
+      var body = document.createElement('div'); body.className = 'comment-body';
       body.textContent = issue.title || '';
-      item.appendChild(meta);
-      item.appendChild(body);
-      list.appendChild(item);
+      item.appendChild(meta); item.appendChild(body); list.appendChild(item);
     });
   })
   .catch(function(){
@@ -802,31 +827,14 @@ setup.world.comments.load = function (charName) {
 setup.world.comments.submit = function (charName, text) {
   var status = document.getElementById('commentStatus');
   var token  = (document.getElementById('ghTokenInput') || {}).value || '';
-  if (!token) {
-    if (status) { status.textContent = 'Enter a GitHub token above to leave a note.'; }
-    return;
-  }
-  if (!text.trim()) {
-    if (status) { status.textContent = 'Write something first!'; }
-    return;
-  }
+  if (!token) { if (status) { status.textContent = 'Enter a GitHub token above to leave a note.'; } return; }
+  if (!text.trim()) { if (status) { status.textContent = 'Write something first!'; } return; }
   if (status) { status.textContent = 'Saving…'; }
-  fetch(
-    'https://api.github.com/repos/jonathaniscarroll/living-characters/issues',
-    {
-      method:  'POST',
-      headers: {
-        'Authorization': 'token ' + token,
-        'Accept':        'application/vnd.github.v3+json',
-        'Content-Type':  'application/json'
-      },
-      body: JSON.stringify({
-        title:  text.trim().slice(0, 140),
-        body:   'Left for **' + charName + '** via the Living Characters world.',
-        labels: ['character-note', charName]
-      })
-    }
-  )
+  fetch('https://api.github.com/repos/jonathaniscarroll/living-characters/issues', {
+    method: 'POST',
+    headers: { 'Authorization': 'token ' + token, 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title: text.trim().slice(0,140), body: 'Left for **' + charName + '** via the Living Characters world.', labels: ['character-note', charName] })
+  })
   .then(function(r){ return r.json(); })
   .then(function(){
     if (status) { status.textContent = '✓ Note saved!'; }
@@ -834,13 +842,11 @@ setup.world.comments.submit = function (charName, text) {
     if (input) { input.value = ''; }
     setTimeout(function(){ setup.world.comments.load(charName); }, 800);
   })
-  .catch(function(){
-    if (status) { status.textContent = 'Error saving note.'; }
-  });
+  .catch(function(){ if (status) { status.textContent = 'Error saving note.'; } });
 };
 
 /* ─────────────────────────────────────────────────────────────────────────
-   INIT — runs after SugarCube renders StoryInterface
+   INIT
 ───────────────────────────────────────────────────────────────────────── */
 $(document).one(':passagerender', function () {
   setup.world.renderCharList();
@@ -853,12 +859,14 @@ $(document).one(':passagerender', function () {
       var b = document.getElementById('passageBody');
       var p = document.getElementById('charPortrait');
       var c = document.getElementById('commentsPanel');
+      var s = document.getElementById('roomStage');
       if (t) { t.textContent = 'Welcome to Our World'; }
       if (l) { l.textContent = 'Click a character on the right to visit them.'; }
       if (b) { b.textContent = 'This is the shared world we built together. Every character here was made by hand — felted, sculpted, drawn, and brought to life.'; }
       if (p) { p.innerHTML = ''; p.className = 'char-portrait'; p.textContent = '\uD83C\uDF0D'; }
       if (c) { c.style.display = 'none'; }
-      // Dispose any active Three.js renderer
+      // Hide room stage on home
+      if (s) { s.classList.remove('visible'); setTimeout(function(){ s.style.display = 'none'; }, 420); }
       if (setup.world._activeRenderer) {
         try { setup.world._activeRenderer.dispose(); } catch(e){}
         setup.world._activeRenderer = null;
@@ -867,9 +875,7 @@ $(document).one(':passagerender', function () {
   }
 
   var allBtn = document.getElementById('allCharsBtn');
-  if (allBtn) {
-    allBtn.addEventListener('click', function () { setup.world.renderCharList(); });
-  }
+  if (allBtn) { allBtn.addEventListener('click', function () { setup.world.renderCharList(); }); }
 
   var themeBtn = document.getElementById('themeBtn');
   if (themeBtn) {
