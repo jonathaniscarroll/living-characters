@@ -1,38 +1,8 @@
-:: StoryTitle
-Living Characters World
-
-:: StoryData
-{}
-
-:: Test {"lat":45,"lng":46,"radius":30,"backdrop":"stone"}
-Room
-
-:: Ifif {"roomId":"1783703350297_r","mood":"Happy","items":[]}
-:: Test Room {"lat":44.636948443780064,"lng":-63.57813835144044,"radius":30,"backdrop":"forest"}
+:: Test Room {"lat":44.65,"lng":-63.59,"radius":30,"backdrop":"forest"}
 A room for testing.
 
-:: Pebble {"roomId":"room_1783712831347","mood":"Happy","items":["small rock","lucky leaf"]}
-:: Pebble-hello
-Oh! A visitor. Hello!
+:: Pebble {"roomId":"room_Test Room","mood":"Happy","items":["small rock","lucky leaf"]}
 
-:: Pebble-secret
-I found a tiny door under the big root.
-
-:: Hop {"roomId":"room_1783712831347","mood":"Happy","items":[]}
-:: Test Room {"lat":44.65087946189741,"lng":-63.58996152877808,"radius":30,"backdrop":"forest"}
-A room for testing.
-
-:: Pebble {"roomId":"room_1783713897919","mood":"Happy","items":["small rock","lucky leaf"]}
-:: Pebble-hello
-Oh! A visitor. Hello!
-
-:: Pebble-secret
-I found a tiny door under the big root.
-
-:: Test Room {"lat":44.64981089952797,"lng":-63.59021902084351,"radius":30,"backdrop":"forest"}
-A room for testing.
-
-:: Pebble {"roomId":"room_1783713926658","mood":"Happy","items":["small rock","lucky leaf"]}
 :: Pebble-hello
 Oh! A visitor. Hello!
 
