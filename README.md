@@ -15,10 +15,11 @@ living-characters/
     StoryData.twee         ← Twine StoryTitle + StoryData passages
     rooms.twee             ← [room] tagged passages with @room lat,lng @radius
     characters.twee        ← [char] tagged passages with dialogue trees
-    main.twee              ← any additional passages (optional)
+    main.twee              ← StoryInterface, Stylesheet, JavaScript
+  media/                   ← character assets (GLB scans, GIFs, photos)
   vendor/
     tweego/
-      tweego               ← Tweego binary (Linux amd64, committed for CI)
+      tweego               ← Tweego binary (Linux x64, committed for CI)
     storyformats/
       sugarcube-2/
         format.js          ← SugarCube 2 story format (committed for CI)
@@ -86,11 +87,15 @@ See `vendor/tweego/TWEEGO.md` and `vendor/storyformats/sugarcube-2/FORMAT.md` fo
 ```
 
 ### Characters
+
 ```twee
 :: CharacterName [char]
 @room RoomName
 @mood Happy
 @items item one, item two
+@model  charactername.glb
+@gif    charactername-wave.gif
+@image  charactername.png
 
 [[👋 Hello->CharacterName-hello]]
 [[❓ Question->CharacterName-question]]
@@ -103,6 +108,19 @@ What they say when you first meet them.
 
 [[← Back->CharacterName]]
 ```
+
+### Portrait asset priority
+
+The portrait in the character card resolves in this order — use whichever asset type you have:
+
+| Priority | Directive | Asset | How to make it |
+|---|---|---|---|
+| 1 | `@model charactername.glb` | Photogrammetric scan | Polycam / Scaniverse → export GLB |
+| 2 | `@gif charactername-wave.gif` | Mixamo animation | Mixamo → FBX → GIF via ezgif or ffmpeg |
+| 3 | `@image charactername.png` | Static photo | Any camera |
+| 4 | *(none)* | CSS-animated emoji 🧸 | Automatic fallback |
+
+Place all asset files in the `media/` folder and commit them alongside the `.twee` source. See [`media/README.md`](media/README.md) for the full scan → `.glb` → commit pipeline.
 
 ---
 
