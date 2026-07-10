@@ -701,8 +701,10 @@ function openRoom(roomId) {
   activeRoomId = roomId;
   document.getElementById('room-title').textContent = room.name;
   document.getElementById('room-lede').textContent  = room.lede || '';
-  document.getElementById('room-view').classList.add('open');
-  buildRoomScene(room);
+  const view = document.getElementById('room-view');
+  view.classList.add('open');
+  /* Wait for the slide-up transition (350ms) before measuring stage size */
+  setTimeout(() => buildRoomScene(room), 360);
 }
 
 function closeRoom() {
@@ -714,7 +716,8 @@ function closeRoom() {
 function buildRoomScene(room) {
   destroyRoomScene();
   const stage = document.getElementById('room-stage');
-  const W = stage.clientWidth || 800, H = stage.clientHeight || 500;
+  const W = stage.clientWidth  || window.innerWidth;
+  const H = stage.clientHeight || (window.innerHeight - 86 - 44);
 
   const scene    = new THREE.Scene();
   scene.background = new THREE.Color(FLOOR_COLORS[room.backdrop] || '#1a1a2e');
@@ -862,7 +865,8 @@ function startGPS() {
     checkProximity();
     updateCompass();
   }, err => {
-    document.getElementById('gps-status').textContent = 'GPS: error';
+    const msgs = { 1:'permission denied', 2:'position unavailable', 3:'timeout' };
+    document.getElementById('gps-status').textContent = 'GPS: ' + (msgs[err.code] || err.message || 'error');
   }, { enableHighAccuracy: true });
 }
 
@@ -1112,7 +1116,6 @@ function saveCharacter() {
   if (!name) { alert('Please give the character a name.'); return; }
 
   const activeMoodBtn = document.querySelector('#mood-picker .mood-opt.active');
-  const mood = activeMoodBtn ? activeMoodBtn.textContent.replace(/[^\w\s]/g,'').trim() : 'Happy';
   const moodLabel = MOODS.find(m => activeMoodBtn && activeMoodBtn.textContent.includes(m.emoji))?.label || 'Happy';
 
   const passages = [];
