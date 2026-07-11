@@ -293,6 +293,11 @@ let ghFileSha = null;
 // Raw URL for assets in this repo's media/ directory
 const MEDIA_URL = `https://raw.githubusercontent.com/${GH_OWNER}/${GH_REPO}/main/media/`;
 
+// Map backdrop key -> image file in media/ (null = use solid colour fallback)
+const BACKDROP_IMAGES = {
+  grass: 'garden.png',
+};
+
 function getToken() {
   return document.getElementById('gh-token-input').value.trim()
     || localStorage.getItem('lc_gh_token') || '';
@@ -479,25 +484,40 @@ function closeRoom(){
   document.getElementById('room-view').classList.remove('open');
   destroyRoomScene();activeRoomId=null;
 }
+
 function buildRoomScene(room){
   destroyRoomScene();
   const stage=document.getElementById('room-stage');
   const W=stage.clientWidth||window.innerWidth, H=stage.clientHeight||(window.innerHeight-86-44);
   const scene=new THREE.Scene();
-  scene.background=new THREE.Color(FLOOR_COLORS[room.backdrop]||'#1a1a2e');
   const aspect=W/H, frustum=8;
   const camera=new THREE.OrthographicCamera(-frustum*aspect,frustum*aspect,frustum,-frustum,0.1,100);
   camera.position.set(10,10,10);camera.lookAt(0,0,0);
   const renderer=new THREE.WebGLRenderer({antialias:true});
   renderer.setSize(W,H);renderer.setPixelRatio(window.devicePixelRatio);
   stage.appendChild(renderer.domElement);
-  const floor=new THREE.Mesh(new THREE.PlaneGeometry(12,12),new THREE.MeshLambertMaterial({color:FLOOR_COLORS[room.backdrop]||'#1a3a1a'}));
+
+  // --- background: image if available, else solid colour ---
+  const bgImageFile = BACKDROP_IMAGES[room.backdrop];
+  if (bgImageFile) {
+    new THREE.TextureLoader().load(
+      MEDIA_URL + bgImageFile,
+      tex => { scene.background = tex; },
+      undefined,
+      () => { scene.background = new THREE.Color(FLOOR_COLORS[room.backdrop]||'#1a1a2e'); }
+    );
+  } else {
+    scene.background = new THREE.Color(FLOOR_COLORS[room.backdrop]||'#1a1a2e');
+  }
+
+  const floor=new THREE.Mesh(new THREE.PlaneGeometry(12,12),new THREE.MeshLambertMaterial({color:FLOOR_COLORS[room.backdrop]||'#1a3a1a',transparent:true,opacity: bgImageFile?0:1}));
   floor.rotation.x=-Math.PI/2;scene.add(floor);
-  const wallMat=new THREE.MeshLambertMaterial({color:WALL_COLORS[room.backdrop]||'#2d5a27'});
+  const wallMat=new THREE.MeshLambertMaterial({color:WALL_COLORS[room.backdrop]||'#2d5a27',transparent:true,opacity: bgImageFile?0:1});
   const wallN=new THREE.Mesh(new THREE.BoxGeometry(12,4,0.2),wallMat);wallN.position.set(0,2,-6);scene.add(wallN);
   const wallW=new THREE.Mesh(new THREE.BoxGeometry(0.2,4,12),wallMat);wallW.position.set(-6,2,0);scene.add(wallW);
-  scene.add(new THREE.AmbientLight(0xffffff,0.6));
-  const dl=new THREE.DirectionalLight(0xffffff,0.8);dl.position.set(5,10,5);scene.add(dl);
+  scene.add(new THREE.AmbientLight(0xffffff,0.8));
+  const dl=new THREE.DirectionalLight(0xffffff,0.6);dl.position.set(5,10,5);scene.add(dl);
+
   const charsInRoom=characters.filter(c=>c.roomId===room.id), labels=[];
   charsInRoom.forEach((ch,i)=>{
     const angle=(i/Math.max(charsInRoom.length,1))*Math.PI*1.2-0.6;
@@ -540,6 +560,7 @@ function buildRoomScene(room){
     }
   });
 }
+
 function destroyRoomScene(){
   if(threeAnimFrameId){cancelAnimationFrame(threeAnimFrameId);threeAnimFrameId=null;}
   if(threeRenderer){threeRenderer.dispose();const c=threeRenderer.domElement;if(c.parentNode)c.parentNode.removeChild(c);threeRenderer=null;}
@@ -609,9 +630,9 @@ function spawnTestRoom(){
       {type:'hello',  text:'Oh! A visitor. Hello!'},
       {type:'secret', text:'I found a tiny door under the big root.'}
     ],
-    photoData: MEDIA_URL + 'garden.png',
-    animData: null,
-    glbUrl: null
+    photoData: null,
+    animData:  null,
+    glbUrl:    null
   });
   renderMapPins();updateCompass();save();map.panTo([centre.lat,centre.lng]);
 }
@@ -734,9 +755,6 @@ function saveCharacter(){
   closeCharModal();renderMapPins();save();
 }
 
-/*
-  buildTweeSource: room id stored in metadata for lossless round-trips.
-*/
 function buildTweeSource(rooms, chars) {
   let out = '';
   rooms.forEach(room => {
