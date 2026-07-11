@@ -69,9 +69,10 @@
     #room-header{background:linear-gradient(90deg,#0f3460,#16213e);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;padding:0 16px;height:44px;flex-shrink:0;}
     #room-back{background:none;border:none;color:var(--accent2);font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;padding:0;}
     #room-title{font-size:14px;font-weight:800;} #room-lede{font-size:11px;color:var(--text-muted);margin-left:auto;}
-    #room-stage{flex:1;position:relative;overflow:hidden;background:#0a0f1e;}
-    #room-stage canvas{display:block;width:100%!important;height:100%!important;}
-    .char-label{position:absolute;pointer-events:none;background:rgba(10,15,30,.85);color:var(--text);font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;backdrop-filter:blur(4px);white-space:nowrap;transform:translate(-50%,0);}
+    /* room-stage: Three.js canvas sits on top; CSS bg image is the room backdrop */
+    #room-stage{flex:1;position:relative;overflow:hidden;background:#1a3a10 center/cover no-repeat;}
+    #room-stage canvas{display:block;width:100%!important;height:100%!important;position:absolute;top:0;left:0;}
+    .char-label{position:absolute;pointer-events:none;background:rgba(10,15,30,.85);color:var(--text);font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;backdrop-filter:blur(4px);white-space:nowrap;transform:translate(-50%,0);z-index:10;}
     #card{position:fixed;right:0;top:86px;bottom:0;width:340px;max-width:100vw;background:var(--surface);border-left:1px solid var(--border);display:flex;flex-direction:column;transform:translateX(100%);transition:transform .28s cubic-bezier(.16,1,.3,1);z-index:1300;overflow-y:auto;}
     #card.open{transform:translateX(0);}
     #card-close{position:absolute;top:10px;right:12px;background:none;border:none;color:var(--text-muted);font-size:20px;cursor:pointer;}
@@ -290,10 +291,9 @@ const GH_PATH   = 'story/main.twee';
 const GH_BRANCH = 'main';
 let ghFileSha = null;
 
-// Raw URL for assets in this repo's media/ directory
 const MEDIA_URL = `https://raw.githubusercontent.com/${GH_OWNER}/${GH_REPO}/main/media/`;
 
-// Map backdrop key -> image file in media/ (null = use solid colour fallback)
+// Backdrop key -> image filename in media/ (used as CSS background on #room-stage)
 const BACKDROP_IMAGES = {
   grass: 'garden.png',
 };
@@ -477,12 +477,26 @@ function openRoom(roomId){
   activeRoomId=roomId;
   document.getElementById('room-title').textContent=room.name;
   document.getElementById('room-lede').textContent=room.lede||'';
+  // Apply CSS background image to the stage before the scene builds
+  const stage=document.getElementById('room-stage');
+  const bgFile=BACKDROP_IMAGES[room.backdrop];
+  if(bgFile){
+    stage.style.backgroundImage=`url('${MEDIA_URL}${bgFile}')`;
+    stage.style.backgroundSize='cover';
+    stage.style.backgroundPosition='center';
+  } else {
+    stage.style.backgroundImage='';
+    stage.style.background=FLOOR_COLORS[room.backdrop]||'#1a1a2e';
+  }
   document.getElementById('room-view').classList.add('open');
   setTimeout(()=>buildRoomScene(room),360);
 }
 function closeRoom(){
   document.getElementById('room-view').classList.remove('open');
   destroyRoomScene();activeRoomId=null;
+  const stage=document.getElementById('room-stage');
+  stage.style.backgroundImage='';
+  stage.style.background='';
 }
 
 function buildRoomScene(room){
@@ -490,33 +504,28 @@ function buildRoomScene(room){
   const stage=document.getElementById('room-stage');
   const W=stage.clientWidth||window.innerWidth, H=stage.clientHeight||(window.innerHeight-86-44);
   const scene=new THREE.Scene();
+  // Keep Three.js background transparent so the CSS bg image shows through
+  scene.background=null;
   const aspect=W/H, frustum=8;
   const camera=new THREE.OrthographicCamera(-frustum*aspect,frustum*aspect,frustum,-frustum,0.1,100);
   camera.position.set(10,10,10);camera.lookAt(0,0,0);
-  const renderer=new THREE.WebGLRenderer({antialias:true});
+  const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});
+  renderer.setClearColor(0x000000,0);
   renderer.setSize(W,H);renderer.setPixelRatio(window.devicePixelRatio);
   stage.appendChild(renderer.domElement);
 
-  // --- background: image if available, else solid colour ---
-  const bgImageFile = BACKDROP_IMAGES[room.backdrop];
-  if (bgImageFile) {
-    new THREE.TextureLoader().load(
-      MEDIA_URL + bgImageFile,
-      tex => { scene.background = tex; },
-      undefined,
-      () => { scene.background = new THREE.Color(FLOOR_COLORS[room.backdrop]||'#1a1a2e'); }
-    );
-  } else {
-    scene.background = new THREE.Color(FLOOR_COLORS[room.backdrop]||'#1a1a2e');
-  }
-
-  const floor=new THREE.Mesh(new THREE.PlaneGeometry(12,12),new THREE.MeshLambertMaterial({color:FLOOR_COLORS[room.backdrop]||'#1a3a1a',transparent:true,opacity: bgImageFile?0:1}));
+  // Floor and walls always visible (semi-transparent when bg image present)
+  const hasBg=!!BACKDROP_IMAGES[room.backdrop];
+  const floor=new THREE.Mesh(
+    new THREE.PlaneGeometry(12,12),
+    new THREE.MeshLambertMaterial({color:FLOOR_COLORS[room.backdrop]||'#1a3a1a',transparent:hasBg,opacity:hasBg?0.25:1})
+  );
   floor.rotation.x=-Math.PI/2;scene.add(floor);
-  const wallMat=new THREE.MeshLambertMaterial({color:WALL_COLORS[room.backdrop]||'#2d5a27',transparent:true,opacity: bgImageFile?0:1});
+  const wallMat=new THREE.MeshLambertMaterial({color:WALL_COLORS[room.backdrop]||'#2d5a27',transparent:hasBg,opacity:hasBg?0.25:1});
   const wallN=new THREE.Mesh(new THREE.BoxGeometry(12,4,0.2),wallMat);wallN.position.set(0,2,-6);scene.add(wallN);
   const wallW=new THREE.Mesh(new THREE.BoxGeometry(0.2,4,12),wallMat);wallW.position.set(-6,2,0);scene.add(wallW);
-  scene.add(new THREE.AmbientLight(0xffffff,0.8));
-  const dl=new THREE.DirectionalLight(0xffffff,0.6);dl.position.set(5,10,5);scene.add(dl);
+  scene.add(new THREE.AmbientLight(0xffffff,0.9));
+  const dl=new THREE.DirectionalLight(0xffffff,0.5);dl.position.set(5,10,5);scene.add(dl);
 
   const charsInRoom=characters.filter(c=>c.roomId===room.id), labels=[];
   charsInRoom.forEach((ch,i)=>{
