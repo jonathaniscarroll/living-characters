@@ -69,7 +69,6 @@
     #room-header{background:linear-gradient(90deg,#0f3460,#16213e);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;padding:0 16px;height:44px;flex-shrink:0;}
     #room-back{background:none;border:none;color:var(--accent2);font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;padding:0;}
     #room-title{font-size:14px;font-weight:800;} #room-lede{font-size:11px;color:var(--text-muted);margin-left:auto;}
-    /* room-stage: Three.js canvas sits on top; CSS bg image is the room backdrop */
     #room-stage{flex:1;position:relative;overflow:hidden;background:#1a3a10 center/cover no-repeat;}
     #room-stage canvas{display:block;width:100%!important;height:100%!important;position:absolute;top:0;left:0;}
     .char-label{position:absolute;pointer-events:none;background:rgba(10,15,30,.85);color:var(--text);font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;backdrop-filter:blur(4px);white-space:nowrap;transform:translate(-50%,0);z-index:10;}
@@ -293,10 +292,13 @@ let ghFileSha = null;
 
 const MEDIA_URL = `https://raw.githubusercontent.com/${GH_OWNER}/${GH_REPO}/main/media/`;
 
-// Backdrop key -> image filename in media/ (used as CSS background on #room-stage)
+// Backdrop key -> image filename in media/ (CSS background on #room-stage)
 const BACKDROP_IMAGES = {
   grass: 'garden.png',
 };
+
+// Default GLB for the test character — Three.js Soldier model, CORS-safe
+const DEFAULT_GLB_URL = 'https://threejs.org/examples/models/gltf/Soldier.glb';
 
 function getToken() {
   return document.getElementById('gh-token-input').value.trim()
@@ -385,6 +387,7 @@ let map, roomPickerMap, roomPickerMarker;
 let gpsWatchId=null, userLat=null, userLng=null;
 let simActive=false, simInterval=null, facilitatorMode=true, activeRoomId=null;
 let threeScene=null, threeRenderer=null, threeCamera=null, threeAnimFrameId=null;
+let glbMixers=[];
 
 function initMap() {
   map = L.map('map', { zoomControl: true }).setView([44.65, -63.59], 16);
@@ -477,7 +480,6 @@ function openRoom(roomId){
   activeRoomId=roomId;
   document.getElementById('room-title').textContent=room.name;
   document.getElementById('room-lede').textContent=room.lede||'';
-  // Apply CSS background image to the stage before the scene builds
   const stage=document.getElementById('room-stage');
   const bgFile=BACKDROP_IMAGES[room.backdrop];
   if(bgFile){
@@ -504,68 +506,149 @@ function buildRoomScene(room){
   const stage=document.getElementById('room-stage');
   const W=stage.clientWidth||window.innerWidth, H=stage.clientHeight||(window.innerHeight-86-44);
   const scene=new THREE.Scene();
-  // Keep Three.js background transparent so the CSS bg image shows through
   scene.background=null;
-  const aspect=W/H, frustum=8;
-  const camera=new THREE.OrthographicCamera(-frustum*aspect,frustum*aspect,frustum,-frustum,0.1,100);
-  camera.position.set(10,10,10);camera.lookAt(0,0,0);
+
+  // Perspective camera works better for GLB models
+  const camera=new THREE.PerspectiveCamera(45,W/H,0.1,100);
+  camera.position.set(0,3,9);camera.lookAt(0,1,0);
+
   const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});
   renderer.setClearColor(0x000000,0);
+  renderer.shadowMap.enabled=true;
   renderer.setSize(W,H);renderer.setPixelRatio(window.devicePixelRatio);
   stage.appendChild(renderer.domElement);
 
-  // Floor and walls always visible (semi-transparent when bg image present)
   const hasBg=!!BACKDROP_IMAGES[room.backdrop];
+  // Invisible ground plane for shadow receiving; tinted walls for depth when no bg
   const floor=new THREE.Mesh(
-    new THREE.PlaneGeometry(12,12),
-    new THREE.MeshLambertMaterial({color:FLOOR_COLORS[room.backdrop]||'#1a3a1a',transparent:hasBg,opacity:hasBg?0.25:1})
+    new THREE.PlaneGeometry(20,20),
+    new THREE.MeshLambertMaterial({color:FLOOR_COLORS[room.backdrop]||'#1a3a1a',transparent:hasBg,opacity:hasBg?0.18:1})
   );
-  floor.rotation.x=-Math.PI/2;scene.add(floor);
-  const wallMat=new THREE.MeshLambertMaterial({color:WALL_COLORS[room.backdrop]||'#2d5a27',transparent:hasBg,opacity:hasBg?0.25:1});
-  const wallN=new THREE.Mesh(new THREE.BoxGeometry(12,4,0.2),wallMat);wallN.position.set(0,2,-6);scene.add(wallN);
-  const wallW=new THREE.Mesh(new THREE.BoxGeometry(0.2,4,12),wallMat);wallW.position.set(-6,2,0);scene.add(wallW);
-  scene.add(new THREE.AmbientLight(0xffffff,0.9));
-  const dl=new THREE.DirectionalLight(0xffffff,0.5);dl.position.set(5,10,5);scene.add(dl);
+  floor.rotation.x=-Math.PI/2;floor.receiveShadow=true;scene.add(floor);
+  if(!hasBg){
+    const wallMat=new THREE.MeshLambertMaterial({color:WALL_COLORS[room.backdrop]||'#2d5a27'});
+    const wallN=new THREE.Mesh(new THREE.BoxGeometry(20,6,0.2),wallMat);wallN.position.set(0,3,-8);scene.add(wallN);
+    const wallW=new THREE.Mesh(new THREE.BoxGeometry(0.2,6,20),wallMat);wallW.position.set(-8,3,0);scene.add(wallW);
+  }
+  scene.add(new THREE.AmbientLight(0xffffff,0.85));
+  const dl=new THREE.DirectionalLight(0xffffff,0.7);dl.position.set(5,12,5);dl.castShadow=true;scene.add(dl);
 
-  const charsInRoom=characters.filter(c=>c.roomId===room.id), labels=[];
+  glbMixers=[];
+  const clock=new THREE.Clock();
+  const charsInRoom=characters.filter(c=>c.roomId===room.id);
+  const labels=[];
+  // Track loaded objects for click detection {obj3d, chId, cx, cz}
+  const charObjects=[];
+
   charsInRoom.forEach((ch,i)=>{
     const angle=(i/Math.max(charsInRoom.length,1))*Math.PI*1.2-0.6;
     const cx=Math.cos(angle)*3.5, cz=Math.sin(angle)*3.5;
     const mood=MOODS.find(m=>m.label===ch.mood)||MOODS[0];
-    const ring=new THREE.Mesh(new THREE.RingGeometry(0.45,0.6,32),new THREE.MeshBasicMaterial({color:mood.color,side:THREE.DoubleSide}));
+
+    // Mood ring on floor
+    const ring=new THREE.Mesh(
+      new THREE.RingGeometry(0.5,0.7,32),
+      new THREE.MeshBasicMaterial({color:mood.color,side:THREE.DoubleSide})
+    );
     ring.rotation.x=-Math.PI/2;ring.position.set(cx,0.01,cz);scene.add(ring);
-    if(ch.photoData||ch.animData){
+
+    const glbUrl=ch.glbUrl||null;
+    if(glbUrl&&THREE.GLTFLoader){
+      const loader=new THREE.GLTFLoader();
+      loader.load(glbUrl, gltf=>{
+        const model=gltf.scene;
+        // Auto-scale: fit to a 2-unit tall bounding box
+        const box=new THREE.Box3().setFromObject(model);
+        const size=new THREE.Vector3(); box.getSize(size);
+        const maxDim=Math.max(size.x,size.y,size.z);
+        const scale=2/maxDim;
+        model.scale.setScalar(scale);
+        // Sit on floor
+        box.setFromObject(model);
+        model.position.set(cx,-box.min.y,cz);
+        model.castShadow=true;
+        // Face camera (toward +Z)
+        model.rotation.y=Math.PI;
+        scene.add(model);
+        charObjects.push({obj:model,chId:ch.id,cx,cz});
+        // Play first animation clip if present
+        if(gltf.animations&&gltf.animations.length){
+          const mixer=new THREE.AnimationMixer(model);
+          // Prefer 'Idle' clip, else use first
+          const clip=THREE.AnimationClip.findByName(gltf.animations,'Idle')||gltf.animations[0];
+          mixer.clipAction(clip).play();
+          glbMixers.push(mixer);
+        }
+        // Label above head
+        const label=document.createElement('div');label.className='char-label';label.textContent=ch.name;
+        stage.appendChild(label);
+        labels.push({label,obj:model,headY:size.y*scale+0.3});
+      },undefined,err=>{
+        console.warn('GLB load failed for',ch.name,err);
+        addFallbackBox(ch,cx,cz,mood,scene,stage,labels,charObjects);
+      });
+    } else if(ch.photoData||ch.animData){
       const tex=new THREE.TextureLoader().load(ch.animData||ch.photoData);
       const sprite=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true}));
-      sprite.scale.set(1.6,1.6,1);sprite.position.set(cx,1.0,cz);scene.add(sprite);
-    }else{
-      const box=new THREE.Mesh(new THREE.BoxGeometry(0.8,1.4,0.3),new THREE.MeshLambertMaterial({color:mood.color}));
-      box.position.set(cx,0.7,cz);scene.add(box);
+      sprite.scale.set(1.8,1.8,1);sprite.position.set(cx,1.1,cz);scene.add(sprite);
+      charObjects.push({obj:sprite,chId:ch.id,cx,cz});
+      const label=document.createElement('div');label.className='char-label';label.textContent=ch.name;
+      stage.appendChild(label);labels.push({label,obj:sprite,headY:2.1});
+    } else {
+      addFallbackBox(ch,cx,cz,mood,scene,stage,labels,charObjects);
     }
-    const label=document.createElement('div');label.className='char-label';label.textContent=ch.name;
-    stage.appendChild(label);labels.push({label,cx,cz});
   });
+
+  function addFallbackBox(ch,cx,cz,mood,scene,stage,labels,charObjects){
+    const box=new THREE.Mesh(
+      new THREE.BoxGeometry(0.8,1.4,0.3),
+      new THREE.MeshLambertMaterial({color:mood.color})
+    );
+    box.position.set(cx,0.7,cz);box.castShadow=true;scene.add(box);
+    charObjects.push({obj:box,chId:ch.id,cx,cz});
+    const label=document.createElement('div');label.className='char-label';label.textContent=ch.name;
+    stage.appendChild(label);labels.push({label,obj:box,headY:1.6});
+  }
+
   threeScene=scene;threeRenderer=renderer;threeCamera=camera;
+
   function updateLabels(){
-    labels.forEach(({label,cx,cz})=>{
-      const vec=new THREE.Vector3(cx,1.9,cz);vec.project(camera);
-      label.style.left=((vec.x*0.5+0.5)*W)+'px';label.style.top=((-vec.y*0.5+0.5)*H)+'px';
+    labels.forEach(({label,obj,headY})=>{
+      const pos=obj.position.clone();pos.y=headY;
+      pos.project(camera);
+      label.style.left=((pos.x*0.5+0.5)*W)+'px';
+      label.style.top=((-pos.y*0.5+0.5)*H)+'px';
     });
   }
-  function animate(){threeAnimFrameId=requestAnimationFrame(animate);renderer.render(scene,camera);updateLabels();}
+
+  function animate(){
+    threeAnimFrameId=requestAnimationFrame(animate);
+    const dt=clock.getDelta();
+    glbMixers.forEach(m=>m.update(dt));
+    renderer.render(scene,camera);
+    updateLabels();
+  }
   animate();
+
   renderer.domElement.addEventListener('click',e=>{
     const rect=renderer.domElement.getBoundingClientRect();
-    const mouse=new THREE.Vector2(((e.clientX-rect.left)/rect.width)*2-1,-(((e.clientY-rect.top)/rect.height)*2-1));
+    const mouse=new THREE.Vector2(
+      ((e.clientX-rect.left)/rect.width)*2-1,
+      -(((e.clientY-rect.top)/rect.height)*2-1)
+    );
     const ray=new THREE.Raycaster();ray.setFromCamera(mouse,camera);
-    const hits=ray.intersectObjects(scene.children,true);
+    const meshes=[];
+    charObjects.forEach(({obj})=>obj.traverse?obj.traverse(c=>{if(c.isMesh)meshes.push(c);}):meshes.push(obj));
+    const hits=ray.intersectObjects(meshes,false);
     if(hits.length){
-      const pos=hits[0].object.position;
-      charsInRoom.forEach((ch,i)=>{
-        const a=(i/Math.max(charsInRoom.length,1))*Math.PI*1.2-0.6;
-        const cx=Math.cos(a)*3.5,cz=Math.sin(a)*3.5;
-        if(Math.abs(pos.x-cx)<1&&Math.abs(pos.z-cz)<1)openCard(ch.id);
+      // Find which character was hit
+      const hitPos=hits[0].object.getWorldPosition(new THREE.Vector3());
+      let closest=null,minD=Infinity;
+      charObjects.forEach(({chId,cx,cz})=>{
+        const d=Math.hypot(hitPos.x-cx,hitPos.z-cz);
+        if(d<minD){minD=d;closest=chId;}
       });
+      if(closest&&minD<2)openCard(closest);
     }
   });
 }
@@ -574,6 +657,7 @@ function destroyRoomScene(){
   if(threeAnimFrameId){cancelAnimationFrame(threeAnimFrameId);threeAnimFrameId=null;}
   if(threeRenderer){threeRenderer.dispose();const c=threeRenderer.domElement;if(c.parentNode)c.parentNode.removeChild(c);threeRenderer=null;}
   document.getElementById('room-stage').querySelectorAll('.char-label').forEach(el=>el.remove());
+  glbMixers=[];
   threeScene=null;threeCamera=null;
 }
 
@@ -628,7 +712,7 @@ function toggleMode(){
 
 function spawnTestRoom(){
   const centre=map.getCenter(),roomId='room_'+Date.now();
-  rooms.push({id:roomId,name:'Test Room',lede:'A room for testing.',lat:centre.lat,lng:centre.lng,radius:30,backdrop:'grass'});
+  rooms.push({id:roomId,name:'Test Room',lede:'A sun-warm garden.',lat:centre.lat,lng:centre.lng,radius:30,backdrop:'grass'});
   characters.push({
     id:'char_'+Date.now(),
     name:'Pebble',
@@ -641,7 +725,7 @@ function spawnTestRoom(){
     ],
     photoData: null,
     animData:  null,
-    glbUrl:    null
+    glbUrl: DEFAULT_GLB_URL
   });
   renderMapPins();updateCompass();save();map.panTo([centre.lat,centre.lng]);
 }
