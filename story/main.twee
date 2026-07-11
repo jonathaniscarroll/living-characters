@@ -1,4 +1,5 @@
 :: Test Room {"lat":44.65,"lng":-63.59,"radius":30,"backdrop":"forest"}
+@bg garden.png
 A room for testing.
 
 :: Pebble {"roomId":"room_Test Room","mood":"Happy","items":["small rock","lucky leaf"]}
