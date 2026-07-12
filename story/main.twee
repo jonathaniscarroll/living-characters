@@ -3,11 +3,13 @@ A room, like any other
 
 :: Pebble {"roomId":"999","mood":"Happy","items":["small rock","lucky leaf"],"glbUrl":"2026-07-09.glb"}
 
-:: Mop {"roomId":"999","mood":"Happy","items":["small rock","lucky leaf"],"glbUrl":"2026-07-09.glb"}
-
 :: Pebble-hello
 Oh! A visitor. Hello!
 
 :: Pebble-secret
 I found a tiny door under the big root.
+
+:: Mop {"roomId":"999","mood":"Happy","items":["small rock","lucky leaf"],"glbUrl":"2026-07-09.glb"}
+
+:: Gravel {"roomId":"999","mood":"Happy","items":[],"glbUrl":"2026-07-09.glb"}
 
