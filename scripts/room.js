@@ -19,14 +19,21 @@ function openRoom(roomId) {
   document.getElementById('room-title').textContent = room.name;
   document.getElementById('room-lede').textContent = room.lede || '';
   const stage = document.getElementById('room-stage');
-  const bgFile = BACKDROP_IMAGES[room.backdrop];
-  if (bgFile) {
-    stage.style.backgroundImage = `url('${MEDIA_URL}${bgFile}')`;
+  // Priority: custom backdropUrl > BACKDROP_IMAGES preset > floor color
+  if (room.backdropUrl) {
+    stage.style.backgroundImage = `url('${room.backdropUrl}')`;
     stage.style.backgroundSize = 'cover';
     stage.style.backgroundPosition = 'center';
   } else {
-    stage.style.backgroundImage = '';
-    stage.style.background = FLOOR_COLORS[room.backdrop] || '#1a1a2e';
+    const bgFile = BACKDROP_IMAGES[room.backdrop];
+    if (bgFile) {
+      stage.style.backgroundImage = `url('${MEDIA_URL}${bgFile}')`;
+      stage.style.backgroundSize = 'cover';
+      stage.style.backgroundPosition = 'center';
+    } else {
+      stage.style.backgroundImage = '';
+      stage.style.background = FLOOR_COLORS[room.backdrop] || '#1a1a2e';
+    }
   }
   document.getElementById('room-view').classList.add('open');
   if (!window.THREE || !window.GLTFLoader) {
@@ -71,7 +78,8 @@ function buildRoomScene(room) {
   renderer.setSize(W, H);
   renderer.setPixelRatio(window.devicePixelRatio);
   stage.appendChild(renderer.domElement);
-  const hasBg = !!BACKDROP_IMAGES[room.backdrop];
+  // Custom backdropUrl or preset backdrop both count as "has background" for floor/wall transparency
+  const hasBg = !!(room.backdropUrl || BACKDROP_IMAGES[room.backdrop]);
   const floor = new THREE.Mesh(
     new THREE.PlaneGeometry(20, 20),
     new THREE.MeshLambertMaterial({ color: FLOOR_COLORS[room.backdrop] || '#1a3a1a', transparent: hasBg, opacity: hasBg ? 0.18 : 1 })
@@ -79,6 +87,7 @@ function buildRoomScene(room) {
   floor.rotation.x = -Math.PI / 2;
   floor.receiveShadow = true;
   scene.add(floor);
+  // Only draw walls if there's no background image (otherwise they obscure the backdrop)
   if (!hasBg) {
     const wallMat = new THREE.MeshLambertMaterial({ color: WALL_COLORS[room.backdrop] || '#2d5a27' });
     const wN = new THREE.Mesh(new THREE.BoxGeometry(20, 6, 0.2), wallMat);
@@ -88,7 +97,7 @@ function buildRoomScene(room) {
     wW.position.set(-8, 3, 0);
     scene.add(wW);
   }
-  scene.add(new THREE.AmbientLight(0xffffff, 0.85));
+  scene.add(new THREE.AmbientLight(0xffffff, 1.3)); // Even lighting for all materials
   const dl = new THREE.DirectionalLight(0xffffff, 0.7);
   dl.position.set(5, 12, 5);
   dl.castShadow = true;
@@ -422,6 +431,64 @@ window.lcRoom = {
   hideObjInspect
 };
 
+// ── Phase 2: Object dragging in room scene ─────────────────────────────────
+let movingObjMesh = null;
+function enableRoomEdit() {
+  movingObjMesh = null;
+}
+
+function onRoomObjectClick(e) {
+  if (!threeScene || !activeRoomId) return;
+  const rect = threeRenderer.domElement.getBoundingClientRect();
+  const mouse = new THREE.Vector2(
+    ((e.clientX - rect.left) / rect.width) * 2 - 1,
+    -((e.clientY - rect.top) / rect.height) * 2 + 1
+  );
+  const raycaster = new THREE.Raycaster();
+  raycaster.setFromCamera(mouse, threeCamera);
+
+  // Get all draggable object meshes
+  const dragMeshes = [];
+  threeScene.traverse(c => {
+    if (c.isMesh && c._objId && !c._moodRingCharId) {
+      dragMeshes.push(c);
+    }
+  });
+
+  const hits = raycaster.intersectObjects(dragMeshes, false);
+  if (hits.length > 0) {
+    const hit = hits[0].object;
+    if (!movingObjMesh) {
+      // First click: select object to move
+      movingObjMesh = hit;
+      threeRenderer.domElement.style.cursor = 'grabbing';
+    } else {
+      // Second click: place object at new position
+      const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+      const point = new THREE.Vector3();
+      if (raycaster.ray.intersectPlane(plane, point)) {
+        movingObjMesh.position.set(point.x, 0, point.z);
+        // Update stored object
+        const objId = movingObjMesh._objId;
+        const obj = objects.find(o => o.id === objId);
+        if (obj) {
+          obj.px = point.x;
+          obj.pz = point.z;
+          obj.position = { x: point.x, y: 0, z: point.z };
+          save();
+          renderMapPins();
+        }
+      }
+      movingObjMesh = null;
+      threeRenderer.domElement.style.cursor = '';
+    }
+  } else if (movingObjMesh) {
+    // Click on empty space: cancel move
+    movingObjMesh = null;
+    threeRenderer.domElement.style.cursor = '';
+  }
+}
+
 export {
   openRoom,
   closeRoom,
@@ -433,5 +500,7 @@ export {
   saveObject,
   deleteObject,
   showObjInspect,
-  hideObjInspect
+  hideObjInspect,
+  onRoomObjectClick,
+  enableRoomEdit
 };

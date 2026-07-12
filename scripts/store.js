@@ -229,6 +229,58 @@ function save() {
   } catch (e) {}
 }
 
+// ── Phase 2: Upload backdrop image to GitHub ─────────────────────────────────
+async function uploadRoomBackdropToGitHub(roomId, file) {
+  const token = getToken();
+  if (!token) {
+    setGhStatus('Enter a GitHub token first to save backdrops', 'err');
+    showToast('GitHub token required to save backdrop to repo', 'err');
+    return null;
+  }
+  const base64 = await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const dataUrl = e.target.result;
+      const base64Content = String(dataUrl).replace(/^data:.*?;base64,/, '');
+      resolve(base64Content);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+  const path = `media/room-backdrops/${roomId}.png`;
+  const url = `https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/contents/${path}`;
+  const body = {
+    message: `Upload backdrop for room ${roomId}`,
+    content: base64,
+    branch: GH_BRANCH
+  };
+  const res = await fetch(url, {
+    method: 'PUT',
+    headers: { Authorization: 'token ' + token, Accept: 'application/vnd.github.v3+json', 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    setGhStatus('Backdrop upload failed: ' + (err.message || res.status), 'err');
+    showToast('Backdrop upload failed', 'err');
+    return null;
+  }
+  const json = await res.json();
+  setGhStatus('Backdrop saved ✓', 'ok');
+  showToast('Backdrop saved to GitHub', 'ok');
+  return `https://raw.githubusercontent.com/${GH_OWNER}/${GH_REPO}/${GH_BRANCH}/media/room-backdrops/${roomId}.png`;
+}
+
+function showToast(msg, type) {
+  const el = document.getElementById('toast');
+  if (!el) return;
+  el.textContent = msg;
+  el.style.borderColor = type === 'err' ? 'var(--accent)' : 'var(--accent2)';
+  el.style.color = type === 'err' ? 'var(--accent)' : 'var(--accent2)';
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 3000);
+}
+
 function loadLocal() {
   try {
     const r = localStorage.getItem('lc_rooms');
@@ -249,7 +301,7 @@ window.addEventListener('DOMContentLoaded', () => {
   const saved = localStorage.getItem('lc_gh_token');
   if (saved) {
     document.getElementById('gh-token-input').value = saved;
-    setGhStatus('token loaded — syncing…', 'ok');
+    // Silently seed SHA in background — token is optional, app works without it
     seedGhFileSha(saved);
   }
 });
@@ -270,7 +322,9 @@ window.lcStore = {
   onTokenInput,
   setGhStatus,
   getToken,
-  decodeBase64Unicode
+  decodeBase64Unicode,
+  seedGhFileSha,
+  uploadRoomBackdropToGitHub
 };
 
 export {
@@ -289,5 +343,7 @@ export {
   onTokenInput,
   setGhStatus,
   getToken,
-  decodeBase64Unicode
+  decodeBase64Unicode,
+  seedGhFileSha,
+  uploadRoomBackdropToGitHub
 };

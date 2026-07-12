@@ -21,6 +21,27 @@ The repo has two halves that work together:
 - **Sync** the world to GitHub through a personal access token, reading and writing `story/main.twee` via the GitHub Contents API.
 - **Persist** the working world in browser `localStorage` so it can be resumed later.
 
+### Room Backdrop Upload
+
+When editing a room, you can upload a custom backdrop image:
+
+1. Click **📸 Upload backdrop image** in the room modal.
+2. Select an image file from your device.
+3. If you have a GitHub token entered, the image will be uploaded to `media/room-backdrops/{roomId}.png` in the repository.
+4. The image becomes the background of that room's Three.js scene when you open it.
+5. The backdrop URL is stored on the room object as `backdropUrl` and persisted in localStorage.
+
+**Priority order for room backgrounds:**
+- Custom `backdropUrl` (uploaded or manually entered)
+- Preset backdrop style (forest, stone, water, etc.)
+
+### Object Placement in Room Scenes
+
+- Click **Move Objects** in the room toolbar to enable object movement mode.
+- In move mode, click an object to select it (cursor changes to grabbing), then click a new floor position to place it.
+- Objects are constrained to the floor plane (Y=0) for easy placement.
+- Lighting is now evened out with increased ambient light so materials render consistently regardless of angle.
+
 ## Quick start
 
 ### Run the authoring app locally
@@ -57,6 +78,7 @@ living-characters/
     card.js                  # character cards and talk panels
     modals.js                # room and character editor workflows + dialogue builder
     vendor-setup.sh          # downloads Tweego + story formats into vendor/
+    obj-to-glb.js            # local CLI to convert OBJ models to GLB
   story/                     # Twee sources compiled by Tweego
     main.twee                # default target for the app's GitHub-backed sync
     characters.twee          # sample character passages
@@ -85,7 +107,7 @@ living-characters/
 
 - The experience is intentionally single-user and facilitator-led; it is not a multi-user live server.
 - Media handling is functional but fairly manual, especially for GLB and custom image assets, and large assets are inlined as base64 in `localStorage`, which can grow quickly.
-- Object placement and scene editing are basic; drag-and-drop and richer direct manipulation are still missing.
+- Object placement is basic (click-to-move within a room); richer direct manipulation such as rotate/scale handles is still missing.
 - The authoring SPA and the deployed Twine story are two separate representations of the world; keeping them in sync is a manual, Twee-mediated step rather than a single source of truth.
 - The project relies on browser storage and a GitHub token rather than a dedicated account or authentication system.
 - There are no automated tests, linting, or type checks; correctness is verified by hand.
@@ -102,7 +124,7 @@ These surfaced during the audit and are good candidates for follow-up fixes:
 
 - Unify the object data model and remove the duplicate scene-building / GitHub-sync code paths.
 - A more polished asset-library workflow for backdrops, character media, and GLB objects.
-- Direct manipulation of objects in the room scene (drag/rotate/scale).
+- Richer direct manipulation of objects in the room scene (rotate/scale handles, drag).
 - Richer object-state interactions, such as item-linked reactions or conditional dialogue.
 - Better validation and feedback for unsupported media files.
 - Basic automated testing and a lightweight deployment checklist.
@@ -110,3 +132,13 @@ These surfaced during the audit and are good candidates for follow-up fixes:
 ## Design intent
 
 The app sits between a spatial story editor and a live facilitation tool. Rooms still matter because they carry real-world coordinates and provide stage space, but characters become the primary unit of dramatic interaction. That makes it well suited to workshops, physical props, and facilitator-led experiences (for example, art-camp participants making felt and clay figures) where the map and room scene are used as a shared stage.
+
+### OBJ to GLB Conversion (Local Tool)
+
+Use the included script to convert OBJ files to GLB for Three.js:
+
+```bash
+node scripts/obj-to-glb.js input.obj output.glb
+```
+
+Note: OBJ format does not store animation data. For textured or animated models, use Blender's export to GLB instead.
