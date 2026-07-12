@@ -270,7 +270,8 @@ window.lcStore = {
   onTokenInput,
   setGhStatus,
   getToken,
-  decodeBase64Unicode
+  decodeBase64Unicode,
+  seedGhFileSha
 };
 
 export {
@@ -289,5 +290,6 @@ export {
   onTokenInput,
   setGhStatus,
   getToken,
-  decodeBase64Unicode
+  decodeBase64Unicode,
+  seedGhFileSha
 };

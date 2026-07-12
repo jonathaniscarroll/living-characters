@@ -430,12 +430,11 @@
 <input id="twee-import-input" type="file" accept=".twee,.txt" style="display:none" onchange="handleImportFile(event)" />
 
 <script>
-// Constants are imported from scripts/store.js; these are kept for inline <script> compat
+// Constants shared with module scripts; kept for inline <script> compat
 const GH_OWNER  = 'jonathaniscarroll';
 const GH_REPO   = 'living-characters';
 const GH_PATH   = 'story/main.twee';
 const GH_BRANCH = 'main';
-let ghFileSha = null;
 
 const MEDIA_URL = `https://raw.githubusercontent.com/${GH_OWNER}/${GH_REPO}/main/media/`;
 const BACKDROP_IMAGES = { room: './garden.png', room2: './room2.png' };
@@ -556,6 +555,17 @@ function hideObjInspect() {
   clearTimeout(objInspectTimeout);
   document.getElementById('obj-inspect').classList.remove('show');
 }
+
+// ── Phase 2: Global wrappers for script imports ─────────────────────────
+// Module scripts export via window.lcStore/lcMap/lcCard/lcRoom/lcModals.
+// These global aliases let inline onclick/oninput attributes find them.
+function ghLoad(){ return window.lcStore.ghLoad(); }
+function ghSave(){ return window.lcStore.ghSave(); }
+function onTokenInput(){ return window.lcStore.onTokenInput(); }
+function setGhStatus(m,c){ return window.lcStore.setGhStatus(m,c); }
+function getToken(){ return window.lcStore.getToken(); }
+function seedGhFileSha(t){ return window.lcStore.seedGhFileSha(t); }
+function decodeBase64Unicode(b){ return window.lcStore.decodeBase64Unicode(b); }
 
 function initMap() { return window.lcMap.initMap(); }
 function renderMapPins() { return window.lcMap.renderMapPins(); }
