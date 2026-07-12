@@ -77,6 +77,13 @@
     #room-stage{flex:1;position:relative;overflow:hidden;background:#1a3a10 center/cover no-repeat;}
     #room-stage canvas{display:block;width:100%!important;height:100%!important;position:absolute;top:0;left:0;}
     .char-label{position:absolute;pointer-events:none;background:rgba(10,15,30,.85);color:var(--text);font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;backdrop-filter:blur(4px);white-space:nowrap;transform:translate(-50%,0);z-index:10;}
+    /* object labels are slightly dimmer */
+    .obj-label{position:absolute;pointer-events:none;background:rgba(10,15,30,.65);color:var(--text-muted);font-size:9px;font-weight:600;padding:2px 6px;border-radius:20px;backdrop-filter:blur(4px);white-space:nowrap;transform:translate(-50%,0);z-index:9;}
+    /* object inspect bubble */
+    #obj-inspect{position:absolute;bottom:80px;left:50%;transform:translateX(-50%);z-index:55;background:rgba(10,15,30,.93);border:1px solid var(--border);border-radius:10px;padding:10px 16px;max-width:260px;text-align:center;pointer-events:none;opacity:0;transition:opacity .2s;}
+    #obj-inspect.show{opacity:1;}
+    #obj-inspect .oi-name{font-size:13px;font-weight:800;color:var(--accent2);}
+    #obj-inspect .oi-desc{font-size:12px;color:var(--text-muted);margin-top:4px;font-style:italic;line-height:1.5;}
     #talk-panel{position:absolute;bottom:0;left:0;right:0;z-index:50;background:linear-gradient(0deg,rgba(10,15,30,.97) 80%,transparent);padding:16px 20px 20px;display:flex;flex-direction:column;gap:10px;transform:translateY(100%);transition:transform .3s cubic-bezier(.16,1,.3,1);}
     #talk-panel.open{transform:translateY(0);}
     #talk-panel-header{display:flex;align-items:center;gap:10px;}
@@ -198,6 +205,11 @@
     <div id="room-lede"></div>
   </div>
   <div id="room-stage">
+    <!-- Phase 2 step 2: object inspect bubble -->
+    <div id="obj-inspect">
+      <div class="oi-name" id="oi-name"></div>
+      <div class="oi-desc" id="oi-desc"></div>
+    </div>
     <div id="talk-panel">
       <div id="talk-panel-header">
         <span id="talk-char-name"></span>
@@ -425,7 +437,6 @@ const PROMPT_TYPES = [
 const FLOOR_COLORS = { forest:'#1a3a1a', stone:'#2a2a3a', water:'#0a2a3a', wood:'#3a2a1a', grass:'#1a3a10', dark:'#0a0a0a' };
 const WALL_COLORS  = { forest:'#2d5a27', stone:'#3a3a5a', water:'#0f3d5c', wood:'#5a3d1a', grass:'#2d5a20', dark:'#1a1a1a' };
 
-// ── Phase 2 step 1: objects[] is the new top-level state array ────────────────
 let rooms=[], characters=[], objects=[], selectedChar=null, editingRoomId=null, editingCharId=null;
 let tempPhotoData=null, tempAnimData=null;
 let map, roomPickerMap, roomPickerMarker;
@@ -433,6 +444,21 @@ let gpsWatchId=null, userLat=null, userLng=null;
 let simActive=false, simInterval=null, facilitatorMode=true, activeRoomId=null;
 let threeScene=null, threeRenderer=null, threeCamera=null, threeAnimFrameId=null;
 let glbMixers=[];
+
+// ── Phase 2 step 2: object inspect bubble helpers ────────────────────────────
+let objInspectTimeout = null;
+function showObjInspect(name, desc) {
+  const el = document.getElementById('obj-inspect');
+  document.getElementById('oi-name').textContent = name;
+  document.getElementById('oi-desc').textContent = desc || '';
+  el.classList.add('show');
+  clearTimeout(objInspectTimeout);
+  objInspectTimeout = setTimeout(() => el.classList.remove('show'), 3500);
+}
+function hideObjInspect() {
+  clearTimeout(objInspectTimeout);
+  document.getElementById('obj-inspect').classList.remove('show');
+}
 
 function initMap() {
   map = L.map('map', { zoomControl: true }).setView([44.65, -63.59], 16);
@@ -601,12 +627,14 @@ function openRoom(roomId){
 }
 function closeRoom(){
   closeTalkPanel();
+  hideObjInspect();
   document.getElementById('room-view').classList.remove('open');
   destroyRoomScene();activeRoomId=null;
   const stage=document.getElementById('room-stage');
   stage.style.backgroundImage='';stage.style.background='';
 }
 
+// ── Phase 2 step 2: buildRoomScene now loads objects[] ───────────────────────
 function buildRoomScene(room){
   destroyRoomScene();
   const stage=document.getElementById('room-stage');
@@ -633,8 +661,12 @@ function buildRoomScene(room){
   const dl=new THREE.DirectionalLight(0xffffff,0.7);dl.position.set(5,12,5);dl.castShadow=true;scene.add(dl);
   glbMixers=[];
   const clock=new THREE.Clock();
+
+  // shared arrays for raycasting + label tracking
+  const labels=[], charObjects=[], objMeshes=[];
+
+  // ── characters ────────────────────────────────────────────────────────────
   const charsInRoom=characters.filter(c=>(c.roomIds||[c.roomId]).includes(room.id));
-  const labels=[],charObjects=[];
   charsInRoom.forEach((ch,i)=>{
     const angle=(i/Math.max(charsInRoom.length,1))*Math.PI*1.2-0.6;
     const cx=Math.cos(angle)*3.5,cz=Math.sin(angle)*3.5;
@@ -671,6 +703,7 @@ function buildRoomScene(room){
       stage.appendChild(label);labels.push({label,obj:sprite,headY:2.1});
     } else { addFallbackBox(ch,cx,cz,mood,scene,stage,labels,charObjects); }
   });
+
   function addFallbackBox(ch,cx,cz,mood,scene,stage,labels,charObjects){
     const box=new THREE.Mesh(new THREE.BoxGeometry(0.8,1.4,0.3),new THREE.MeshLambertMaterial({color:mood.color}));
     box.position.set(cx,0.7,cz);box.castShadow=true;scene.add(box);
@@ -678,7 +711,79 @@ function buildRoomScene(room){
     const label=document.createElement('div');label.className='char-label';label.textContent=ch.name;
     stage.appendChild(label);labels.push({label,obj:box,headY:1.6});
   }
+
+  // ── Phase 2 step 2: objects[] ─────────────────────────────────────────────
+  const roomObjs = objects.filter(o => o.roomId === room.id);
+  roomObjs.forEach(obj => {
+    const px = (obj.position && obj.position.x != null) ? obj.position.x : 0;
+    const py = (obj.position && obj.position.y != null) ? obj.position.y : 0;
+    const pz = (obj.position && obj.position.z != null) ? obj.position.z : 0;
+    const ry = (obj.rotation && obj.rotation.y != null) ? obj.rotation.y : 0;
+    const sc = obj.scale || 1;
+
+    function placeObject(mesh, heightForLabel) {
+      mesh.position.set(px, py, pz);
+      mesh.rotation.y = ry;
+      mesh.scale.setScalar(sc);
+      mesh.castShadow = true;
+      mesh._objId = obj.id;
+      scene.add(mesh);
+      // collect all descendant meshes for raycasting
+      mesh.traverse(child => { if (child.isMesh) { child._objId = obj.id; objMeshes.push(child); } });
+      if (!mesh.isMesh) objMeshes.push(mesh); // sprites / plain meshes
+      // label
+      const lbl = document.createElement('div');
+      lbl.className = 'obj-label';
+      lbl.textContent = '📦 ' + obj.name;
+      stage.appendChild(lbl);
+      labels.push({ label: lbl, obj: mesh, headY: heightForLabel });
+    }
+
+    if (obj.glbUrl && window.GLTFLoader) {
+      const loader = new window.GLTFLoader();
+      loader.load(obj.glbUrl, gltf => {
+        const model = gltf.scene;
+        const box3 = new THREE.Box3().setFromObject(model);
+        const size = new THREE.Vector3(); box3.getSize(size);
+        const autoScale = 1.2 / Math.max(size.x, size.y, size.z);
+        model.scale.setScalar(sc * autoScale);
+        model.position.set(px, py, pz);
+        model.rotation.y = ry;
+        model.castShadow = true;
+        model._objId = obj.id;
+        scene.add(model);
+        model.traverse(child => { if (child.isMesh) { child._objId = obj.id; objMeshes.push(child); } });
+        if (gltf.animations && gltf.animations.length) {
+          const mixer = new THREE.AnimationMixer(model);
+          mixer.clipAction(gltf.animations[0]).play();
+          glbMixers.push(mixer);
+        }
+        const lbl = document.createElement('div');
+        lbl.className = 'obj-label';
+        lbl.textContent = '📦 ' + obj.name;
+        stage.appendChild(lbl);
+        const h = size.y * sc * autoScale + 0.2;
+        labels.push({ label: lbl, obj: model, headY: h });
+      }, undefined, err => {
+        console.warn('Object GLB load failed for', obj.name, err);
+        addFallbackObjBox(obj, px, py, pz, ry, sc);
+      });
+    } else {
+      addFallbackObjBox(obj, px, py, pz, ry, sc);
+    }
+
+    function addFallbackObjBox(obj, px, py, pz, ry, sc) {
+      const mesh = new THREE.Mesh(
+        new THREE.BoxGeometry(0.6, 0.6, 0.6),
+        new THREE.MeshLambertMaterial({ color: 0x8b6914 })
+      );
+      placeObject(mesh, py + 0.6 * sc + 0.15);
+    }
+  });
+  // ── end objects[] ─────────────────────────────────────────────────────────
+
   threeScene=scene;threeRenderer=renderer;threeCamera=camera;
+
   function updateLabels(){
     labels.forEach(({label,obj,headY})=>{
       const pos=obj.position.clone();pos.y=headY;
@@ -695,13 +800,26 @@ function buildRoomScene(room){
     updateLabels();
   }
   animate();
+
+  // ── unified click handler: characters + objects ───────────────────────────
   renderer.domElement.addEventListener('click',e=>{
     const rect=renderer.domElement.getBoundingClientRect();
     const mouse=new THREE.Vector2(((e.clientX-rect.left)/rect.width)*2-1,-(((e.clientY-rect.top)/rect.height)*2-1));
     const ray=new THREE.Raycaster();ray.setFromCamera(mouse,camera);
-    const meshes=[];
-    charObjects.forEach(({obj})=>obj.traverse?obj.traverse(c=>{if(c.isMesh)meshes.push(c);}):meshes.push(obj));
-    const hits=ray.intersectObjects(meshes,false);
+
+    // 1. check objects first (they are props, not characters)
+    if (objMeshes.length) {
+      const objHits = ray.intersectObjects(objMeshes, false);
+      if (objHits.length) {
+        const hitObj = objects.find(o => o.id === objHits[0].object._objId);
+        if (hitObj) { showObjInspect(hitObj.name, hitObj.description); return; }
+      }
+    }
+
+    // 2. check characters
+    const charMeshes=[];
+    charObjects.forEach(({obj})=>obj.traverse?obj.traverse(c=>{if(c.isMesh)charMeshes.push(c);}):charMeshes.push(obj));
+    const hits=ray.intersectObjects(charMeshes,false);
     if(hits.length){
       const hitPos=hits[0].object.getWorldPosition(new THREE.Vector3());
       let closest=null,minD=Infinity;
@@ -713,10 +831,11 @@ function buildRoomScene(room){
     }
   });
 }
+
 function destroyRoomScene(){
   if(threeAnimFrameId){cancelAnimationFrame(threeAnimFrameId);threeAnimFrameId=null;}
   if(threeRenderer){threeRenderer.dispose();const c=threeRenderer.domElement;if(c.parentNode)c.parentNode.removeChild(c);threeRenderer=null;}
-  document.getElementById('room-stage').querySelectorAll('.char-label').forEach(el=>el.remove());
+  document.getElementById('room-stage').querySelectorAll('.char-label,.obj-label').forEach(el=>el.remove());
   glbMixers=[];threeScene=null;threeCamera=null;
 }
 
@@ -779,6 +898,18 @@ function spawnTestRoom(){
     items:['small rock','lucky leaf'],
     passages:[{type:'hello',text:'Oh! A visitor. Hello!'},{type:'secret',text:'I found a tiny door under the big root.'}],
     photoData:null,animData:null,glbUrl:DEFAULT_GLB_URL
+  });
+  // spawn a test object too so the new system is immediately visible
+  objects.push({
+    id:'obj_test_'+Date.now(),
+    roomId,
+    name:'Old Chest',
+    glbUrl:'',
+    position:{x:2,y:0,z:2},
+    rotation:{y:0.5},
+    scale:1,
+    description:'A battered wooden chest. Something rattles inside.',
+    interactable:true
   });
   renderMapPins();updateCompass();save();map.panTo([centre.lat,centre.lng]);
 }
@@ -850,7 +981,7 @@ function openCharModal(charId){
   document.getElementById('char-modal-title').textContent=ch?'Edit Character':'Add a Character';
   document.getElementById('cf-name').value=ch?ch.name:'';
   document.getElementById('cf-items').value=ch?(ch.items||[]).join(', '):'';
-  document.getElementById('cf-glb-url').value=ch?(ch.glbUrl||''):'';
+  document.getElementById('cf-glb-url').value=ch?(ch.glbUrl||')':'';
   const currentIds = ch ? (ch.roomIds || (ch.roomId ? [ch.roomId] : [])) : [];
   buildRoomChipPicker(currentIds);
   const pp=document.getElementById('cf-photo-preview');
@@ -919,14 +1050,12 @@ function saveCharacter(){
   closeCharModal();renderMapPins();save();
 }
 
-// ── Phase 2 step 1: Twee I/O extended for *-object passages ──────────────────
 function buildTweeSource(rooms, chars, objs) {
   let out = '';
   rooms.forEach(room => {
     out += `:: ${room.name} {"id":"${room.id}","lat":${room.lat},"lng":${room.lng},"radius":${room.radius},"backdrop":"${room.backdrop}"}\n`;
     out += room.lede ? room.lede + '\n' : '';
     out += '\n';
-    // objects in this room
     (objs||[]).filter(o => o.roomId === room.id).forEach(obj => {
       const meta = { roomId: obj.roomId, scale: obj.scale||1 };
       if (obj.glbUrl) meta.glbUrl = obj.glbUrl;
@@ -937,7 +1066,6 @@ function buildTweeSource(rooms, chars, objs) {
       out += obj.description ? obj.description + '\n' : '';
       out += '\n';
     });
-    // characters in this room
     chars.filter(c => (c.roomIds || [c.roomId]).includes(room.id)).forEach(ch => {
       const meta = { roomIds: ch.roomIds || [ch.roomId], mood: ch.mood, items: (ch.items||[]) };
       if (ch.glbUrl) meta.glbUrl = ch.glbUrl;
@@ -982,7 +1110,6 @@ function importTweeSource(src,silent){
         const roomId=meta.id||('room_'+passName.replace(/\s+/g,'_'));
         newRooms.push({id:roomId,name:passName,lede:body,lat:meta.lat,lng:meta.lng,radius:meta.radius||30,backdrop:meta.backdrop||'forest'});
       } else if(passName.endsWith('-object')){
-        // ── Phase 2 step 1: parse *-object passages ──
         const objName = passName.slice(0,-7).trim();
         newObjs.push({
           id: 'obj_' + objName.replace(/\s+/g,'_') + '_' + Date.now(),
@@ -1021,7 +1148,6 @@ document.addEventListener('drop',e=>{
   const reader=new FileReader();reader.onload=ev=>importTweeSource(ev.target.result);reader.readAsText(file);
 });
 
-// ── Phase 2 step 1: save/loadLocal include objects[] ─────────────────────────
 function save(){
   try{
     localStorage.setItem('lc_rooms',JSON.stringify(rooms));
