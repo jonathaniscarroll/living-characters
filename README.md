@@ -163,31 +163,29 @@ Token with `repo` scope — entered once, stored in `localStorage`.
 
 ## Roadmap
 
-### Phase 4 — Better content upload workflow
+### Stepped plan for the next features
 
-The next major improvement is a first-class asset upload system for all media that currently depends on manual file handling or pasted URLs.
+1. Make asset uploads simple and friendly for children and facilitators
+   - Add tap-to-upload buttons for character GLBs, room backdrops, and object GLBs
+   - Use big, friendly labels and short helper text
+   - Keep the flow visual and encouraging, not technical
 
-#### Planned features
+2. Add a simple content library panel
+   - Show uploaded files in one easy list
+   - Let the facilitator pick an asset and attach it to a room, character, or object
+   - Preview thumbnails where possible
 
-- Drag-and-drop upload for room backdrop images
-- Drag-and-drop upload for object GLBs and character GLBs
-- A simple asset library / upload panel inside the facilitator UI
-- Automatic file naming, storage, and preview generation
-- Per-room/per-character/per-object asset attachment from the editor
-- Optional GitHub-backed or local asset sync so uploaded files travel with the world
+3. Support room backdrop images
+   - Upload a picture for each room backdrop
+   - Let facilitators swap the room look with one tap
 
-#### Proposed workflow
+4. Support object and character GLBs
+   - Upload a .glb file once and reuse it across characters or props
+   - Keep the same friendly picker workflow in the editor
 
-1. Open the facilitator UI and choose “Upload content”
-2. Drop or select one or more files: backdrop images, object GLBs, or character GLBs
-3. The project stores them in the workspace/media area (or a future cloud asset store)
-4. The editor then attaches the uploaded asset to the relevant room/character/object in one click
-
-#### Priority content types
-
-- Room backdrop images for the room scene
-- Object GLBs for placeable props
-- Character GLBs for 3D character models
+5. Add cloud-safe asset storage
+   - Store uploaded assets alongside the world data
+   - Make sure the same world can be opened on another device with its assets intact
 
 ### Phase 2 remaining — Room objects
 

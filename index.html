@@ -328,13 +328,21 @@
         <input id="cf-photo-input" type="file" accept="image/*" style="display:none" onchange="previewFile('cf-photo-input','cf-photo-preview','photoData')" />
       </div>
     </div>
-    <div class="field"><label>Mixamo animation (GIF) or GLB model URL</label>
+    <div class="field"><label>Mixamo animation (GIF)</label>
       <div class="file-row">
         <img id="cf-anim-preview" class="file-preview" src="" style="display:none" />
         <label class="file-btn" for="cf-anim-input">Upload Mixamo GIF</label>
         <input id="cf-anim-input" type="file" accept="image/gif,image/png,image/jpeg" style="display:none" onchange="previewFile('cf-anim-input','cf-anim-preview','animData')" />
       </div>
+    </div>
+    <div class="field"><label>3D character model (GLB)</label>
+      <div class="file-row">
+        <label class="file-btn" for="cf-glb-input">✨ Upload .glb file</label>
+        <input id="cf-glb-input" type="file" accept=".glb,model/gltf-binary" style="display:none" onchange="uploadCharacterGlb()" />
+      </div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:5px">Tap to pick a 3D model from your device. You can also paste a web link if you already have one.</div>
       <input id="cf-glb-url" type="text" placeholder="...or paste a .glb URL for 3-D model" style="margin-top:6px" />
+      <div id="cf-glb-status" style="font-size:11px;color:var(--accent2);margin-top:5px"></div>
     </div>
     <div class="field"><label>Mood</label><div class="mood-picker" id="mood-picker"></div></div>
     <div class="field"><label>Items (comma-separated)</label><input id="cf-items" type="text" placeholder="small hat, acorn, lucky pebble" /></div>
@@ -549,6 +557,7 @@ function openCharModal(charId){ return window.lcModals.openCharModal(charId); }
 function togglePromptPill(btn){ return window.lcModals.togglePromptPill(btn); }
 function closeCharModal(){ return window.lcModals.closeCharModal(); }
 function previewFile(inputId,previewId,dataKey){ return window.lcModals.previewFile(inputId,previewId,dataKey); }
+function uploadCharacterGlb(){ return window.lcModals.uploadCharacterGlb(); }
 function saveCharacter(){ return window.lcModals.saveCharacter(); }
 
 function buildTweeSource(rooms, chars, objs) {

@@ -57,6 +57,7 @@ function openCharModal(charId) {
   editingCharId = charId;
   tempPhotoData = null;
   tempAnimData = null;
+  tempGlbData = null;
   const ch = charId ? characters.find(c => c.id === charId) : null;
   document.getElementById('char-modal-title').textContent = ch ? 'Edit Character' : 'Add a Character';
   document.getElementById('cf-name').value = ch ? ch.name : '';
@@ -70,6 +71,15 @@ function openCharModal(charId) {
   const ap = document.getElementById('cf-anim-preview');
   if (ch && ch.animData) { ap.src = ch.animData; ap.style.display = 'block'; tempAnimData = ch.animData; }
   else { ap.src = ''; ap.style.display = 'none'; }
+  const glbStatus = document.getElementById('cf-glb-status');
+  if (ch && ch.glbUrl && ch.glbUrl.startsWith('data:')) {
+    tempGlbData = ch.glbUrl;
+    glbStatus.textContent = '✓ Your 3D model is ready to save.';
+  } else if (ch && ch.glbUrl) {
+    glbStatus.textContent = '✓ Using a web link for this character.';
+  } else {
+    glbStatus.textContent = '';
+  }
   const mp = document.getElementById('mood-picker');
   mp.innerHTML = '';
   MOODS.forEach(m => {
@@ -112,6 +122,35 @@ function closeCharModal() {
   editingCharId = null;
   tempPhotoData = null;
   tempAnimData = null;
+  tempGlbData = null;
+  document.getElementById('cf-glb-status').textContent = '';
+}
+
+function uploadCharacterGlb() {
+  const input = document.getElementById('cf-glb-input');
+  const status = document.getElementById('cf-glb-status');
+  const urlField = document.getElementById('cf-glb-url');
+  const file = input.files && input.files[0];
+  if (!file) return;
+  const name = file.name.toLowerCase();
+  if (!name.endsWith('.glb')) {
+    status.textContent = 'That file does not look like a .glb model. Please try another one.';
+    status.style.color = '#ff8a80';
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = e => {
+    tempGlbData = e.target.result;
+    urlField.value = '';
+    status.textContent = `✓ “${file.name}” is ready to use!`;
+    status.style.color = 'var(--accent2)';
+  };
+  reader.onerror = () => {
+    tempGlbData = null;
+    status.textContent = 'That file could not be read. Please try again.';
+    status.style.color = '#ff8a80';
+  };
+  reader.readAsDataURL(file);
 }
 
 function previewFile(inputId, previewId, dataKey) {
@@ -133,7 +172,7 @@ function saveCharacter() {
   const roomIds = getSelectedRoomIds();
   const primaryRoomId = roomIds[0] || '';
   const items = document.getElementById('cf-items').value.split(',').map(s => s.trim()).filter(Boolean);
-  const glbUrl = document.getElementById('cf-glb-url').value.trim();
+  const glbUrl = tempGlbData || document.getElementById('cf-glb-url').value.trim();
   if (!name) { alert('Please give the character a name.'); return; }
   const activeMoodBtn = document.querySelector('#mood-picker .mood-opt.active');
   const moodLabel = MOODS.find(m => activeMoodBtn && activeMoodBtn.textContent.includes(m.emoji))?.label || 'Happy';
@@ -164,6 +203,7 @@ window.lcModals = {
   closeCharModal,
   togglePromptPill,
   previewFile,
+  uploadCharacterGlb,
   saveCharacter
 };
 
@@ -177,5 +217,6 @@ export {
   closeCharModal,
   togglePromptPill,
   previewFile,
+  uploadCharacterGlb,
   saveCharacter
 };
