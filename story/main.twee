@@ -1,5 +1,4 @@
 :: Room {"id":"999","lat":44.65,"lng":-63.59,"radius":30,"backdrop":"room"}
-@bg media/garden.png
 A room, like any other
 
 :: Pebble {"roomId":"999","mood":"Happy","items":["small rock","lucky leaf"],"glbUrl":"2026-07-09.glb"}
