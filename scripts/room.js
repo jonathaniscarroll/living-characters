@@ -97,7 +97,7 @@ function buildRoomScene(room) {
     wW.position.set(-8, 3, 0);
     scene.add(wW);
   }
-  scene.add(new THREE.AmbientLight(0xffffff, 0.85));
+  scene.add(new THREE.AmbientLight(0xffffff, 1.3)); // Even lighting for all materials
   const dl = new THREE.DirectionalLight(0xffffff, 0.7);
   dl.position.set(5, 12, 5);
   dl.castShadow = true;
@@ -431,6 +431,64 @@ window.lcRoom = {
   hideObjInspect
 };
 
+// ── Phase 2: Object dragging in room scene ─────────────────────────────────
+let movingObjMesh = null;
+function enableRoomEdit() {
+  movingObjMesh = null;
+}
+
+function onRoomObjectClick(e) {
+  if (!threeScene || !activeRoomId) return;
+  const rect = threeRenderer.domElement.getBoundingClientRect();
+  const mouse = new THREE.Vector2(
+    ((e.clientX - rect.left) / rect.width) * 2 - 1,
+    -((e.clientY - rect.top) / rect.height) * 2 + 1
+  );
+  const raycaster = new THREE.Raycaster();
+  raycaster.setFromCamera(mouse, threeCamera);
+
+  // Get all draggable object meshes
+  const dragMeshes = [];
+  threeScene.traverse(c => {
+    if (c.isMesh && c._objId && !c._moodRingCharId) {
+      dragMeshes.push(c);
+    }
+  });
+
+  const hits = raycaster.intersectObjects(dragMeshes, false);
+  if (hits.length > 0) {
+    const hit = hits[0].object;
+    if (!movingObjMesh) {
+      // First click: select object to move
+      movingObjMesh = hit;
+      threeRenderer.domElement.style.cursor = 'grabbing';
+    } else {
+      // Second click: place object at new position
+      const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+      const point = new THREE.Vector3();
+      if (raycaster.ray.intersectPlane(plane, point)) {
+        movingObjMesh.position.set(point.x, 0, point.z);
+        // Update stored object
+        const objId = movingObjMesh._objId;
+        const obj = objects.find(o => o.id === objId);
+        if (obj) {
+          obj.px = point.x;
+          obj.pz = point.z;
+          obj.position = { x: point.x, y: 0, z: point.z };
+          save();
+          renderMapPins();
+        }
+      }
+      movingObjMesh = null;
+      threeRenderer.domElement.style.cursor = '';
+    }
+  } else if (movingObjMesh) {
+    // Click on empty space: cancel move
+    movingObjMesh = null;
+    threeRenderer.domElement.style.cursor = '';
+  }
+}
+
 export {
   openRoom,
   closeRoom,
@@ -442,5 +500,7 @@ export {
   saveObject,
   deleteObject,
   showObjInspect,
-  hideObjInspect
+  hideObjInspect,
+  onRoomObjectClick,
+  enableRoomEdit
 };

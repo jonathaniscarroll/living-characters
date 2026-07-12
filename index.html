@@ -204,7 +204,8 @@
     .room-tbtn{font-size:11px;padding:4px 9px;border-radius:6px;border:none;cursor:pointer;font-family:inherit;font-weight:600;white-space:nowrap;}
     .room-tbtn.add-obj{background:#2a2060;color:#c9b8ff;border:1px solid #5a4a90;}
     .room-tbtn.edit-room{background:rgba(255,255,255,.08);color:var(--text-muted);}
-    .room-tbtn:hover{opacity:.8;}
+.room-tbtn.move-obj{background:#4a2060;color:#d9b8ff;border:1px solid #7a4a9a;}
+.room-tbtn:hover{opacity:.8;}
     /* ── Phase 2 Step 7: object list panel ── */
     #obj-list-panel{position:absolute;top:8px;right:8px;z-index:40;background:rgba(10,15,30,.88);border:1px solid var(--border);border-radius:10px;padding:8px 10px;min-width:150px;max-width:220px;max-height:220px;overflow-y:auto;display:none;flex-direction:column;gap:5px;}
     #obj-list-panel.show{display:flex;}
@@ -264,6 +265,7 @@
     <div class="room-toolbar">
       <button class="room-tbtn edit-room" onclick="editActiveRoom()">✏️ Edit</button>
       <button class="room-tbtn add-obj"   onclick="openObjModal(null)">📦 + Object</button>
+      <button class="room-tbtn move-obj" onclick="enableRoomEdit()">Move Objects</button>
     </div>
   </div>
   <div id="room-stage">
@@ -603,6 +605,7 @@ function openRoom(roomId){ return window.lcRoom.openRoom(roomId); }
 function closeRoom(){ return window.lcRoom.closeRoom(); }
 function buildRoomScene(room){ return window.lcRoom.buildRoomScene(room); }
 function destroyRoomScene(){ return window.lcRoom.destroyRoomScene(); }
+function onRoomObjectClick(e){ return window.lcRoom.onRoomObjectClick(e); }
 
 function startGPS(){ return window.lcMap.startGPS(); }
 function startSim(){ return window.lcMap.startSim(); }
