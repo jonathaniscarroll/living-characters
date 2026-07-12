@@ -301,6 +301,11 @@ function buildRoomScene(room) {
   animate();
 
   renderer.domElement.addEventListener('click', e => {
+    // Check if we're in object move mode (set by Move Objects button)
+    if (window.roomEditMode && window.roomEditMode === true) {
+      onRoomObjectClick(e);
+      return;
+    }
     const rect = renderer.domElement.getBoundingClientRect();
     const mouse = new THREE.Vector2(((e.clientX - rect.left) / rect.width) * 2 - 1, -(((e.clientY - rect.top) / rect.height) * 2 - 1));
     const ray = new THREE.Raycaster();
