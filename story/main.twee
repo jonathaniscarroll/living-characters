@@ -2,7 +2,7 @@
 @bg garden.png
 A room, like any other
 
-:: Pebble {"roomId":"999","mood":"Happy","items":["small rock","lucky leaf"]}
+:: Pebble {"roomId":"999","mood":"Happy","items":["small rock","lucky leaf"],"glbUrl":"2026-07-09.glb"}
 
 :: Mop {"roomId":"999","mood":"Happy","items":["small rock","lucky leaf"],"glbUrl":"2026-07-09.glb"}
 
