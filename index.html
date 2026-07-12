@@ -21,6 +21,11 @@
     window.THREE = THREE;
     window.GLTFLoader = GLTFLoader;
   </script>
+  <script type="module" src="./scripts/store.js"></script>
+  <script type="module" src="./scripts/map.js"></script>
+  <script type="module" src="./scripts/room.js"></script>
+  <script type="module" src="./scripts/card.js"></script>
+  <script type="module" src="./scripts/modals.js"></script>
 
   <style>
     :root {
@@ -484,13 +489,13 @@ const PROMPT_TYPES = [
 const FLOOR_COLORS = { forest:'#1a3a1a', stone:'#2a2a3a', water:'#0a2a3a', wood:'#3a2a1a', grass:'#1a3a10', dark:'#0a0a0a' };
 const WALL_COLORS  = { forest:'#2d5a27', stone:'#3a3a5a', water:'#0f3d5c', wood:'#5a3d1a', grass:'#2d5a20', dark:'#1a1a1a' };
 
-let rooms=[], characters=[], objects=[], selectedChar=null, editingRoomId=null, editingCharId=null, editingObjId=null;
-let tempPhotoData=null, tempAnimData=null;
-let map, roomPickerMap, roomPickerMarker;
-let gpsWatchId=null, userLat=null, userLng=null;
-let simActive=false, simInterval=null, facilitatorMode=true, activeRoomId=null;
-let threeScene=null, threeRenderer=null, threeCamera=null, threeAnimFrameId=null;
-let glbMixers=[];
+var rooms=[], characters=[], objects=[], selectedChar=null, editingRoomId=null, editingCharId=null, editingObjId=null;
+var tempPhotoData=null, tempAnimData=null;
+var map, roomPickerMap, roomPickerMarker;
+var gpsWatchId=null, userLat=null, userLng=null;
+var simActive=false, simInterval=null, facilitatorMode=true, activeRoomId=null;
+var threeScene=null, threeRenderer=null, threeCamera=null, threeAnimFrameId=null;
+var glbMixers=[];
 
 // ── Phase 2 step 2: object inspect bubble helpers ────────────────────────────
 let objInspectTimeout = null;
@@ -507,641 +512,44 @@ function hideObjInspect() {
   document.getElementById('obj-inspect').classList.remove('show');
 }
 
-function initMap() {
-  map = L.map('map', { zoomControl: true }).setView([44.65, -63.59], 16);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© OpenStreetMap contributors', maxZoom: 19
-  }).addTo(map);
-  renderMapPins();
-}
+function initMap() { return window.lcMap.initMap(); }
+function renderMapPins() { return window.lcMap.renderMapPins(); }
+function showTooltip(ch, evt) { return window.lcMap.showTooltip(ch, evt); }
+function hideTooltip() { return window.lcMap.hideTooltip(); }
 
-function renderMapPins() {
-  map.eachLayer(l => { if (l._lcPin) map.removeLayer(l); });
-  rooms.forEach(room => {
-    const circle = L.circle([room.lat, room.lng], {
-      radius: room.radius||30, color:'#f5a623', fillColor:'#f5a623', fillOpacity:0.08, weight:1
-    }).addTo(map);
-    circle._lcPin = true;
-    const chars = characters.filter(c => (c.roomIds || [c.roomId]).includes(room.id));
-    const objs  = objects.filter(o => o.roomId === room.id);
-    const icon = L.divIcon({ className:'', html:
-      `<div style="background:#16213e;border:2px solid #f5a623;border-radius:8px;padding:4px 8px;font-size:11px;font-weight:700;color:#f5a623;white-space:nowrap;cursor:pointer;">
-        🏠 ${room.name}<br><span style="font-size:9px;color:#a0a0b0">${chars.length} char${chars.length!==1?'s':''} · ${objs.length} obj${objs.length!==1?'s':''}</span>
-      </div>`, iconAnchor:[0,0] });
-    const marker = L.marker([room.lat, room.lng], { icon }).addTo(map);
-    marker._lcPin = true;
-    marker.on('click', () => openRoom(room.id));
-  });
-  characters.forEach(ch => {
-    const primaryRoomId = (ch.roomIds && ch.roomIds[0]) || ch.roomId;
-    const room = rooms.find(r => r.id === primaryRoomId);
-    if (!room) return;
-    const mood = MOODS.find(m => m.label === ch.mood) || MOODS[0];
-    const jitter = (Math.random()-0.5)*0.0004;
-    const icon = L.divIcon({ className:'', html:
-      `<div style="display:flex;flex-direction:column;align-items:center;cursor:pointer;">
-        <div style="width:44px;height:44px;border-radius:50%;border:3px solid ${mood.color};overflow:hidden;background:#0a0f1e;display:flex;align-items:center;justify-content:center;">
-          ${ch.photoData?`<img src="${ch.photoData}" style="width:100%;height:100%;object-fit:cover">`:`<span style="font-size:22px">🧸</span>`}
-        </div>
-        <div style="font-size:9px;font-weight:700;color:#eaeaea;background:rgba(10,15,30,.8);padding:1px 5px;border-radius:10px;margin-top:2px;white-space:nowrap;">${ch.name}</div>
-      </div>`, iconAnchor:[22,22] });
-    const marker = L.marker([room.lat+jitter, room.lng+jitter], { icon }).addTo(map);
-    marker._lcPin = true;
-    marker.on('click', () => openCard(ch.id));
-    marker.on('mouseover', e => showTooltip(ch, e.originalEvent));
-    marker.on('mouseout', hideTooltip);
-  });
-}
+function openCard(charId){ return window.lcCard.openCard(charId); }
+function closeCard(){ return window.lcCard.closeCard(); }
+function editSelectedChar(){ return window.lcCard.editSelectedChar(); }
+function deleteSelectedChar(){ return window.lcCard.deleteSelectedChar(); }
+function talkToSelectedChar(){ return window.lcCard.talkToSelectedChar(); }
+function openTalkPanel(ch){ return window.lcCard.openTalkPanel(ch); }
+function closeTalkPanel(){ return window.lcCard.closeTalkPanel(); }
+function pulseMoodRing(charId){ return window.lcCard.pulseMoodRing(charId); }
 
-function showTooltip(ch, evt) {
-  const tt=document.getElementById('tooltip');
-  const mood=MOODS.find(m=>m.label===ch.mood)||MOODS[0];
-  const primaryRoomId = (ch.roomIds && ch.roomIds[0]) || ch.roomId;
-  const room=rooms.find(r=>r.id===primaryRoomId);
-  document.getElementById('tt-name').textContent=ch.name;
-  document.getElementById('tt-loc').textContent=room?room.name+(ch.roomIds&&ch.roomIds.length>1?` +${ch.roomIds.length-1}`:''):'';
-  document.getElementById('tt-mood').textContent=mood.emoji+' '+mood.label;
-  tt.style.left=(evt.clientX+12)+'px'; tt.style.top=(evt.clientY+12)+'px'; tt.classList.add('show');
-}
-function hideTooltip(){document.getElementById('tooltip').classList.remove('show');}
+function openRoom(roomId){ return window.lcRoom.openRoom(roomId); }
+function closeRoom(){ return window.lcRoom.closeRoom(); }
+function buildRoomScene(room){ return window.lcRoom.buildRoomScene(room); }
+function destroyRoomScene(){ return window.lcRoom.destroyRoomScene(); }
 
-function openCard(charId){
-  selectedChar=characters.find(c=>c.id===charId); if(!selectedChar) return;
-  const mood=MOODS.find(m=>m.label===selectedChar.mood)||MOODS[0];
-  const roomIds = selectedChar.roomIds || [selectedChar.roomId];
-  const roomNames = roomIds.map(id=>rooms.find(r=>r.id===id)?.name).filter(Boolean);
-  const animEl=document.getElementById('card-anim'); animEl.innerHTML='';
-  if (selectedChar.animData){const img=document.createElement('img');img.src=selectedChar.animData;animEl.appendChild(img);}
-  else if (selectedChar.photoData){const img=document.createElement('img');img.src=selectedChar.photoData;animEl.appendChild(img);}
-  else{animEl.innerHTML='<div class="placeholder">🧸</div>';}
-  document.getElementById('card-name').textContent=selectedChar.name;
-  document.getElementById('card-location').textContent=roomNames.length?'📍 '+roomNames.join(' · '):'';
-  document.getElementById('card-mood-dot').style.background=mood.color;
-  document.getElementById('card-mood-text').textContent=mood.emoji+' '+mood.label;
-  const il=document.getElementById('card-items-list'); il.innerHTML='';
-  (selectedChar.items||[]).forEach(item=>{const c=document.createElement('div');c.className='item-chip';c.textContent=item;il.appendChild(c);});
-  const pl=document.getElementById('card-passage-list'); pl.innerHTML='';
-  (selectedChar.passages||[]).forEach(p=>{
-    const pt=PROMPT_TYPES.find(t=>t.key===p.type)||{label:p.type};
-    const b=document.createElement('div'); b.className='dialogue-block';
-    b.innerHTML=`<div class="passage-type">${pt.label}</div><div class="passage-text">${p.text||'<em>nothing yet</em>'}</div>`;
-    pl.appendChild(b);
-  });
-  document.getElementById('card').classList.add('open');
-}
-function closeCard(){document.getElementById('card').classList.remove('open');selectedChar=null;}
-function editSelectedChar(){if(!selectedChar)return;closeCard();openCharModal(selectedChar.id);}
-function deleteSelectedChar(){
-  if(!selectedChar||!confirm('Remove '+selectedChar.name+'?'))return;
-  characters=characters.filter(c=>c.id!==selectedChar.id);
-  closeCard();renderMapPins();updateCompass();save();
-}
+function startGPS(){ return window.lcMap.startGPS(); }
+function startSim(){ return window.lcMap.startSim(); }
+function checkProximity(){ return window.lcMap.checkProximity(); }
+function haversine(lat1,lng1,lat2,lng2){ return window.lcMap.haversine(lat1,lng1,lat2,lng2); }
+function updateCompass(){ return window.lcMap.updateCompass(); }
+function toggleMode(){ return window.lcMap.toggleMode(); }
+function spawnTestRoom(){ return window.lcMap.spawnTestRoom(); }
 
-function talkToSelectedChar(){
-  if(!selectedChar)return;
-  const primaryRoomId = (selectedChar.roomIds && selectedChar.roomIds[0]) || selectedChar.roomId;
-  if(primaryRoomId && !document.getElementById('room-view').classList.contains('open')){
-    openRoom(primaryRoomId);
-    setTimeout(()=>openTalkPanel(selectedChar),400);
-  } else {
-    openTalkPanel(selectedChar);
-  }
-  closeCard();
-}
+function openRoomModal(roomId){ return window.lcModals.openRoomModal(roomId); }
+function closeRoomModal(){ return window.lcModals.closeRoomModal(); }
+function saveRoom(){ return window.lcModals.saveRoom(); }
 
-function openTalkPanel(ch){
-  const passages = ch.passages||[];
-  document.getElementById('talk-char-name').textContent = ch.name;
-  const bubble = document.getElementById('talk-bubble');
-  bubble.textContent = 'Tap a prompt below to hear what they say…';
-  bubble.className = 'empty';
-  const btnsEl = document.getElementById('talk-btns');
-  btnsEl.innerHTML = '';
-  if(!passages.length){
-    bubble.textContent = ch.name + ' has nothing to say yet. Edit them to add dialogue!';
-    bubble.className = '';
-  } else {
-    passages.forEach(p=>{
-      const pt = PROMPT_TYPES.find(t=>t.key===p.type)||{label:p.type, key:p.type};
-      const btn = document.createElement('button');
-      btn.className = 'talk-btn';
-      btn.textContent = pt.label;
-      btn.onclick = ()=>{
-        btnsEl.querySelectorAll('.talk-btn').forEach(b=>b.classList.remove('active'));
-        btn.classList.add('active');
-        bubble.textContent = p.text || '…';
-        bubble.className = '';
-        pulseMoodRing(ch.id);
-      };
-      btnsEl.appendChild(btn);
-    });
-  }
-  document.getElementById('talk-panel').classList.add('open');
-}
-function closeTalkPanel(){ document.getElementById('talk-panel').classList.remove('open'); }
-
-function pulseMoodRing(charId){
-  if(!threeScene) return;
-  threeScene.traverse(obj=>{
-    if(obj._moodRingCharId === charId){
-      const t0 = performance.now();
-      const pulse = ()=>{
-        const t = (performance.now()-t0)/400;
-        if(t>1){obj.scale.setScalar(1);return;}
-        obj.scale.setScalar(1 + 0.4*Math.sin(t*Math.PI));
-        requestAnimationFrame(pulse);
-      };
-      pulse();
-    }
-  });
-}
-
-function openRoom(roomId){
-  const room=rooms.find(r=>r.id===roomId);if(!room)return;
-  activeRoomId=roomId;
-  document.getElementById('room-title').textContent=room.name;
-  document.getElementById('room-lede').textContent=room.lede||'';
-  const stage=document.getElementById('room-stage');
-  const bgFile=BACKDROP_IMAGES[room.backdrop];
-  if(bgFile){
-    stage.style.backgroundImage=`url('${MEDIA_URL}${bgFile}')`;stage.style.backgroundSize='cover';stage.style.backgroundPosition='center';
-  } else {
-    stage.style.backgroundImage='';stage.style.background=FLOOR_COLORS[room.backdrop]||'#1a1a2e';
-  }
-  document.getElementById('room-view').classList.add('open');
-  if (!window.THREE || !window.GLTFLoader) { console.warn('3D viewer is still loading.'); return; }
-  setTimeout(()=>buildRoomScene(room),360);
-}
-function closeRoom(){
-  closeTalkPanel();
-  hideObjInspect();
-  document.getElementById('room-view').classList.remove('open');
-  destroyRoomScene();activeRoomId=null;
-  const stage=document.getElementById('room-stage');
-  stage.style.backgroundImage='';stage.style.background='';
-}
-
-// ── Phase 2 step 2: buildRoomScene now loads objects[] ───────────────────────
-function buildRoomScene(room){
-  destroyRoomScene();
-  const stage=document.getElementById('room-stage');
-  const W=stage.clientWidth||window.innerWidth, H=stage.clientHeight||(window.innerHeight-86-44);
-  const scene=new THREE.Scene();scene.background=null;
-  const camera=new THREE.OrthographicCamera(W/-200,H/200,H/200,H/-200,1,1000);
-  camera.position.set(9,9,9);camera.lookAt(0,1,0);
-  
-  const raycaster=new THREE.Raycaster();
-  const mouse=new THREE.Vector2();
-  stage.addEventListener('mousemove', e=>{
-    const rect=stage.getBoundingClientRect();
-    mouse.x=((e.clientX-rect.left)/rect.width)*2-1;
-    mouse.y=-((e.clientY-rect.top)/rect.height)*2+1;
-  });
-  const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});
-
-  renderer.setClearColor(0x000000,0);renderer.shadowMap.enabled=true;
-  renderer.setSize(W,H);renderer.setPixelRatio(window.devicePixelRatio);
-  stage.appendChild(renderer.domElement);
-  const hasBg=!!BACKDROP_IMAGES[room.backdrop];
-  const floor=new THREE.Mesh(
-    new THREE.PlaneGeometry(20,20),
-    new THREE.MeshLambertMaterial({color:FLOOR_COLORS[room.backdrop]||'#1a3a1a',transparent:hasBg,opacity:hasBg?0.18:1})
-  );
-  floor.rotation.x=-Math.PI/2;floor.receiveShadow=true;scene.add(floor);
-  if(!hasBg){
-    const wallMat=new THREE.MeshLambertMaterial({color:WALL_COLORS[room.backdrop]||'#2d5a27'});
-    const wN=new THREE.Mesh(new THREE.BoxGeometry(20,6,0.2),wallMat);wN.position.set(0,3,-8);scene.add(wN);
-    const wW=new THREE.Mesh(new THREE.BoxGeometry(0.2,6,20),wallMat);wW.position.set(-8,3,0);scene.add(wW);
-  }
-  scene.add(new THREE.AmbientLight(0xffffff,0.85));
-  const dl=new THREE.DirectionalLight(0xffffff,0.7);dl.position.set(5,12,5);dl.castShadow=true;scene.add(dl);
-  glbMixers=[];
-  const clock=new THREE.Clock();
-
-  // shared arrays for raycasting + label tracking
-  const labels=[], charObjects=[], objMeshes=[];
-
-  // ── characters ────────────────────────────────────────────────────────────
-  
-  // ── objects ────────────────────────────────────────────────────────────
-  const objsInRoom=objects.filter(o=>o.roomId===room.id);
-  objsInRoom.forEach(obj=>{
-    if(obj.glbUrl&&window.GLTFLoader){
-      const loader=new window.GLTFLoader();
-      loader.load(obj.glbUrl,gltf=>{
-        const model=gltf.scene;
-        model.scale.setScalar(obj.scale||1);
-        model.position.set(obj.px||0,0,obj.pz||0);
-        model.castShadow=true;
-        scene.add(model);
-        objMeshes.push({ mesh:model, objId:obj.id, name:obj.name, desc:obj.desc });
-
-        const label=document.createElement('div');label.className='obj-label';label.textContent=obj.name;
-        stage.appendChild(label);labels.push({el:label,cx:obj.px||0,cz:obj.pz||0});
-      });
-    }
-  });
-
-  // render object list panel
-  const panel = document.getElementById('obj-list-panel');
-  const listC = document.getElementById('obj-list-container');
-  listC.innerHTML='';
-  if(objsInRoom.length===0){
-    panel.classList.remove('show');
-  } else {
-    panel.classList.add('show');
-    objsInRoom.forEach(o=>{
-      const row=document.createElement('div'); row.className='obj-list-row';
-      row.innerHTML=`<div class="obj-list-name">${o.name}</div>
-                     <button class="obj-list-edit" onclick="openObjModal('${o.id}')">✏️</button>`;
-      listC.appendChild(row);
-    });
-  }
-
-  const charsInRoom=characters.filter(c=>(c.roomIds||[c.roomId]).includes(room.id));
-  charsInRoom.forEach((ch,i)=>{
-
-    const angle=(i/Math.max(charsInRoom.length,1))*Math.PI*1.2-0.6;
-    const cx=Math.cos(angle)*3.5,cz=Math.sin(angle)*3.5;
-    const mood=MOODS.find(m=>m.label===ch.mood)||MOODS[0];
-    const ring=new THREE.Mesh(new THREE.RingGeometry(0.5,0.7,32),new THREE.MeshBasicMaterial({color:mood.color,side:THREE.DoubleSide}));
-    ring.rotation.x=-Math.PI/2;ring.position.set(cx,0.01,cz);ring._moodRingCharId=ch.id;scene.add(ring);
-    if(ch.glbUrl&&window.GLTFLoader){
-      const loader=new window.GLTFLoader();
-      loader.load(ch.glbUrl,gltf=>{
-        const model=gltf.scene;
-        const box=new THREE.Box3().setFromObject(model);
-        const size=new THREE.Vector3();box.getSize(size);
-        const scale=2/Math.max(size.x,size.y,size.z);
-        model.scale.setScalar(scale);box.setFromObject(model);
-        model.position.set(cx,0,cz);model.castShadow=true;model.rotation.y=Math.PI;
-        scene.add(model);charObjects.push({obj:model,chId:ch.id,cx,cz});
-        if(gltf.animations&&gltf.animations.length){
-          const mixer=new THREE.AnimationMixer(model);
-          const clip=THREE.AnimationClip.findByName(gltf.animations,'Idle')||gltf.animations[0];
-          mixer.clipAction(clip).play();glbMixers.push(mixer);
-        }
-        const label=document.createElement('div');label.className='char-label';label.textContent=ch.name;
-        stage.appendChild(label);labels.push({label,obj:model,headY:size.y*scale+0.3});
-      },undefined,err=>{
-        console.warn('GLB load failed for',ch.name,err);
-        addFallbackBox(ch,cx,cz,mood,scene,stage,labels,charObjects);
-      });
-    } else if(ch.photoData||ch.animData){
-      const tex=new THREE.TextureLoader().load(ch.animData||ch.photoData);
-      const sprite=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true}));
-      sprite.scale.set(1.8,1.8,1);sprite.position.set(cx,1.1,cz);scene.add(sprite);
-      charObjects.push({obj:sprite,chId:ch.id,cx,cz});
-      const label=document.createElement('div');label.className='char-label';label.textContent=ch.name;
-      stage.appendChild(label);labels.push({label,obj:sprite,headY:2.1});
-    } else { addFallbackBox(ch,cx,cz,mood,scene,stage,labels,charObjects); }
-  });
-
-  function addFallbackBox(ch,cx,cz,mood,scene,stage,labels,charObjects){
-    const box=new THREE.Mesh(new THREE.BoxGeometry(0.8,1.4,0.3),new THREE.MeshLambertMaterial({color:mood.color}));
-    box.position.set(cx,0.7,cz);box.castShadow=true;scene.add(box);
-    charObjects.push({obj:box,chId:ch.id,cx,cz});
-    const label=document.createElement('div');label.className='char-label';label.textContent=ch.name;
-    stage.appendChild(label);labels.push({label,obj:box,headY:1.6});
-  }
-
-  // ── Phase 2 step 2: objects[] ─────────────────────────────────────────────
-  const roomObjs = objects.filter(o => o.roomId === room.id);
-  roomObjs.forEach(obj => {
-    const px = (obj.position && obj.position.x != null) ? obj.position.x : 0;
-    const py = (obj.position && obj.position.y != null) ? obj.position.y : 0;
-    const pz = (obj.position && obj.position.z != null) ? obj.position.z : 0;
-    const ry = (obj.rotation && obj.rotation.y != null) ? obj.rotation.y : 0;
-    const sc = obj.scale || 1;
-
-    function placeObject(mesh, heightForLabel) {
-      mesh.position.set(px, py, pz);
-      mesh.rotation.y = ry;
-      mesh.scale.setScalar(sc);
-      mesh.castShadow = true;
-      mesh._objId = obj.id;
-      scene.add(mesh);
-      // collect all descendant meshes for raycasting
-      mesh.traverse(child => { if (child.isMesh) { child._objId = obj.id; objMeshes.push(child); } });
-      if (!mesh.isMesh) objMeshes.push(mesh); // sprites / plain meshes
-      // label
-      const lbl = document.createElement('div');
-      lbl.className = 'obj-label';
-      lbl.textContent = '📦 ' + obj.name;
-      stage.appendChild(lbl);
-      labels.push({ label: lbl, obj: mesh, headY: heightForLabel });
-    }
-
-    if (obj.glbUrl && window.GLTFLoader) {
-      const loader = new window.GLTFLoader();
-      loader.load(obj.glbUrl, gltf => {
-        const model = gltf.scene;
-        const box3 = new THREE.Box3().setFromObject(model);
-        const size = new THREE.Vector3(); box3.getSize(size);
-        const autoScale = 1.2 / Math.max(size.x, size.y, size.z);
-        model.scale.setScalar(sc * autoScale);
-        model.position.set(px, py, pz);
-        model.rotation.y = ry;
-        model.castShadow = true;
-        model._objId = obj.id;
-        scene.add(model);
-        model.traverse(child => { if (child.isMesh) { child._objId = obj.id; objMeshes.push(child); } });
-        if (gltf.animations && gltf.animations.length) {
-          const mixer = new THREE.AnimationMixer(model);
-          mixer.clipAction(gltf.animations[0]).play();
-          glbMixers.push(mixer);
-        }
-        const lbl = document.createElement('div');
-        lbl.className = 'obj-label';
-        lbl.textContent = '📦 ' + obj.name;
-        stage.appendChild(lbl);
-        const h = size.y * sc * autoScale + 0.2;
-        labels.push({ label: lbl, obj: model, headY: h });
-      }, undefined, err => {
-        console.warn('Object GLB load failed for', obj.name, err);
-        addFallbackObjBox(obj, px, py, pz, ry, sc);
-      });
-    } else {
-      addFallbackObjBox(obj, px, py, pz, ry, sc);
-    }
-
-    function addFallbackObjBox(obj, px, py, pz, ry, sc) {
-      const mesh = new THREE.Mesh(
-        new THREE.BoxGeometry(0.6, 0.6, 0.6),
-        new THREE.MeshLambertMaterial({ color: 0x8b6914 })
-      );
-      placeObject(mesh, py + 0.6 * sc + 0.15);
-    }
-  });
-  // ── end objects[] ─────────────────────────────────────────────────────────
-
-  threeScene=scene;threeRenderer=renderer;threeCamera=camera;
-
-  function updateLabels(){
-    labels.forEach(({label,obj,headY})=>{
-      const pos=obj.position.clone();pos.y=headY;
-      pos.project(camera);
-      label.style.left=((pos.x*0.5+0.5)*W)+'px';
-      label.style.top=((-pos.y*0.5+0.5)*H)+'px';
-    });
-  }
-  function animate(){
-    threeAnimFrameId=requestAnimationFrame(animate);
-    const dt=clock.getDelta();
-    glbMixers.forEach(m=>m.update(dt));
-    renderer.render(scene,camera);
-    updateLabels();
-  }
-  animate();
-
-  // ── unified click handler: characters + objects ───────────────────────────
-  renderer.domElement.addEventListener('click',e=>{
-    const rect=renderer.domElement.getBoundingClientRect();
-    const mouse=new THREE.Vector2(((e.clientX-rect.left)/rect.width)*2-1,-(((e.clientY-rect.top)/rect.height)*2-1));
-    const ray=new THREE.Raycaster();ray.setFromCamera(mouse,camera);
-
-    // 1. check objects first (they are props, not characters)
-    if (objMeshes.length) {
-      const objHits = ray.intersectObjects(objMeshes, false);
-      if (objHits.length) {
-        const hitObj = objects.find(o => o.id === objHits[0].object._objId);
-        if (hitObj) { showObjInspect(hitObj.name, hitObj.description); return; }
-      }
-    }
-
-    // 2. check characters
-    const charMeshes=[];
-    charObjects.forEach(({obj})=>obj.traverse?obj.traverse(c=>{if(c.isMesh)charMeshes.push(c);}):charMeshes.push(obj));
-    const hits=ray.intersectObjects(charMeshes,false);
-    if(hits.length){
-      const hitPos=hits[0].object.getWorldPosition(new THREE.Vector3());
-      let closest=null,minD=Infinity;
-      charObjects.forEach(({chId,cx,cz})=>{
-        const d=Math.hypot(hitPos.x-cx,hitPos.z-cz);
-        if(d<minD){minD=d;closest=chId;}
-      });
-      if(closest&&minD<2){const ch=characters.find(c=>c.id===closest);if(ch)openTalkPanel(ch);}
-    }
-  });
-}
-
-function destroyRoomScene(){
-  if(threeAnimFrameId){cancelAnimationFrame(threeAnimFrameId);threeAnimFrameId=null;}
-  if(threeRenderer){threeRenderer.dispose();const c=threeRenderer.domElement;if(c.parentNode)c.parentNode.removeChild(c);threeRenderer=null;}
-  document.getElementById('room-stage').querySelectorAll('.char-label,.obj-label').forEach(el=>el.remove());
-  glbMixers=[];threeScene=null;threeCamera=null;
-}
-
-function startGPS(){
-  if(!navigator.geolocation){alert('Geolocation not supported.');return;}
-  document.getElementById('gps-status').textContent='GPS: acquiring…';
-  gpsWatchId=navigator.geolocation.watchPosition(pos=>{
-    userLat=pos.coords.latitude;userLng=pos.coords.longitude;
-    document.getElementById('gps-status').textContent=`GPS: ${userLat.toFixed(4)}, ${userLng.toFixed(4)}`;
-    checkProximity();updateCompass();
-  },err=>{
-    const msgs={1:'permission denied',2:'position unavailable',3:'timeout'};
-    document.getElementById('gps-status').textContent='GPS: '+(msgs[err.code]||err.message||'error');
-  },{enableHighAccuracy:true});
-}
-function startSim(){
-  if(simActive){clearInterval(simInterval);simActive=false;document.getElementById('gps-status').textContent='Sim: stopped';return;}
-  if(!rooms.length){alert('Add a room first.');return;}
-  simActive=true;let idx=0;
-  const step=()=>{
-    const room=rooms[idx%rooms.length];
-    userLat=room.lat+(Math.random()-0.5)*0.0002;userLng=room.lng+(Math.random()-0.5)*0.0002;
-    document.getElementById('gps-status').textContent=`Sim: near ${room.name}`;
-    map.panTo([userLat,userLng]);checkProximity();updateCompass();idx++;
-  };
-  step();simInterval=setInterval(step,3000);
-}
-function checkProximity(){
-  if(userLat===null)return;
-  rooms.forEach(room=>{
-    if(haversine(userLat,userLng,room.lat,room.lng)<(room.radius||30)&&!facilitatorMode)openRoom(room.id);
-  });
-}
-function haversine(lat1,lng1,lat2,lng2){
-  const R=6371000,dLat=(lat2-lat1)*Math.PI/180,dLng=(lng2-lng1)*Math.PI/180;
-  const a=Math.sin(dLat/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
-  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
-}
-function updateCompass(){
-  const list=document.getElementById('compass-list');list.innerHTML='';
-  if(userLat===null)return;
-  rooms.map(r=>({...r,dist:haversine(userLat,userLng,r.lat,r.lng)})).sort((a,b)=>a.dist-b.dist).slice(0,5).forEach(r=>{
-    const inside=r.dist<(r.radius||30),item=document.createElement('div');
-    item.className='compass-list-item'+(inside?' inside':'');
-    item.innerHTML=`<span class="room-name">${r.name}</span><span>${inside?'✓ here':Math.round(r.dist)+'m'}</span>`;
-    list.appendChild(item);
-  });
-}
-function toggleMode(){
-  facilitatorMode=!facilitatorMode;
-  document.getElementById('mode-label').textContent=facilitatorMode?'Facilitator':'Visitor';
-  document.querySelector('.hbtn.toggle-mode').textContent=facilitatorMode?'Projector':'Facilitator';
-}
-
-function spawnTestRoom(){
-  const centre=map.getCenter(),roomId='room_'+Date.now();
-  rooms.push({id:roomId,name:'Test Room',lede:'A sun-warm garden.',lat:centre.lat,lng:centre.lng,radius:30,backdrop:'grass'});
-  characters.push({
-    id:'char_'+Date.now(),name:'Pebble',roomId,roomIds:[roomId],mood:'Happy',
-    items:['small rock','lucky leaf'],
-    passages:[{type:'hello',text:'Oh! A visitor. Hello!'},{type:'secret',text:'I found a tiny door under the big root.'}],
-    photoData:null,animData:null,glbUrl:DEFAULT_GLB_URL
-  });
-  // spawn a test object too so the new system is immediately visible
-  objects.push({
-    id:'obj_test_'+Date.now(),
-    roomId,
-    name:'Old Chest',
-    glbUrl:'',
-    position:{x:2,y:0,z:2},
-    rotation:{y:0.5},
-    scale:1,
-    description:'A battered wooden chest. Something rattles inside.',
-    interactable:true
-  });
-  renderMapPins();updateCompass();save();map.panTo([centre.lat,centre.lng]);
-}
-
-function openRoomModal(roomId){
-  editingRoomId=roomId;
-  const room=roomId?rooms.find(r=>r.id===roomId):null;
-  document.getElementById('room-modal-title').textContent=room?'Edit Room':'Add a Room';
-  document.getElementById('rf-name').value=room?room.name:'';
-  document.getElementById('rf-lede').value=room?room.lede:'';
-  document.getElementById('rf-lat').value=room?room.lat:'';
-  document.getElementById('rf-lng').value=room?room.lng:'';
-  document.getElementById('rf-radius').value=room?room.radius:30;
-  document.getElementById('rf-backdrop').value=room?room.backdrop:'forest';
-  document.getElementById('room-modal-overlay').classList.add('open');
-  setTimeout(()=>{
-    if(!roomPickerMap){
-      const centre=room?[room.lat,room.lng]:[44.65,-63.59];
-      roomPickerMap=L.map('room-latlng-map').setView(centre,15);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(roomPickerMap);
-      roomPickerMap.on('click',e=>{
-        document.getElementById('rf-lat').value=e.latlng.lat.toFixed(6);
-        document.getElementById('rf-lng').value=e.latlng.lng.toFixed(6);
-        if(roomPickerMarker)roomPickerMap.removeLayer(roomPickerMarker);
-        roomPickerMarker=L.marker(e.latlng).addTo(roomPickerMap);
-      });
-    }
-    if(room){roomPickerMap.panTo([room.lat,room.lng]);if(roomPickerMarker)roomPickerMap.removeLayer(roomPickerMarker);roomPickerMarker=L.marker([room.lat,room.lng]).addTo(roomPickerMap);}
-    roomPickerMap.invalidateSize();
-  },80);
-}
-function closeRoomModal(){document.getElementById('room-modal-overlay').classList.remove('open');editingRoomId=null;}
-function saveRoom(){
-  const name=document.getElementById('rf-name').value.trim();
-  const lede=document.getElementById('rf-lede').value.trim();
-  const lat=parseFloat(document.getElementById('rf-lat').value);
-  const lng=parseFloat(document.getElementById('rf-lng').value);
-  const radius=parseInt(document.getElementById('rf-radius').value)||30;
-  const backdrop=document.getElementById('rf-backdrop').value;
-  if(!name||isNaN(lat)||isNaN(lng)){alert('Please fill in name and click the map to set a location.');return;}
-  if(editingRoomId){const room=rooms.find(r=>r.id===editingRoomId);if(room)Object.assign(room,{name,lede,lat,lng,radius,backdrop});}
-  else rooms.push({id:'room_'+Date.now(),name,lede,lat,lng,radius,backdrop});
-  closeRoomModal();renderMapPins();updateCompass();save();map.panTo([lat,lng]);
-}
-
-function buildRoomChipPicker(selectedIds) {
-  const container = document.getElementById('cf-room-chips');
-  const hint = document.getElementById('cf-room-chips-hint');
-  container.innerHTML = '';
-  if (!rooms.length) { hint.textContent = 'No rooms added yet — create a room first.'; hint.style.display=''; return; }
-  hint.style.display = 'none';
-  rooms.forEach(room => {
-    const chip = document.createElement('button');
-    chip.type = 'button';
-    chip.className = 'room-chip' + (selectedIds.includes(room.id) ? ' active' : '');
-    chip.textContent = '🏠 ' + room.name;
-    chip.dataset.roomId = room.id;
-    chip.onclick = () => chip.classList.toggle('active');
-    container.appendChild(chip);
-  });
-}
-function getSelectedRoomIds() {
-  return Array.from(document.querySelectorAll('#cf-room-chips .room-chip.active')).map(c => c.dataset.roomId);
-}
-
-function openCharModal(charId){
-  editingCharId=charId;tempPhotoData=null;tempAnimData=null;
-  const ch=charId?characters.find(c=>c.id===charId):null;
-  document.getElementById('char-modal-title').textContent=ch?'Edit Character':'Add a Character';
-  document.getElementById('cf-name').value=ch?ch.name:'';
-  document.getElementById('cf-items').value=ch?(ch.items||[]).join(', '):'';
-  document.getElementById('cf-glb-url').value=ch?(ch.glbUrl||''):'';
-  const currentIds = ch ? (ch.roomIds || (ch.roomId ? [ch.roomId] : [])) : [];
-  buildRoomChipPicker(currentIds);
-  const pp=document.getElementById('cf-photo-preview');
-  if(ch&&ch.photoData){pp.src=ch.photoData;pp.style.display='block';tempPhotoData=ch.photoData;}
-  else{pp.src='';pp.style.display='none';}
-  const ap=document.getElementById('cf-anim-preview');
-  if(ch&&ch.animData){ap.src=ch.animData;ap.style.display='block';tempAnimData=ch.animData;}
-  else{ap.src='';ap.style.display='none';}
-  const mp=document.getElementById('mood-picker');mp.innerHTML='';
-  MOODS.forEach(m=>{
-    const btn=document.createElement('button');
-    const isActive=ch?ch.mood===m.label:m.label==='Happy';
-    btn.className='mood-opt'+(isActive?' active':'');
-    btn.textContent=m.emoji+' '+m.label;
-    btn.style.borderColor=isActive?m.color:'transparent';
-    btn.onclick=()=>{
-      mp.querySelectorAll('.mood-opt').forEach(b=>{b.classList.remove('active');b.style.borderColor='transparent';});
-      btn.classList.add('active');btn.style.borderColor=m.color;
-    };
-    mp.appendChild(btn);
-  });
-  const db=document.getElementById('dialogue-builder');db.innerHTML='';
-  PROMPT_TYPES.forEach(pt=>{
-    const existing=ch&&ch.passages?ch.passages.find(p=>p.type===pt.key):null;
-    const row=document.createElement('div');row.className='prompt-row';row.dataset.key=pt.key;
-    row.innerHTML=`
-      <button class="prompt-pill ${existing?.text?'active':''}" onclick="togglePromptPill(this)">${pt.label}</button>
-      <div style="flex:1;display:flex;flex-direction:column;gap:3px">
-        <textarea class="prompt-input" placeholder="${pt.placeholder}" rows="2">${existing?.text||''}</textarea>
-        <div class="prompt-hint">${pt.hint}</div>
-      </div>`;
-    db.appendChild(row);
-  });
-  document.getElementById('char-modal-overlay').classList.add('open');
-}
-function togglePromptPill(btn){btn.classList.toggle('active');}
-function closeCharModal(){document.getElementById('char-modal-overlay').classList.remove('open');editingCharId=null;tempPhotoData=null;tempAnimData=null;}
-function previewFile(inputId,previewId,dataKey){
-  const input=document.getElementById(inputId),preview=document.getElementById(previewId);
-  if(!input.files||!input.files[0])return;
-  const reader=new FileReader();
-  reader.onload=e=>{
-    preview.src=e.target.result;preview.style.display='block';
-    if(dataKey==='photoData')tempPhotoData=e.target.result;
-    if(dataKey==='animData')tempAnimData=e.target.result;
-  };
-  reader.readAsDataURL(input.files[0]);
-}
-function saveCharacter(){
-  const name=document.getElementById('cf-name').value.trim();
-  const roomIds=getSelectedRoomIds();
-  const primaryRoomId=roomIds[0]||'';
-  const items=document.getElementById('cf-items').value.split(',').map(s=>s.trim()).filter(Boolean);
-  const glbUrl=document.getElementById('cf-glb-url').value.trim();
-  if(!name){alert('Please give the character a name.');return;}
-  const activeMoodBtn=document.querySelector('#mood-picker .mood-opt.active');
-  const moodLabel=MOODS.find(m=>activeMoodBtn&&activeMoodBtn.textContent.includes(m.emoji))?.label||'Happy';
-  const passages=[];
-  document.querySelectorAll('#dialogue-builder .prompt-row').forEach(row=>{
-    const text=row.querySelector('.prompt-input').value.trim();
-    if(text)passages.push({type:row.dataset.key,text});
-  });
-  const data={name,roomId:primaryRoomId,roomIds,mood:moodLabel,items,passages,glbUrl,photoData:tempPhotoData,animData:tempAnimData};
-  if(editingCharId){const ch=characters.find(c=>c.id===editingCharId);if(ch)Object.assign(ch,data);}
-  else characters.push({id:'char_'+Date.now(),...data});
-  closeCharModal();renderMapPins();save();
-}
+function buildRoomChipPicker(selectedIds) { return window.lcModals.buildRoomChipPicker(selectedIds); }
+function getSelectedRoomIds() { return window.lcModals.getSelectedRoomIds(); }
+function openCharModal(charId){ return window.lcModals.openCharModal(charId); }
+function togglePromptPill(btn){ return window.lcModals.togglePromptPill(btn); }
+function closeCharModal(){ return window.lcModals.closeCharModal(); }
+function previewFile(inputId,previewId,dataKey){ return window.lcModals.previewFile(inputId,previewId,dataKey); }
+function saveCharacter(){ return window.lcModals.saveCharacter(); }
 
 function buildTweeSource(rooms, chars, objs) {
   let out = '';
@@ -1172,66 +580,12 @@ function buildTweeStandalone(rooms, chars, objs) {
   return ':: StoryTitle\nLiving Characters World\n\n:: StoryData\n{"ifid":"C15CE33F-61F6-4909-BB59-73EE7A3D57B1"}\n\n'
     + buildTweeSource(rooms, chars, objs);
 }
-function previewTwee(){
-  document.getElementById('twee-source').textContent=buildTweeStandalone(rooms,characters,objects);
-  document.getElementById('twee-preview-overlay').classList.add('open');
-}
-function closeTweePreview(){document.getElementById('twee-preview-overlay').classList.remove('open');}
-function downloadTwee(){
-  const blob=new Blob([buildTweeStandalone(rooms,characters,objects)],{type:'text/plain'});
-  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='living-characters.twee';a.click();
-}
-function triggerImport(){document.getElementById('twee-import-input').click();}
-function handleImportFile(event){
-  const file=event.target.files[0];if(!file)return;
-  const reader=new FileReader();reader.onload=e=>importTweeSource(e.target.result);reader.readAsText(file);
-  event.target.value='';
-}
-function importTweeSource(src,silent){
-  const lines=src.split('\n'),newRooms=[],newChars=[],newObjs=[];
-  let i=0;
-  while(i<lines.length){
-    const line=lines[i];
-    if(line.startsWith(':: ')&&!line.startsWith(':: StoryTitle')&&!line.startsWith(':: StoryData')){
-      const m=line.match(/^:: ([^{]+?)(?:\s+(\{.*\}))?$/);
-      if(!m){i++;continue;}
-      const passName=m[1].trim(),meta=m[2]?JSON.parse(m[2]):{};
-      const bodyLines=[];i++;
-      while(i<lines.length&&!lines[i].startsWith(':: ')){bodyLines.push(lines[i]);i++;}
-      const body=bodyLines.join('\n').trim();
-      if(meta.lat!==undefined){
-        const roomId=meta.id||('room_'+passName.replace(/\s+/g,'_'));
-        newRooms.push({id:roomId,name:passName,lede:body,lat:meta.lat,lng:meta.lng,radius:meta.radius||30,backdrop:meta.backdrop||'forest'});
-      } else if(passName.endsWith('-object')){
-        const objName = passName.slice(0,-7).trim();
-        newObjs.push({
-          id: 'obj_' + objName.replace(/\s+/g,'_') + '_' + Date.now(),
-          roomId: meta.roomId || '',
-          name: objName,
-          glbUrl: meta.glbUrl || '',
-          position: { x: meta.x||0, y: meta.y||0, z: meta.z||0 },
-          rotation: { y: meta.rotY||0 },
-          scale: meta.scale||1,
-          description: body,
-          interactable: meta.interactable !== false
-        });
-      } else if((meta.roomIds!==undefined||meta.roomId!==undefined)&&!passName.includes('-')){
-        const roomIds=Array.isArray(meta.roomIds)?meta.roomIds:(meta.roomId?[meta.roomId]:[]);
-        const primaryRoomId=roomIds[0]||meta.roomId;
-        newChars.push({id:'char_'+passName.replace(/\s+/g,'_'),name:passName,roomId:primaryRoomId,roomIds,mood:meta.mood||'Happy',items:meta.items||[],passages:[],photoData:null,animData:null,glbUrl:meta.glbUrl||null});
-      } else if(passName.includes('-')){
-        const [charName,...tp]=passName.split('-'),type=tp.join('-');
-        const ch=newChars.find(c=>c.name===charName);
-        if(ch)ch.passages.push({type,text:body});
-      }
-    }else i++;
-  }
-  if(newRooms.length||newChars.length||newObjs.length){
-    rooms=newRooms;characters=newChars;objects=newObjs;
-    renderMapPins();updateCompass();save();
-    if(!silent)alert(`Imported ${newRooms.length} rooms, ${newChars.length} characters and ${newObjs.length} objects.`);
-  }else if(!silent)alert('No rooms or characters found in that .twee file.');
-}
+function previewTwee(){ return window.lcStore.previewTwee(); }
+function closeTweePreview(){ return window.lcStore.closeTweePreview(); }
+function downloadTwee(){ return window.lcStore.downloadTwee(); }
+function triggerImport(){ return window.lcStore.triggerImport(); }
+function handleImportFile(event){ return window.lcStore.handleImportFile(event); }
+function importTweeSource(src,silent){ return window.lcStore.importTweeSource(src,silent); }
 
 document.addEventListener('dragover',e=>{e.preventDefault();document.getElementById('drop-overlay').classList.add('active');});
 document.addEventListener('dragleave',e=>{if(!e.relatedTarget)document.getElementById('drop-overlay').classList.remove('active');});
@@ -1241,28 +595,14 @@ document.addEventListener('drop',e=>{
   const reader=new FileReader();reader.onload=ev=>importTweeSource(ev.target.result);reader.readAsText(file);
 });
 
-function save(){
-  try{
-    localStorage.setItem('lc_rooms',JSON.stringify(rooms));
-    localStorage.setItem('lc_chars',JSON.stringify(characters));
-    localStorage.setItem('lc_objects',JSON.stringify(objects));
-  }catch(e){}
-}
-function loadLocal(){
-  try{
-    const r=localStorage.getItem('lc_rooms'),c=localStorage.getItem('lc_chars'),o=localStorage.getItem('lc_objects');
-    if(r)rooms=JSON.parse(r);
-    if(c){
-      characters=JSON.parse(c);
-      characters.forEach(ch=>{
-        if(!ch.roomIds||!Array.isArray(ch.roomIds)) ch.roomIds=ch.roomId?[ch.roomId]:[];
-      });
-    }
-    if(o) objects=JSON.parse(o);
-  }catch(e){}
-}
+function save(){ return window.lcStore.save(); }
+function loadLocal(){ return window.lcStore.loadLocal(); }
 
-loadLocal();initMap();updateCompass();
+window.addEventListener('load', () => {
+  loadLocal();
+  initMap();
+  updateCompass();
+});
 
 // ── Objects ──────────────────────────────────────────────────────────────
 function editActiveRoom() {
