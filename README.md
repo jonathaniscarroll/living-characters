@@ -15,6 +15,20 @@ The current implementation supports a full loop for creating and presenting a sm
 - Sync the world to GitHub through a personal access token.
 - Persist the working world in browser storage so it can be resumed later.
 
+### Room Backdrop Upload
+
+When editing a room, you can upload a custom backdrop image:
+
+1. Click **📸 Upload backdrop image** in the room modal.
+2. Select an image file from your device.
+3. If you have a GitHub token entered, the image will be uploaded to `media/room-backdrops/{roomId}.png` in the repository.
+4. The image becomes the background of that room's Three.js scene when you open it.
+5. The backdrop URL is stored on the room object as `backdropUrl` and persisted in localStorage.
+
+**Priority order for room backgrounds:**
+- Custom `backdropUrl` (uploaded or manually entered)
+- Preset backdrop style (forest, stone, water, etc.)
+
 ## Quick start
 
 This is a static web app, so there is no build step.
