@@ -1,10 +1,10 @@
-:: Test Room {"lat":44.65,"lng":-63.59,"radius":30,"backdrop":"forest"}
+:: Room {"roomId":"999","lat":44.65,"lng":-63.59,"radius":30,"backdrop":"forest"}
 @bg garden.png
-A room for testing.
+A room, like any other
 
-:: Pebble {"roomId":"room_Test Room","mood":"Happy","items":["small rock","lucky leaf"]}
+:: Pebble {"roomId":"999","mood":"Happy","items":["small rock","lucky leaf"]}
 
-:: Mop {"roomId":"room_Test Room","mood":"Happy","items":["small rock","lucky leaf"],"glbUrl":"2026-07-09.glb"}
+:: Mop {"roomId":"999","mood":"Happy","items":["small rock","lucky leaf"],"glbUrl":"2026-07-09.glb"}
 
 :: Pebble-hello
 Oh! A visitor. Hello!
