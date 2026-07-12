@@ -469,7 +469,7 @@ function renderMapPins() {
       radius: room.radius||30, color:'#f5a623', fillColor:'#f5a623', fillOpacity:0.08, weight:1
     }).addTo(map);
     circle._lcPin = true;
-    const chars = characters.filter(c => c.roomId === room.id);
+    const chars = characters.filter(c => (c.roomIds || [c.roomId]).includes(room.id));
     const icon = L.divIcon({ className:'', html:
       `<div style="background:#16213e;border:2px solid #f5a623;border-radius:8px;padding:4px 8px;font-size:11px;font-weight:700;color:#f5a623;white-space:nowrap;cursor:pointer;">
         🏠 ${room.name}<br><span style="font-size:9px;color:#a0a0b0">${chars.length} character${chars.length!==1?'s':''}</span>
@@ -479,7 +479,8 @@ function renderMapPins() {
     marker.on('click', () => openRoom(room.id));
   });
   characters.forEach(ch => {
-    const room = rooms.find(r => r.id === ch.roomId);
+    const primaryRoomId = (ch.roomIds && ch.roomIds[0]) || ch.roomId;
+    const room = rooms.find(r => r.id === primaryRoomId);
     if (!room) return;
     const mood = MOODS.find(m => m.label === ch.mood) || MOODS[0];
     const jitter = (Math.random()-0.5)*0.0004;
@@ -501,7 +502,8 @@ function renderMapPins() {
 function showTooltip(ch, evt) {
   const tt=document.getElementById('tooltip');
   const mood=MOODS.find(m=>m.label===ch.mood)||MOODS[0];
-  const room=rooms.find(r=>r.id===ch.roomId);
+  const primaryRoomId = (ch.roomIds && ch.roomIds[0]) || ch.roomId;
+  const room=rooms.find(r=>r.id===primaryRoomId);
   document.getElementById('tt-name').textContent=ch.name;
   document.getElementById('tt-loc').textContent=room?room.name:'';
   document.getElementById('tt-mood').textContent=mood.emoji+' '+mood.label;
@@ -512,7 +514,8 @@ function hideTooltip(){document.getElementById('tooltip').classList.remove('show
 function openCard(charId){
   selectedChar=characters.find(c=>c.id===charId); if(!selectedChar) return;
   const mood=MOODS.find(m=>m.label===selectedChar.mood)||MOODS[0];
-  const room=rooms.find(r=>r.id===selectedChar.roomId);
+  const primaryRoomId = (selectedChar.roomIds && selectedChar.roomIds[0]) || selectedChar.roomId;
+  const room=rooms.find(r=>r.id===primaryRoomId);
   const animEl=document.getElementById('card-anim'); animEl.innerHTML='';
   if (selectedChar.animData){const img=document.createElement('img');img.src=selectedChar.animData;animEl.appendChild(img);}
   else if (selectedChar.photoData){const img=document.createElement('img');img.src=selectedChar.photoData;animEl.appendChild(img);}
@@ -543,9 +546,9 @@ function deleteSelectedChar(){
 // ── Talk-to-character ──────────────────────────────────────────────────────────
 function talkToSelectedChar(){
   if(!selectedChar)return;
-  // If we're already in a room, show the panel there; otherwise open the room first
-  if(selectedChar.roomId && !document.getElementById('room-view').classList.contains('open')){
-    openRoom(selectedChar.roomId);
+  const primaryRoomId = (selectedChar.roomIds && selectedChar.roomIds[0]) || selectedChar.roomId;
+  if(primaryRoomId && !document.getElementById('room-view').classList.contains('open')){
+    openRoom(primaryRoomId);
     setTimeout(()=>openTalkPanel(selectedChar),400);
   } else {
     openTalkPanel(selectedChar);
@@ -575,7 +578,6 @@ function openTalkPanel(ch){
         btn.classList.add('active');
         bubble.textContent = p.text || '…';
         bubble.className = '';
-        // Pulse the character's mood ring in the 3D scene (visual feedback)
         pulseMoodRing(ch.id);
       };
       btnsEl.appendChild(btn);
@@ -588,7 +590,6 @@ function closeTalkPanel(){
   document.getElementById('talk-panel').classList.remove('open');
 }
 
-// Brief scale-pulse on mood ring when character speaks
 function pulseMoodRing(charId){
   if(!threeScene) return;
   threeScene.traverse(obj=>{
@@ -644,10 +645,7 @@ function buildRoomScene(room){
   const scene=new THREE.Scene();
   scene.background=null;
 
-  // const camera=new THREE.OrthographicCamera(45,W/H,0.1,100);
-    // const camera=new THREE.OrthographicCamera( W / - 2, W / 2, H / 2, H / - 2, 1, 1000 );
-    const camera=new THREE.OrthographicCamera( W/-200,H/200, H / 200, H / - 200, 1, 1000 );
-  // new THREE.OrthographicCamera( width / - 2, width / 2, height / 2, height / - 2, 1, 1000 );
+  const camera=new THREE.OrthographicCamera( W/-200,H/200, H / 200, H / - 200, 1, 1000 );
   camera.position.set(9,9,9);camera.lookAt(0,1,0);
 
   const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});
@@ -672,7 +670,7 @@ function buildRoomScene(room){
 
   glbMixers=[];
   const clock=new THREE.Clock();
-  const charsInRoom=characters.filter(c=>c.roomId===room.id);
+  const charsInRoom=characters.filter(c => (c.roomIds || [c.roomId]).includes(room.id));
   const labels=[];
   const charObjects=[];
 
@@ -686,7 +684,7 @@ function buildRoomScene(room){
       new THREE.MeshBasicMaterial({color:mood.color,side:THREE.DoubleSide})
     );
     ring.rotation.x=-Math.PI/2;ring.position.set(cx,0.01,cz);
-    ring._moodRingCharId = ch.id;  // tag for pulse animation
+    ring._moodRingCharId = ch.id;
     scene.add(ring);
 
     const glbUrl=ch.glbUrl||null;
@@ -761,7 +759,6 @@ function buildRoomScene(room){
   }
   animate();
 
-  // Click a character in the room → open talk panel directly
   renderer.domElement.addEventListener('click',e=>{
     const rect=renderer.domElement.getBoundingClientRect();
     const mouse=new THREE.Vector2(
@@ -821,7 +818,9 @@ function startSim(){
 }
 function checkProximity(){
   if(userLat===null)return;
-  rooms.forEach(room=>{if(haversine(userLat,userLng,room.lat,room.lng)<(room.radius||30)&&!facilitatorMode)openRoom(room.id);});
+  rooms.forEach(room=>{
+    if(haversine(userLat,userLng,room.lat,room.lng)<(room.radius||30)&&!facilitatorMode)openRoom(room.id);
+  });
 }
 function haversine(lat1,lng1,lat2,lng2){
   const R=6371000,dLat=(lat2-lat1)*Math.PI/180,dLng=(lng2-lng1)*Math.PI/180;
@@ -851,6 +850,7 @@ function spawnTestRoom(){
     id:'char_'+Date.now(),
     name:'Pebble',
     roomId,
+    roomIds:[roomId],
     mood:'Happy',
     items:['small rock','lucky leaf'],
     passages:[
@@ -916,7 +916,8 @@ function openCharModal(charId){
   sel.innerHTML='<option value="">— choose a room —</option>';
   rooms.forEach(r=>{
     const opt=document.createElement('option');opt.value=r.id;opt.textContent=r.name;
-    if(ch&&ch.roomId===r.id)opt.selected=true;sel.appendChild(opt);
+    if(ch && (ch.roomIds || [ch.roomId]).includes(r.id)) opt.selected=true;
+    sel.appendChild(opt);
   });
   const pp=document.getElementById('cf-photo-preview');
   if(ch&&ch.photoData){pp.src=ch.photoData;pp.style.display='block';tempPhotoData=ch.photoData;}
@@ -927,9 +928,10 @@ function openCharModal(charId){
   const mp=document.getElementById('mood-picker');mp.innerHTML='';
   MOODS.forEach(m=>{
     const btn=document.createElement('button');
-    btn.className='mood-opt'+(ch&&ch.mood===m.label?' active':(!ch&&m.label==='Happy'?' active':''));
+    const isActive = ch ? ch.mood===m.label : m.label==='Happy';
+    btn.className='mood-opt'+(isActive?' active':'');
     btn.textContent=m.emoji+' '+m.label;
-    btn.style.borderColor=btn.classList.contains('active')?m.color:'transparent';
+    btn.style.borderColor=isActive?m.color:'transparent';
     btn.onclick=()=>{
       mp.querySelectorAll('.mood-opt').forEach(b=>{b.classList.remove('active');b.style.borderColor='transparent';});
       btn.classList.add('active');btn.style.borderColor=m.color;
@@ -976,24 +978,21 @@ function saveCharacter(){
     const text=row.querySelector('.prompt-input').value.trim();
     if(text)passages.push({type:row.dataset.key,text});
   });
-  const data={name,roomId,mood:moodLabel,items,passages,glbUrl,photoData:tempPhotoData,animData:tempAnimData};
+  const roomIdsArray = roomId ? [roomId] : [];
+  const data={name,roomId,roomIds:roomIdsArray,mood:moodLabel,items,passages,glbUrl,photoData:tempPhotoData,animData:tempAnimData};
   if(editingCharId){const ch=characters.find(c=>c.id===editingCharId);if(ch)Object.assign(ch,data);}
   else characters.push({id:'char_'+Date.now(),...data});
   closeCharModal();renderMapPins();save();
 }
 
-// ── Twee export: strip binary media to keep file small ─────────────────────────
-// photoData / animData are base64 data URIs — they must NOT go into story/main.twee.
-// They are preserved in localStorage only. Reference media by glbUrl (a URL) instead.
 function buildTweeSource(rooms, chars) {
   let out = '';
   rooms.forEach(room => {
     out += `:: ${room.name} {"id":"${room.id}","lat":${room.lat},"lng":${room.lng},"radius":${room.radius},"backdrop":"${room.backdrop}"}\n`;
     out += room.lede ? room.lede + '\n' : '';
     out += '\n';
-    chars.filter(c => c.roomId === room.id).forEach(ch => {
-      // glbUrl is a plain URL and safe to include; photoData/animData are stripped
-      const meta = { roomId: room.id, mood: ch.mood, items: ch.items||[] };
+    chars.filter(c => (c.roomIds || [c.roomId]).includes(room.id)).forEach(ch => {
+      const meta = { roomIds: ch.roomIds || [ch.roomId], mood: ch.mood, items: (ch.items||[]) };
       if (ch.glbUrl) meta.glbUrl = ch.glbUrl;
       out += `:: ${ch.name} ${JSON.stringify(meta)}\n\n`;
       (ch.passages||[]).forEach(p => { out += `:: ${ch.name}-${p.type}\n${p.text}\n\n`; });
@@ -1037,8 +1036,23 @@ function importTweeSource(src,silent){
       if(meta.lat!==undefined){
         const roomId = meta.id || ('room_' + passName.replace(/\s+/g,'_'));
         newRooms.push({id:roomId,name:passName,lede:body,lat:meta.lat,lng:meta.lng,radius:meta.radius||30,backdrop:meta.backdrop||'forest'});
-      }else if(meta.roomId!==undefined&&!passName.includes('-')){
-        newChars.push({id:'char_'+passName.replace(/\s+/g,'_'),name:passName,roomId:meta.roomId,mood:meta.mood||'Happy',items:meta.items||[],passages:[],photoData:null,animData:null,glbUrl:meta.glbUrl||null});
+      }else if((meta.roomIds !== undefined || meta.roomId !== undefined) && !passName.includes('-')){
+        const roomIds = Array.isArray(meta.roomIds)
+          ? meta.roomIds
+          : (meta.roomId ? [meta.roomId] : []);
+        const primaryRoomId = roomIds[0] || meta.roomId;
+        newChars.push({
+          id:'char_'+passName.replace(/\s+/g,'_'),
+          name:passName,
+          roomId:primaryRoomId,
+          roomIds:roomIds,
+          mood:meta.mood||'Happy',
+          items:meta.items||[],
+          passages:[],
+          photoData:null,
+          animData:null,
+          glbUrl:meta.glbUrl||null
+        });
       }else if(passName.includes('-')){
         const [charName,...tp]=passName.split('-'),type=tp.join('-');
         const ch=newChars.find(c=>c.name===charName);
@@ -1068,6 +1082,11 @@ function loadLocal(){
   try{
     const r=localStorage.getItem('lc_rooms'),c=localStorage.getItem('lc_chars');
     if(r)rooms=JSON.parse(r);if(c)characters=JSON.parse(c);
+    characters.forEach(ch => {
+      if (!ch.roomIds || !Array.isArray(ch.roomIds)) {
+        ch.roomIds = ch.roomId ? [ch.roomId] : [];
+      }
+    });
   }catch(e){}
 }
 
