@@ -1,1 +1,250 @@
-PLACEHOLDER_WILL_INJECT_BELOW
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Living Characters — Virtual World</title>
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.1/examples/jsm/"
+      }
+    }
+  </script>
+  <script type="module">
+    import * as THREE from 'three';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+    window.THREE = THREE;
+    window.GLTFLoader = GLTFLoader;
+  </script>
+
+  <style>
+    :root {
+      --bg:#1a1a2e; --surface:#16213e; --surface2:#0f3460;
+      --accent:#e94560; --accent2:#f5a623;
+      --text:#eaeaea; --text-muted:#a0a0b0;
+      --pin-size:52px; --radius:12px; --border:#ffffff18;
+    }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+    html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;overflow:hidden;}
+    #header{position:fixed;top:0;left:0;right:0;z-index:1100;background:linear-gradient(90deg,#0f3460,#16213e);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 16px;height:48px;gap:8px;flex-wrap:nowrap;}
+    #header h1{font-size:15px;font-weight:700;letter-spacing:.04em;flex-shrink:0;}
+    #header .btns{display:flex;gap:5px;align-items:center;flex-wrap:nowrap;overflow-x:auto;}
+    .hbtn{font-size:11px;padding:5px 9px;border-radius:6px;border:none;cursor:pointer;font-family:inherit;font-weight:600;transition:opacity .15s;white-space:nowrap;flex-shrink:0;}
+    .hbtn:hover{opacity:.8;}
+    .hbtn.add-char{background:var(--accent);color:#fff;}
+    .hbtn.add-room{background:#2d5a27;color:#90ee90;}
+    .hbtn.test-room{background:#3a4f1a;color:#c8f08a;border:1px solid #7ab828;}
+    .hbtn.gps-btn{background:#1a3a5c;color:#90caf9;}
+    .hbtn.sim-btn{background:#3a2d5c;color:#c9b8ff;}
+    .hbtn.export-btn{background:#2d5a27;color:#90ee90;}
+    .hbtn.import-btn{background:#1a3a5c;color:#90caf9;}
+    .hbtn.gh-load{background:#1c3a2a;color:#6fcf97;}
+    .hbtn.gh-save{background:#3a2007;color:#f5a623;}
+    .hbtn.toggle-mode{background:#ffffff18;color:var(--text);}
+    #mode-label{font-size:10px;color:var(--text-muted);}
+    #gps-status{font-size:10px;color:#90caf9;max-width:160px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex-shrink:0;}
+    #gh-bar{position:fixed;top:48px;left:0;right:0;z-index:1090;background:#0a1520;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;padding:6px 14px;height:38px;}
+    #gh-bar label{font-size:10px;color:var(--text-muted);white-space:nowrap;flex-shrink:0;}
+    #gh-token-input{flex:1;max-width:340px;background:rgba(255,255,255,.06);border:1px solid var(--border);border-radius:6px;padding:4px 10px;color:var(--text);font-size:12px;font-family:monospace;outline:none;}
+    #gh-token-input:focus{border-color:var(--accent2);}
+    #gh-token-input::placeholder{font-family:inherit;font-size:11px;color:var(--text-muted);}
+    #gh-commit-input{flex:1;max-width:220px;background:rgba(255,255,255,.06);border:1px solid var(--border);border-radius:6px;padding:4px 10px;color:var(--text);font-size:12px;font-family:inherit;outline:none;}
+    #gh-commit-input::placeholder{font-size:11px;color:var(--text-muted);}
+    #gh-status{font-size:10px;color:var(--text-muted);white-space:nowrap;flex-shrink:0;}
+    #gh-status.ok{color:#6fcf97;} #gh-status.err{color:var(--accent);}
+    #map{position:fixed;top:86px;left:0;right:0;bottom:0;z-index:1;}
+    #compass-panel{position:fixed;bottom:20px;left:20px;z-index:1050;background:rgba(10,15,30,.92);border:1px solid var(--border);border-radius:12px;padding:14px;width:200px;backdrop-filter:blur(8px);}
+    #compass-panel h4{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--text-muted);margin-bottom:10px;}
+    .compass-rose{position:relative;width:130px;height:130px;margin:0 auto 10px auto;border:2px solid #ffffff30;border-radius:50%;background:radial-gradient(circle,#16213e 60%,#0a0f1e);}
+    .compass-rose .north{position:absolute;top:4px;left:50%;transform:translateX(-50%);font-size:11px;font-weight:800;color:var(--accent);}
+    .compass-rose .center-dot{position:absolute;left:50%;top:50%;width:8px;height:8px;margin:-4px;background:#fff;border-radius:50%;}
+    .heading-needle{position:absolute;left:50%;top:50%;width:3px;height:52px;margin-left:-1.5px;margin-top:-52px;background:var(--accent);transform-origin:50% 100%;}
+    .heading-needle::before{content:'';position:absolute;left:-5px;top:-8px;border-left:6.5px solid transparent;border-right:6.5px solid transparent;border-bottom:10px solid var(--accent);}
+    .compass-list{font-size:11px;display:flex;flex-direction:column;gap:5px;}
+    .compass-list-item{display:flex;justify-content:space-between;color:var(--text-muted);}
+    .compass-list-item .room-name{color:var(--text);font-weight:600;}
+    .compass-list-item.inside .room-name{color:#4ade80;}
+    #room-view{position:fixed;inset:86px 0 0 0;z-index:1200;background:var(--bg);display:flex;flex-direction:column;transform:translateY(100%);transition:transform .35s cubic-bezier(.16,1,.3,1);}
+    #room-view.open{transform:translateY(0);}
+    #room-header{background:linear-gradient(90deg,#0f3460,#16213e);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;padding:0 16px;height:44px;flex-shrink:0;}
+    #room-back{background:none;border:none;color:var(--accent2);font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;padding:0;}
+    #room-title{font-size:14px;font-weight:800;}
+    #room-lede{font-size:11px;color:var(--text-muted);}
+    /* ── Phase 2 Step 7: room toolbar ── */
+    .room-toolbar{margin-left:auto;display:flex;gap:6px;align-items:center;}
+    .room-tbtn{font-size:11px;padding:4px 9px;border-radius:6px;border:none;cursor:pointer;font-family:inherit;font-weight:600;white-space:nowrap;}
+    .room-tbtn.add-obj{background:#2a2060;color:#c9b8ff;border:1px solid #5a4a90;}
+    .room-tbtn.edit-room{background:rgba(255,255,255,.08);color:var(--text-muted);}
+    .room-tbtn:hover{opacity:.8;}
+    #room-stage{flex:1;position:relative;overflow:hidden;background:#1a3a10 center/cover no-repeat;}
+    #room-stage canvas{display:block;width:100%!important;height:100%!important;position:absolute;top:0;left:0;}
+    .char-label{position:absolute;pointer-events:none;background:rgba(10,15,30,.85);color:var(--text);font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;backdrop-filter:blur(4px);white-space:nowrap;transform:translate(-50%,0);z-index:10;}
+    .obj-label{position:absolute;pointer-events:none;background:rgba(10,15,30,.65);color:var(--text-muted);font-size:9px;font-weight:600;padding:2px 6px;border-radius:20px;backdrop-filter:blur(4px);white-space:nowrap;transform:translate(-50%,0);z-index:9;}
+    #obj-inspect{position:absolute;bottom:80px;left:50%;transform:translateX(-50%);z-index:55;background:rgba(10,15,30,.93);border:1px solid var(--border);border-radius:10px;padding:10px 16px;max-width:260px;text-align:center;pointer-events:none;opacity:0;transition:opacity .2s;}
+    #obj-inspect.show{opacity:1;}
+    #obj-inspect .oi-name{font-size:13px;font-weight:800;color:var(--accent2);}
+    #obj-inspect .oi-desc{font-size:12px;color:var(--text-muted);margin-top:4px;font-style:italic;line-height:1.5;}
+    #talk-panel{position:absolute;bottom:0;left:0;right:0;z-index:50;background:linear-gradient(0deg,rgba(10,15,30,.97) 80%,transparent);padding:16px 20px 20px;display:flex;flex-direction:column;gap:10px;transform:translateY(100%);transition:transform .3s cubic-bezier(.16,1,.3,1);}
+    #talk-panel.open{transform:translateY(0);}
+    #talk-panel-header{display:flex;align-items:center;gap:10px;}
+    #talk-char-name{font-size:14px;font-weight:800;color:var(--text);}
+    #talk-panel-close{margin-left:auto;background:none;border:none;color:var(--text-muted);font-size:18px;cursor:pointer;line-height:1;}
+    #talk-bubble{background:rgba(255,255,255,.07);border:1px solid var(--border);border-radius:12px;padding:12px 16px;font-size:13px;line-height:1.6;color:var(--text);min-height:48px;font-style:italic;}
+    #talk-bubble.empty{color:var(--text-muted);}
+    #talk-btns{display:flex;flex-wrap:wrap;gap:8px;}
+    .talk-btn{padding:7px 14px;border-radius:20px;border:1px solid var(--border);background:rgba(255,255,255,.06);color:var(--text);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:background .15s,border-color .15s;}
+    .talk-btn:hover,.talk-btn.active{background:rgba(245,166,35,.2);border-color:var(--accent2);color:var(--accent2);}
+    #card{position:fixed;right:0;top:86px;bottom:0;width:340px;max-width:100vw;background:var(--surface);border-left:1px solid var(--border);display:flex;flex-direction:column;transform:translateX(100%);transition:transform .28s cubic-bezier(.16,1,.3,1);z-index:1300;overflow-y:auto;}
+    #card.open{transform:translateX(0);}
+    #card-close{position:absolute;top:10px;right:12px;background:none;border:none;color:var(--text-muted);font-size:20px;cursor:pointer;}
+    #card-anim{width:100%;aspect-ratio:1;background:#0a0f1e;display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;}
+    #card-anim img{max-width:100%;max-height:100%;object-fit:contain;}
+    #card-anim .placeholder{font-size:64px;}
+    #card-body{padding:16px;display:flex;flex-direction:column;gap:12px;}
+    #card-name{font-size:20px;font-weight:800;} #card-location{font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;}
+    #card-mood-row{display:flex;align-items:center;gap:8px;}
+    #card-mood-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;} #card-mood-text{font-size:13px;}
+    #card-items h3,#card-dialogue h3{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);margin-bottom:6px;}
+    #card-items-list{display:flex;flex-wrap:wrap;gap:6px;}
+    .item-chip{background:rgba(255,255,255,.08);border-radius:20px;padding:4px 10px;font-size:12px;}
+    .dialogue-block{border-left:3px solid var(--accent);padding:8px 12px;background:rgba(255,255,255,.04);border-radius:0 8px 8px 0;font-size:13px;line-height:1.6;}
+    .dialogue-block .passage-type{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--accent2);font-weight:700;margin-bottom:3px;}
+    .dialogue-block .passage-text{color:var(--text-muted);font-style:italic;}
+    .card-actions{display:flex;gap:8px;padding:0 16px 16px;}
+    .card-btn{flex:1;padding:8px;border-radius:8px;border:none;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;}
+    .card-btn.edit{background:rgba(255,255,255,.1);color:var(--text);} .card-btn.delete{background:rgba(233,69,96,.15);color:var(--accent);}
+    .card-btn.talk{background:rgba(245,166,35,.2);color:var(--accent2);border:1px solid var(--accent2);}
+    .modal-overlay{position:fixed;inset:0;z-index:1400;background:rgba(0,0,0,.65);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s;}
+    .modal-overlay.open{opacity:1;pointer-events:all;}
+    .modal-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px;width:480px;max-width:calc(100vw - 32px);max-height:calc(100vh - 64px);overflow-y:auto;display:flex;flex-direction:column;gap:14px;}
+    .modal-box h2{font-size:16px;font-weight:800;}
+    .modal-section-title{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--accent2);font-weight:700;border-bottom:1px solid var(--border);padding-bottom:6px;margin-top:4px;}
+    .field{display:flex;flex-direction:column;gap:5px;}
+    .field label{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);}
+    .field input,.field select,.field textarea{background:rgba(255,255,255,.06);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--text);font-size:13px;font-family:inherit;outline:none;}
+    .field input:focus,.field select:focus,.field textarea:focus{border-color:var(--accent);}
+    .field textarea{resize:vertical;min-height:52px;}
+    .modal-actions{display:flex;gap:10px;margin-top:4px;}
+    .mbtn{flex:1;padding:10px;border-radius:8px;border:none;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;}
+    .mbtn.save{background:var(--accent);color:#fff;} .mbtn.cancel{background:rgba(255,255,255,.08);color:var(--text);}
+    .mbtn.danger{background:rgba(233,69,96,.18);color:var(--accent);}
+    .file-row{display:flex;gap:8px;align-items:center;}
+    .file-preview{width:52px;height:52px;border-radius:8px;object-fit:cover;background:#0a0f1e;flex-shrink:0;}
+    .file-btn{flex:1;padding:8px 12px;border-radius:8px;background:rgba(255,255,255,.06);border:1px dashed #ffffff28;color:var(--text-muted);font-size:12px;font-family:inherit;cursor:pointer;text-align:center;}
+    .mood-picker{display:flex;gap:8px;flex-wrap:wrap;}
+    .mood-opt{padding:4px 12px;border-radius:20px;border:1px solid transparent;font-size:12px;cursor:pointer;background:rgba(255,255,255,.06);}
+    .mood-opt.active{border-color:var(--accent2);background:rgba(245,166,35,.15);}
+    .room-chips{display:flex;flex-wrap:wrap;gap:7px;}
+    .room-chip{padding:5px 12px;border-radius:20px;border:1.5px solid var(--border);font-size:12px;font-weight:600;cursor:pointer;background:rgba(255,255,255,.05);color:var(--text-muted);transition:background .12s,border-color .12s,color .12s;user-select:none;}
+    .room-chip:hover{border-color:#ffffff40;color:var(--text);}
+    .room-chip.active{background:rgba(245,166,35,.18);border-color:var(--accent2);color:var(--accent2);}
+    .room-chips-hint{font-size:10px;color:var(--text-muted);margin-top:2px;}
+    #dialogue-builder{display:flex;flex-direction:column;gap:10px;}
+    .prompt-row{display:flex;gap:6px;align-items:flex-start;}
+    .prompt-pill{flex-shrink:0;padding:5px 10px;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer;background:rgba(255,255,255,.08);border:1px solid var(--border);color:var(--text-muted);white-space:nowrap;}
+    .prompt-pill.active{background:rgba(245,166,35,.2);color:var(--accent2);border-color:var(--accent2);}
+    .prompt-input{flex:1;background:rgba(255,255,255,.06);border:1px solid var(--border);border-radius:8px;padding:7px 10px;color:var(--text);font-size:12px;font-family:inherit;outline:none;resize:none;min-height:36px;}
+    .prompt-input:focus{border-color:var(--accent);}
+    .prompt-hint{font-size:10px;color:var(--text-muted);margin-top:-6px;margin-left:2px;}
+    #room-latlng-map{width:100%;height:200px;border-radius:8px;border:1px solid var(--border);z-index:0;}
+    #twee-preview-overlay .modal-box{max-height:calc(100vh - 64px);}
+    #twee-source{flex:1;overflow-y:auto;max-height:50vh;font-family:'Courier New',monospace;font-size:11px;background:#000510;color:#90ee90;border:1px solid #ffffff18;border-radius:6px;padding:12px;white-space:pre;line-height:1.5;}
+    #tooltip{position:fixed;z-index:1500;background:rgba(10,15,30,.92);backdrop-filter:blur(8px);border:1px solid var(--border);border-radius:10px;padding:10px 14px;pointer-events:none;opacity:0;transition:opacity .12s;max-width:200px;}
+    #tooltip.show{opacity:1;}
+    #tooltip .tt-name{font-size:13px;font-weight:800;} #tooltip .tt-loc{font-size:10px;color:var(--text-muted);text-transform:uppercase;} #tooltip .tt-mood{font-size:11px;margin-top:3px;}
+    #drop-overlay{position:fixed;inset:0;z-index:2000;background:rgba(0,0,80,.75);backdrop-filter:blur(6px);display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;opacity:0;transition:opacity .2s;color:#fff;font-size:22px;gap:12px;}
+    #drop-overlay.active{opacity:1;pointer-events:all;}
+    #drop-overlay .drop-sub{font-size:13px;color:#a0c8ff;}
+    /* ── Phase 2 Step 7: object list panel ── */
+    #obj-list-panel{position:absolute;top:8px;right:8px;z-index:40;background:rgba(10,15,30,.88);border:1px solid var(--border);border-radius:10px;padding:8px 10px;min-width:150px;max-width:220px;max-height:220px;overflow-y:auto;display:none;flex-direction:column;gap:5px;}
+    #obj-list-panel.show{display:flex;}
+    #obj-list-panel h5{font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--text-muted);margin-bottom:2px;}
+    .obj-list-row{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-muted);}
+    .obj-list-row .obj-list-name{flex:1;color:var(--text);font-weight:600;}
+    .obj-list-edit{background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:12px;padding:1px 4px;border-radius:4px;}
+    .obj-list-edit:hover{color:var(--accent2);}
+    ::-webkit-scrollbar{width:6px;} ::-webkit-scrollbar-track{background:transparent;} ::-webkit-scrollbar-thumb{background:#ffffff20;border-radius:3px;}
+  </style>
+</head>
+<body>
+
+<div id="header">
+  <h1>🏠 Living Characters</h1>
+  <div class="btns">
+    <span id="gps-status">GPS: off</span>
+    <button class="hbtn gps-btn"   onclick="startGPS()">📍 GPS</button>
+    <button class="hbtn sim-btn"   onclick="startSim()">🚶 Simulate</button>
+    <button class="hbtn test-room" onclick="spawnTestRoom()">🧪 Test Room</button>
+    <button class="hbtn add-room"  onclick="openRoomModal(null)">+ Room</button>
+    <button class="hbtn add-char"  onclick="openCharModal(null)">+ Character</button>
+    <button class="hbtn import-btn" onclick="triggerImport()">⬆ .twee</button>
+    <button class="hbtn export-btn" onclick="previewTwee()">⬇ .twee</button>
+    <button class="hbtn gh-load"   onclick="ghLoad()">☁ Load</button>
+    <button class="hbtn gh-save"   onclick="ghSave()">☁ Save</button>
+    <button class="hbtn toggle-mode" onclick="toggleMode()">Projector</button>
+    <span id="mode-label">Facilitator</span>
+  </div>
+</div>
+
+<div id="gh-bar">
+  <label for="gh-token-input">🔑 GitHub token:</label>
+  <input id="gh-token-input" type="password" placeholder="ghp_… (saved locally once entered)"
+         autocomplete="current-password" spellcheck="false" oninput="onTokenInput()" />
+  <input id="gh-commit-input" type="text" placeholder="Commit message (optional)" />
+  <span id="gh-status">not connected</span>
+</div>
+
+<div id="map"></div>
+
+<div id="compass-panel">
+  <h4>🧭 Rooms from here</h4>
+  <div class="compass-rose" id="compass-rose">
+    <div class="north">N</div>
+    <div class="heading-needle" id="heading-needle"></div>
+    <div class="center-dot"></div>
+  </div>
+  <div class="compass-list" id="compass-list"></div>
+</div>
+
+<div id="room-view">
+  <div id="room-header">
+    <button id="room-back" onclick="closeRoom()">← Map</button>
+    <div id="room-title">Room</div>
+    <div id="room-lede"></div>
+    <!-- Phase 2 Step 7: room toolbar -->
+    <div class="room-toolbar">
+      <button class="room-tbtn edit-room" onclick="editActiveRoom()">✏️ Edit</button>
+      <button class="room-tbtn add-obj"   onclick="openObjModal(null)">📦 + Object</button>
+    </div>
+  </div>
+  <div id="room-stage">
+    <!-- object inspect bubble -->
+    <div id="obj-inspect">
+      <div class="oi-name" id="oi-name"></div>
+      <div class="oi-desc" id="oi-desc"></div>
+    </div>
+    <!-- Phase 2 Step 7: object list panel (top-right of stage) -->
+    <div id="obj-list-panel">
+      <h5>Objects in room</h5>
+    </div>
+    <div id="talk-panel">
+      <div id="talk-panel-header">
+        <span id="talk-char-name"></span>
+        <button id="talk-panel-close" onclick="closeTalkPanel()">✕</button>
+      </div>
+      <div id="talk-bubble" class="empty">Tap a prompt below to hear what they say…</div>
+      <div id="talk-btns"></div>
+    </div>
+  </div>
+</div>
+
+<div id="card">
+  <button id="card-close" onclick="closeCard()">✕</button>
+  <div id="card-anim"><div class="placeholder">🧸</div></div>
+  <div id="card-body">
+    <div><div
