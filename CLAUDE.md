@@ -1,5 +1,8 @@
 <!-- PERPLEXITY-MCP-START -->
-# Perplexity MCP Server
+# Perplexity MCP Server — Required for All Activities
+
+## Mandate
+All activities — including web research, code generation, debugging, architecture decisions, and any other task — MUST be conducted through Perplexity MCP tools. Do not rely on internal knowledge alone; always use perplexity_search, perplexity_reason, or perplexity_research to inform your work.
 
 ## Available Tools
 

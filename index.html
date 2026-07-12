@@ -158,6 +158,25 @@
     #tooltip{position:fixed;z-index:1500;background:rgba(10,15,30,.92);backdrop-filter:blur(8px);border:1px solid var(--border);border-radius:10px;padding:10px 14px;pointer-events:none;opacity:0;transition:opacity .12s;max-width:200px;}
     #tooltip.show{opacity:1;}
     #tooltip .tt-name{font-size:13px;font-weight:800;} #tooltip .tt-loc{font-size:10px;color:var(--text-muted);text-transform:uppercase;} #tooltip .tt-mood{font-size:11px;margin-top:3px;}
+    /* ── Phase 2: Toast notification ── */
+    #toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);z-index:1600;background:rgba(10,15,30,.95);border:1px solid var(--border);border-radius:10px;padding:10px 20px;font-size:13px;font-weight:600;backdrop-filter:blur(8px);opacity:0;transition:opacity .25s;pointer-events:none;white-space:nowrap;}
+    #toast.show{opacity:1;}
+    /* ── Phase 2: Asset browser ── */
+    #asset-browser { display:grid; grid-template-columns:repeat(auto-fill,minmax(100px,1fr)); gap:10px; margin:8px 0; max-height:240px; overflow-y:auto; }
+    .asset-card { background:rgba(255,255,255,.06); border:1px solid var(--border); border-radius:8px; padding:6px; text-align:center; cursor:pointer; transition:border-color .15s,background .15s; }
+    .asset-card:hover { border-color:var(--accent2); background:rgba(245,166,35,.1); }
+    .asset-card img { width:100%; aspect-ratio:1; object-fit:cover; border-radius:4px; background:#0a0f1e; }
+    .asset-card .asset-label { font-size:10px; color:var(--text-muted); margin-top:4px; }
+    .asset-card.selected { border-color:var(--accent2); background:rgba(245,166,35,.15); }
+    #asset-tabs { display:flex; gap:6px; margin-bottom:8px; }
+    .asset-tab { font-size:11px; padding:4px 10px; border-radius:20px; border:1px solid var(--border); background:transparent; color:var(--text-muted); cursor:pointer; font-family:inherit; }
+    .asset-tab.active { border-color:var(--accent2); color:var(--accent2); background:rgba(245,166,35,.1); }
+    /* ── Phase 2: interactable toggle ── */
+    .toggle-row { display:flex; align-items:center; gap:10px; }
+    .toggle-switch { position:relative; width:40px; height:22px; background:#ffffff20; border-radius:11px; cursor:pointer; transition:background .2s; flex-shrink:0; }
+    .toggle-switch.active { background:var(--accent2); }
+    .toggle-switch::after { content:''; position:absolute; top:2px; left:2px; width:18px; height:18px; background:#fff; border-radius:50%; transition:transform .2s; }
+    .toggle-switch.active::after { transform:translateX(18px); }
     #drop-overlay{position:fixed;inset:0;z-index:2000;background:rgba(0,0,80,.75);backdrop-filter:blur(6px);display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;opacity:0;transition:opacity .2s;color:#fff;font-size:22px;gap:12px;}
     #drop-overlay.active{opacity:1;pointer-events:all;}
     #drop-overlay .drop-sub{font-size:13px;color:#a0c8ff;}
@@ -406,9 +425,12 @@
   <div class="tt-mood" id="tt-mood"></div>
 </div>
 
+<div id="toast"></div>
+
 <input id="twee-import-input" type="file" accept=".twee,.txt" style="display:none" onchange="handleImportFile(event)" />
 
 <script>
+// Constants are imported from scripts/store.js; these are kept for inline <script> compat
 const GH_OWNER  = 'jonathaniscarroll';
 const GH_REPO   = 'living-characters';
 const GH_PATH   = 'story/main.twee';
@@ -418,81 +440,6 @@ let ghFileSha = null;
 const MEDIA_URL = `https://raw.githubusercontent.com/${GH_OWNER}/${GH_REPO}/main/media/`;
 const BACKDROP_IMAGES = { room: './garden.png', room2: './room2.png' };
 const DEFAULT_GLB_URL = 'https://threejs.org/examples/models/gltf/Soldier.glb';
-
-async function seedGhFileSha(token) {
-  try {
-    const headers = { Accept: 'application/vnd.github.v3+json' };
-    if (token) headers.Authorization = 'token ' + token;
-    const res = await fetch(
-      `https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/contents/${GH_PATH}?ref=${GH_BRANCH}`,
-      { headers }
-    );
-    if (res.ok) { const data = await res.json(); ghFileSha = data.sha; setGhStatus('ready ✓', 'ok'); }
-  } catch(_) {}
-}
-function getToken() {
-  return document.getElementById('gh-token-input').value.trim() || localStorage.getItem('lc_gh_token') || '';
-}
-function onTokenInput() {
-  const t = document.getElementById('gh-token-input').value.trim();
-  if (t) { localStorage.setItem('lc_gh_token', t); setGhStatus('token saved ✓', 'ok'); seedGhFileSha(t); }
-}
-function setGhStatus(msg, cls) {
-  const el = document.getElementById('gh-status'); el.textContent = msg; el.className = cls || '';
-}
-window.addEventListener('DOMContentLoaded', () => {
-  const saved = localStorage.getItem('lc_gh_token');
-  if (saved) { document.getElementById('gh-token-input').value = saved; setGhStatus('token loaded — syncing…', 'ok'); seedGhFileSha(saved); }
-});
-
-async function ghLoad() {
-  const token = getToken();
-  if (!token) { setGhStatus('Enter a GitHub token first', 'err'); return; }
-  setGhStatus('Loading…');
-  try {
-    const res = await fetch(
-      `https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/contents/${GH_PATH}?ref=${GH_BRANCH}`,
-      { headers: { Authorization: 'token ' + token, Accept: 'application/vnd.github.v3+json' } }
-    );
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const data = await res.json();
-    ghFileSha = data.sha;
-    const src = decodeBase64Unicode(data.content.replace(/\n/g, ''));
-    importTweeSource(src, true);
-    setGhStatus('Loaded ✓  (' + rooms.length + ' rooms, ' + characters.length + ' chars, ' + objects.length + ' objects)', 'ok');
-  } catch(e) { setGhStatus('Load failed: ' + e.message, 'err'); }
-}
-async function ghSave() {
-  const token = getToken();
-  if (!token) { setGhStatus('Enter a GitHub token first', 'err'); return; }
-  const src = buildTweeSource(rooms, characters, objects);
-  const encoded = btoa(unescape(encodeURIComponent(src)));
-  const msg = document.getElementById('gh-commit-input').value.trim() || 'Update living-characters world via tool';
-  setGhStatus('Saving…');
-  try {
-    const body = { message: msg, content: encoded, branch: GH_BRANCH };
-    if (ghFileSha) body.sha = ghFileSha;
-    const res = await fetch(
-      `https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/contents/${GH_PATH}`,
-      { method: 'PUT',
-        headers: { Authorization: 'token ' + token, Accept: 'application/vnd.github.v3+json', 'Content-Type': 'application/json' },
-        body: JSON.stringify(body) }
-    );
-    if (!res.ok) {
-      const errData = await res.json();
-      if (res.status === 409 || res.status === 422) {
-        ghFileSha = null; setGhStatus('SHA conflict — re-syncing, try Save again', 'err'); seedGhFileSha(token);
-      } else { setGhStatus('Save failed: ' + (errData.message || 'HTTP ' + res.status), 'err'); }
-      return;
-    }
-    const data = await res.json();
-    ghFileSha = data.content.sha;
-    setGhStatus('Saved ✓  ' + data.commit.sha.slice(0,7), 'ok');
-  } catch(e) { setGhStatus('Save failed: ' + e.message, 'err'); }
-}
-function decodeBase64Unicode(b64) {
-  return decodeURIComponent(atob(b64).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
-}
 
 const MOODS = [
   { label:'Happy',   color:'#4ade80', emoji:'😊' },
@@ -521,6 +468,79 @@ var gpsWatchId=null, userLat=null, userLng=null;
 var simActive=false, simInterval=null, facilitatorMode=true, activeRoomId=null;
 var threeScene=null, threeRenderer=null, threeCamera=null, threeAnimFrameId=null;
 var glbMixers=[];
+
+// ── Phase 2: Toast notification ─────────────────────────────────────────────
+let toastTimeout = null;
+function showToast(msg, type) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.style.borderColor = type === 'err' ? 'var(--accent)' : 'var(--accent2)';
+  el.style.color = type === 'err' ? 'var(--accent)' : 'var(--accent2)';
+  el.classList.add('show');
+  clearTimeout(toastTimeout);
+  toastTimeout = setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+// ── Phase 2: Asset browser ──────────────────────────────────────────────────
+const ASSET_LIBRARY = {
+  backdrops: [
+    { name: 'Forest', url: './garden.png' },
+    { name: 'Room', url: './room2.png' },
+  ],
+  glbModels: [
+    { name: 'Soldier', url: 'https://threejs.org/examples/models/gltf/Soldier.glb' },
+    { name: 'Parrot', url: 'https://threejs.org/examples/models/gltf/Parrot.glb' },
+    { name: 'Duck', url: 'https://threejs.org/examples/models/gltf/Duck/glTF/Duck.gltf' },
+  ]
+};
+function openAssetBrowser(targetField) {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay open';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:1500;background:rgba(0,0,0,.65);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;';
+  overlay.innerHTML = `
+    <div class="modal-box" style="width:520px">
+      <h2>📚 Asset Library</h2>
+      <div id="asset-tabs">
+        <button class="asset-tab active" data-tab="backdrops">Backdrops</button>
+        <button class="asset-tab" data-tab="glb">3D Models</button>
+      </div>
+      <div id="asset-browser"></div>
+      <div class="modal-actions">
+        <button class="mbtn cancel" onclick="this.closest('.modal-overlay').remove()">Close</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  const browser = overlay.querySelector('#asset-browser');
+  const tabs = overlay.querySelectorAll('.asset-tab');
+  let currentTab = 'backdrops';
+  function renderAssets(tab) {
+    const items = ASSET_LIBRARY[tab] || [];
+    browser.innerHTML = items.map(a => `
+      <div class="asset-card" data-url="${a.url}" data-name="${a.name}">
+        ${tab === 'backdrops' ? `<img src="${a.url}" alt="${a.name}" onerror="this.outerHTML='<div style=\\'width:100%;aspect-ratio:1;display:flex;align-items:center;justify-content:center;font-size:32px\\'>📦</div>'">` : `<div style="width:100%;aspect-ratio:1;display:flex;align-items:center;justify-content:center;font-size:32px;background:#0a0f1e;border-radius:4px;">📦</div>`}
+        <div class="asset-label">${a.name}</div>
+      </div>`).join('');
+    browser.querySelectorAll('.asset-card').forEach(card => {
+      card.onclick = () => {
+        const url = card.dataset.url;
+        const name = card.dataset.name;
+        const field = document.getElementById(targetField);
+        if (field) field.value = url;
+        showToast('✓ Selected: ' + name);
+        overlay.remove();
+      };
+    });
+  }
+  tabs.forEach(tab => {
+    tab.onclick = () => {
+      tabs.forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      currentTab = tab.dataset.tab;
+      renderAssets(currentTab);
+    };
+  });
+  renderAssets('backdrops');
+}
 
 // ── Phase 2 step 2: object inspect bubble helpers ────────────────────────────
 let objInspectTimeout = null;
