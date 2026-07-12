@@ -8,13 +8,20 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.min.js"></script>
-  <script>
-    (async () => {
-      try {
-        const mod = await import('https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/loaders/GLTFLoader.js');
-        THREE.GLTFLoader = mod.GLTFLoader;
-      } catch(e) { console.warn('GLTFLoader unavailable', e); }
-    })();
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.1/examples/jsm/"
+      }
+    }
+  </script>
+  <script type="module">
+    import * as THREE from 'three';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+    window.THREE = THREE;
+    window.GLTFLoader = GLTFLoader;
   </script>
 
   <style>
@@ -491,6 +498,10 @@ function openRoom(roomId){
     stage.style.background=FLOOR_COLORS[room.backdrop]||'#1a1a2e';
   }
   document.getElementById('room-view').classList.add('open');
+  if (!window.THREE || !window.GLTFLoader) {
+    console.warn('3D viewer is still loading.');
+    return;
+  }
   setTimeout(()=>buildRoomScene(room),360);
 }
 function closeRoom(){
