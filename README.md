@@ -87,3 +87,13 @@ The most valuable improvements would be:
 
 The app sits between a spatial story editor and a live facilitation tool. Rooms still matter because they carry real-world coordinates and provide stage space, but characters become the primary unit of dramatic interaction. That makes it well suited to workshops, physical props, and facilitator-led experiences where the map and room scene are used as a shared stage.
 
+### OBJ to GLB Conversion (Local Tool)
+
+Use the included script to convert OBJ files to GLB for Three.js:
+
+```bash
+node scripts/obj-to-glb.js input.obj output.glb
+```
+
+Note: OBJ format does not store animation data. For textured or animated models, use Blender's export to GLB instead.
+
