@@ -27,10 +27,12 @@ function openRoomModal(roomId) {
   document.getElementById('rf-radius').value = room ? room.radius : '30';
   document.getElementById('rf-backdrop').value = room ? room.backdrop : 'forest';
   const bp = document.getElementById('rf-backdrop-preview');
-  if (room && room.backdropData) {
-    bp.src = room.backdropData;
+  // Support both backdropData (base64 local) and backdropUrl (remote)
+  const existingPreview = (room && room.backdropData) ? room.backdropData : ((room && room.backdropUrl) ? room.backdropUrl : null);
+  if (existingPreview) {
+    bp.src = existingPreview;
     bp.style.display = 'block';
-    tempBackdropData = room.backdropData;
+    if (room.backdropData) tempBackdropData = room.backdropData;
     document.getElementById('rf-backdrop-status').textContent = '✓ Your backdrop image is ready to save.';
   } else {
     bp.src = '';
@@ -38,7 +40,6 @@ function openRoomModal(roomId) {
     document.getElementById('rf-backdrop-status').textContent = '';
   }
   document.getElementById('room-modal-overlay').classList.add('open');
-  // Initialize the room picker map if not yet created
   setTimeout(initRoomPickerMap, 100);
 }
 
@@ -68,7 +69,7 @@ function saveRoom() {
   } else {
     rooms.push(data);
   }
-  tempBackdropUrl = undefined; // clear after saving
+  tempBackdropUrl = undefined;
   closeRoomModal();
   renderMapPins();
   updateCompass();
@@ -80,7 +81,7 @@ let roomPickerMap = null;
 let roomPickerMarker = null;
 function initRoomPickerMap() {
   const el = document.getElementById('room-latlng-map');
-  if (!el || el._leaflet_id) return; // already initialized
+  if (!el || el._leaflet_id) return;
   roomPickerMap = L.map(el, { zoomControl: true, attributionControl: false }).setView([44.65, -63.59], 13);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(roomPickerMap);
   roomPickerMap.on('click', e => {
@@ -89,10 +90,8 @@ function initRoomPickerMap() {
     if (roomPickerMarker) roomPickerMarker.setLatLng(e.latlng);
     else roomPickerMarker = L.marker(e.latlng).addTo(roomPickerMap);
   });
-  // Watch lat/lng inputs for manual entry
   document.getElementById('rf-lat').addEventListener('input', updateRoomPickerMarker);
   document.getElementById('rf-lng').addEventListener('input', updateRoomPickerMarker);
-  // Force Leaflet to recalculate size after modal opens
   setTimeout(() => roomPickerMap.invalidateSize(), 300);
 }
 function updateRoomPickerMarker() {
@@ -109,8 +108,9 @@ function uploadRoomBackdrop() {
   const input = document.getElementById('rf-backdrop-input');
   const status = document.getElementById('rf-backdrop-status');
   const preview = document.getElementById('rf-backdrop-preview');
-  const file = input.files && input.files[0];
-  if (!file) return;
+  // Guard: file input may be empty (e.g. user cancelled)
+  if (!input || !input.files || !input.files[0]) return;
+  const file = input.files[0];
   const reader = new FileReader();
   reader.onload = e => {
     tempBackdropData = e.target.result;
@@ -118,13 +118,21 @@ function uploadRoomBackdrop() {
     preview.style.display = 'block';
     status.textContent = `✓ "${file.name}" is ready to use!`;
     status.style.color = 'var(--accent2)';
-    // Upload to GitHub after preview loads
-    window.lcStore.uploadRoomBackdropToGitHub(editingRoomId || 'room_' + Date.now(), file).then(url => {
-      if (url) {
-        tempBackdropUrl = url;
-        status.textContent = `✓ "${file.name}" uploaded to repo!`;
-      }
-    }).catch(() => {});
+    // Also store as backdropUrl immediately so the room scene can use it
+    // without waiting for a GitHub upload
+    tempBackdropUrl = e.target.result;
+    // Attempt GitHub upload in background; update URL if it succeeds
+    const targetRoomId = editingRoomId || ('room_' + Date.now());
+    if (window.lcStore && typeof window.lcStore.uploadRoomBackdropToGitHub === 'function') {
+      window.lcStore.uploadRoomBackdropToGitHub(targetRoomId, file).then(url => {
+        if (url) {
+          tempBackdropUrl = url;
+          status.textContent = `✓ "${file.name}" uploaded to repo!`;
+        }
+      }).catch(() => {
+        // GitHub upload failed — local base64 copy is still usable
+      });
+    }
   };
   reader.onerror = () => {
     tempBackdropData = null;
@@ -223,7 +231,7 @@ function uploadCharacterGlb() {
   reader.onload = e => {
     tempGlbData = e.target.result;
     urlField.value = '';
-    status.textContent = `✓ “${file.name}” is ready to use!`;
+    status.textContent = `✓ "${file.name}" is ready to use!`;
     status.style.color = 'var(--accent2)';
   };
   reader.onerror = () => {

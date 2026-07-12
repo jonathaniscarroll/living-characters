@@ -19,9 +19,11 @@ function openRoom(roomId) {
   document.getElementById('room-title').textContent = room.name;
   document.getElementById('room-lede').textContent = room.lede || '';
   const stage = document.getElementById('room-stage');
-  // Priority: custom backdropUrl > BACKDROP_IMAGES preset > floor color
-  if (room.backdropUrl) {
-    stage.style.backgroundImage = `url('${room.backdropUrl}')`;
+  // Priority: backdropData (local base64) > backdropUrl (remote) > preset > floor colour
+  // backdropData is set immediately on upload; backdropUrl may come later from GitHub
+  const backdropSrc = room.backdropData || room.backdropUrl || null;
+  if (backdropSrc) {
+    stage.style.backgroundImage = `url('${backdropSrc}')`;
     stage.style.backgroundSize = 'cover';
     stage.style.backgroundPosition = 'center';
   } else {
@@ -61,7 +63,14 @@ function buildRoomScene(room) {
   const H = stage.clientHeight || (window.innerHeight - 86 - 44);
   const scene = new THREE.Scene();
   scene.background = null;
-  const camera = new THREE.OrthographicCamera(W / -200, H / 200, H / 200, H / -200, 1, 1000);
+  // Fixed orthographic frustum: left/right use W, top/bottom use H
+  const aspect = W / H;
+  const viewSize = 10;
+  const camera = new THREE.OrthographicCamera(
+    -viewSize * aspect / 2, viewSize * aspect / 2,
+    viewSize / 2, -viewSize / 2,
+    1, 1000
+  );
   camera.position.set(9, 9, 9);
   camera.lookAt(0, 1, 0);
 
@@ -72,14 +81,17 @@ function buildRoomScene(room) {
     mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
     mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
   });
+
+  // alpha:true + setClearColor(0,0) so the CSS backdrop on #room-stage shows through
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.setClearColor(0x000000, 0);
   renderer.shadowMap.enabled = true;
   renderer.setSize(W, H);
   renderer.setPixelRatio(window.devicePixelRatio);
   stage.appendChild(renderer.domElement);
-  // Custom backdropUrl or preset backdrop both count as "has background" for floor/wall transparency
-  const hasBg = !!(room.backdropUrl || BACKDROP_IMAGES[room.backdrop]);
+
+  // hasBg is true if there is any backdrop image (local or remote or preset)
+  const hasBg = !!(room.backdropData || room.backdropUrl || BACKDROP_IMAGES[room.backdrop]);
   const floor = new THREE.Mesh(
     new THREE.PlaneGeometry(20, 20),
     new THREE.MeshLambertMaterial({ color: FLOOR_COLORS[room.backdrop] || '#1a3a1a', transparent: hasBg, opacity: hasBg ? 0.18 : 1 })
@@ -87,7 +99,6 @@ function buildRoomScene(room) {
   floor.rotation.x = -Math.PI / 2;
   floor.receiveShadow = true;
   scene.add(floor);
-  // Only draw walls if there's no background image (otherwise they obscure the backdrop)
   if (!hasBg) {
     const wallMat = new THREE.MeshLambertMaterial({ color: WALL_COLORS[room.backdrop] || '#2d5a27' });
     const wN = new THREE.Mesh(new THREE.BoxGeometry(20, 6, 0.2), wallMat);
@@ -97,7 +108,7 @@ function buildRoomScene(room) {
     wW.position.set(-8, 3, 0);
     scene.add(wW);
   }
-  scene.add(new THREE.AmbientLight(0xffffff, 1.3)); // Even lighting for all materials
+  scene.add(new THREE.AmbientLight(0xffffff, 1.3));
   const dl = new THREE.DirectionalLight(0xffffff, 0.7);
   dl.position.set(5, 12, 5);
   dl.castShadow = true;
@@ -301,7 +312,6 @@ function buildRoomScene(room) {
   animate();
 
   renderer.domElement.addEventListener('click', e => {
-    // Check if we're in object move mode (set by Move Objects button)
     if (window.roomEditMode && window.roomEditMode === true) {
       onRoomObjectClick(e);
       return;
@@ -452,7 +462,6 @@ function onRoomObjectClick(e) {
   const raycaster = new THREE.Raycaster();
   raycaster.setFromCamera(mouse, threeCamera);
 
-  // Get all draggable object meshes
   const dragMeshes = [];
   threeScene.traverse(c => {
     if (c.isMesh && c._objId && !c._moodRingCharId) {
@@ -464,16 +473,13 @@ function onRoomObjectClick(e) {
   if (hits.length > 0) {
     const hit = hits[0].object;
     if (!movingObjMesh) {
-      // First click: select object to move
       movingObjMesh = hit;
       threeRenderer.domElement.style.cursor = 'grabbing';
     } else {
-      // Second click: place object at new position
       const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
       const point = new THREE.Vector3();
       if (raycaster.ray.intersectPlane(plane, point)) {
         movingObjMesh.position.set(point.x, 0, point.z);
-        // Update stored object
         const objId = movingObjMesh._objId;
         const obj = objects.find(o => o.id === objId);
         if (obj) {
@@ -488,7 +494,6 @@ function onRoomObjectClick(e) {
       threeRenderer.domElement.style.cursor = '';
     }
   } else if (movingObjMesh) {
-    // Click on empty space: cancel move
     movingObjMesh = null;
     threeRenderer.domElement.style.cursor = '';
   }
