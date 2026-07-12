@@ -29,6 +29,13 @@ When editing a room, you can upload a custom backdrop image:
 - Custom `backdropUrl` (uploaded or manually entered)
 - Preset backdrop style (forest, stone, water, etc.)
 
+### Object Placement in Room Scenes
+
+- Click **Move Objects** in the room toolbar to enable object movement mode.
+- In move mode, click an object to select it (cursor changes to grabbing), then click a new floor position to place it.
+- Objects are constrained to the floor plane (Y=0) for easy placement.
+- Lighting is now evened out with increased ambient light so materials render consistently regardless of angle.
+
 ## Quick start
 
 This is a static web app, so there is no build step.
@@ -96,4 +103,3 @@ node scripts/obj-to-glb.js input.obj output.glb
 ```
 
 Note: OBJ format does not store animation data. For textured or animated models, use Blender's export to GLB instead.
-
