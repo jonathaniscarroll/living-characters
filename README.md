@@ -4,6 +4,46 @@ A GPS + proximity virtual world builder where **characters replace locations as 
 
 ---
 
+## ⚠️ Current status (July 2026 audit)
+
+### Save bug — root cause
+
+`ghSave()` uses the **file's SHA at time of last load** (`ghFileSha`) to write back to GitHub. The bug is:
+
+1. **`ghFileSha` is never seeded on first load** — it stays `null` until `ghLoad()` is explicitly pressed. If the user skips `ghLoad()` and clicks `ghSave()`, GitHub receives a PUT with no SHA on a file that already exists → **409 Conflict → "Save failed"**.
+2. **Stale SHA after a failed save** — if a save attempt throws before the SHA is updated, `ghFileSha` keeps the old value. The *next* save tries to overwrite a SHA that no longer exists → another conflict.
+3. **`localStorage` photos/GIFs inflate the Twee payload** — `photoData` and `animData` are stored as full base64 data URIs and written verbatim into `story/main.twee`. With even a few characters the file easily exceeds GitHub's 1 MB API limit, returning a silent failure or a 422.
+
+### Fix plan (in priority order)
+
+| # | What | Why |
+|---|---|---|
+| 1 | On `DOMContentLoaded`, call the GitHub API to **HEAD-fetch `story/main.twee`** and seed `ghFileSha` automatically | Eliminates the "forgot to Load first" conflict |
+| 2 | After every successful save, **update `ghFileSha` from the response** (already done) — but also **catch and show** the 409/422 body | Better error visibility |
+| 3 | **Strip `photoData`/`animData` from the Twee export** — store media as files in `media/` and reference them by filename only | Keeps Twee small and text-diff-friendly |
+| 4 | Seed `ghFileSha` at app start by hitting `GET /repos/.../contents/story/main.twee` once (unauthenticated if public, or with token) | Low-cost, no round-trip delay |
+
+---
+
+## Next feature: Talk to characters in rooms
+
+When a character card is open inside the room view, show a **simple dialogue panel** that steps through their passage tree interactively:
+
+```
+[Hello] → passage text shown
+[Ask a question] → passage text shown
+[What's your secret?] → passage text shown
+```
+
+Implementation notes:
+- Add a `#dialogue-panel` overlay inside `#room-stage` (not the card sidebar)
+- Render passage-type buttons for every passage the character has authored
+- Clicking a button animates the character (bounce/pulse) and displays the text in a speech-bubble `div`
+- No backend needed — all data already lives in `character.passages[]`
+- Close with Esc or a "← Back" tap; card stays open behind
+
+---
+
 ## Architecture
 
 ```
@@ -13,6 +53,23 @@ living-characters/
     main.twee              ← cloud save/load target (☁ Save / ☁ Load buttons)
   media/                   ← character assets (GLB scans, GIFs, photos)
 ```
+
+---
+
+## Simplification targets (from audit)
+
+The `index.html` is currently ~1 600 lines and grows with each feature. Recommended splits:
+
+| File | Contents |
+|---|---|
+| `index.html` | Layout, header, modals, wiring only |
+| `scripts/store.js` | `save()`, `loadLocal()`, `ghLoad()`, `ghSave()`, Twee encode/decode |
+| `scripts/map.js` | Leaflet init, `renderMapPins()`, tooltip, proximity/GPS |
+| `scripts/room.js` | Three.js scene, `buildRoomScene()`, `destroyRoomScene()`, `animate()` |
+| `scripts/card.js` | `openCard()`, `closeCard()`, dialogue panel (talk-to-character) |
+| `scripts/modals.js` | Character + room modals, file preview |
+
+Until the split happens, keep all `const` data blocks (MOODS, PROMPT_TYPES, etc.) at the very top of the `<script>` so they're easy to find.
 
 ---
 
@@ -35,7 +92,7 @@ The tool exports and imports a single `.twee` file. The format is flat — one p
 A short description shown on entry.
 ```
 
-> ⚠️ **`"id"` is required for correct round-trips.** The room's exact id is stored in the metadata so characters can link back to it by `roomId` after import. Files exported before this fix (without `"id"`) fall back to a name-derived id and still import cleanly, but a fresh **☁ Save** will write the corrected format.
+> ⚠️ **`"id"` is required for correct round-trips.** The room's exact id is stored in the metadata so characters can link back to it by `roomId` after import.
 
 ### Characters
 
@@ -61,20 +118,20 @@ I found a tiny door under the big root.
 
 ---
 
-## Room view: Three.js isometric scene
+## Room view: Three.js scene
 
 When a room is entered (by GPS proximity or map tap) the room view renders a **Three.js scene**:
 
 | Element | Details |
 |---|---|
-| Camera | `OrthographicCamera` at `(10,10,10)` — true 45° isometric |
-| Floor | `PlaneGeometry(12×12)` tinted from `backdrop` |
-| Walls | Two back-wall planes meeting at a corner |
+| Camera | `PerspectiveCamera(45°)` at `(0,3,9)` looking at `(0,1,0)` |
+| Floor | `PlaneGeometry(20×20)` tinted from `backdrop` |
+| Walls | Two back-wall planes meeting at a corner (when no backdrop image) |
 | Character sprites | `Sprite` with `photoData` or `animData` texture |
 | Mood rings | `RingGeometry` on the floor, coloured by mood |
 | GLB models | `GLTFLoader` loads `.glb` URL, plays `AnimationMixer` clips |
 | Name labels | HTML `<div>` elements projected to 2-D screen space each frame |
-| Click detection | `Raycaster` — clicking a sprite opens the character card |
+| Click detection | `Raycaster` — clicking a character opens their card |
 
 Backdrop colours:
 
@@ -93,9 +150,12 @@ Backdrop colours:
 
 The **☁ Save** and **☁ Load** buttons read/write `story/main.twee` on this repo via the GitHub API. A personal access token with `repo` scope is required — enter it once in the token bar and it is saved to `localStorage`.
 
-**Workflow after the roomId fix:**
-1. On the facilitator machine, hit **☁ Save** once — this writes rooms with `"id"` fields.
-2. **☁ Load** on any machine will now restore rooms and characters fully linked.
+**Workflow:**
+1. On the facilitator machine, hit **☁ Load** first — this seeds the internal SHA so saves don't conflict.
+2. Make edits, then **☁ Save**.
+3. On any other machine, **☁ Load** will restore all rooms and characters.
+
+> ⚠️ **Do not embed large photos in the Twee save** — store images in `media/` and reference by filename to stay under GitHub's 1 MB API limit.
 
 ---
 
