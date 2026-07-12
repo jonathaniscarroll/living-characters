@@ -686,8 +686,8 @@ function buildRoomScene(room){
     scene.add(ring);
 
     const glbUrl=ch.glbUrl||null;
-    if(glbUrl&&THREE.GLTFLoader){
-      const loader=new THREE.GLTFLoader();
+    if(glbUrl && window.GLTFLoader){
+      const loader= new window.GLTFLoader();
       loader.load(glbUrl, gltf=>{
         const model=gltf.scene;
         const box=new THREE.Box3().setFromObject(model);
