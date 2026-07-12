@@ -19,14 +19,21 @@ function openRoom(roomId) {
   document.getElementById('room-title').textContent = room.name;
   document.getElementById('room-lede').textContent = room.lede || '';
   const stage = document.getElementById('room-stage');
-  const bgFile = BACKDROP_IMAGES[room.backdrop];
-  if (bgFile) {
-    stage.style.backgroundImage = `url('${MEDIA_URL}${bgFile}')`;
+  // Priority: custom backdropUrl > BACKDROP_IMAGES preset > floor color
+  if (room.backdropUrl) {
+    stage.style.backgroundImage = `url('${room.backdropUrl}')`;
     stage.style.backgroundSize = 'cover';
     stage.style.backgroundPosition = 'center';
   } else {
-    stage.style.backgroundImage = '';
-    stage.style.background = FLOOR_COLORS[room.backdrop] || '#1a1a2e';
+    const bgFile = BACKDROP_IMAGES[room.backdrop];
+    if (bgFile) {
+      stage.style.backgroundImage = `url('${MEDIA_URL}${bgFile}')`;
+      stage.style.backgroundSize = 'cover';
+      stage.style.backgroundPosition = 'center';
+    } else {
+      stage.style.backgroundImage = '';
+      stage.style.background = FLOOR_COLORS[room.backdrop] || '#1a1a2e';
+    }
   }
   document.getElementById('room-view').classList.add('open');
   if (!window.THREE || !window.GLTFLoader) {

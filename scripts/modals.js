@@ -57,15 +57,18 @@ function saveRoom() {
   const radius = parseFloat(document.getElementById('rf-radius').value) || 30;
   const backdrop = document.getElementById('rf-backdrop').value;
   const backdropData = tempBackdropData || undefined;
+  const backdropUrl = typeof tempBackdropUrl !== 'undefined' ? tempBackdropUrl : undefined;
   if (!name || Number.isNaN(lat) || Number.isNaN(lng)) return alert('Needs a name and coordinates.');
   const data = { id: editingRoomId || ('room_' + Date.now()), name, lede, lat, lng, radius, backdrop };
   if (backdropData) data.backdropData = backdropData;
+  if (backdropUrl) data.backdropUrl = backdropUrl;
   if (editingRoomId) {
     const existing = rooms.find(r => r.id === editingRoomId);
     if (existing) Object.assign(existing, data);
   } else {
     rooms.push(data);
   }
+  tempBackdropUrl = undefined; // clear after saving
   closeRoomModal();
   renderMapPins();
   updateCompass();
@@ -102,7 +105,7 @@ function updateRoomPickerMarker() {
   }
 }
 
-function uploadRoomBackdrop() {
+async function uploadRoomBackdrop() {
   const input = document.getElementById('rf-backdrop-input');
   const status = document.getElementById('rf-backdrop-status');
   const preview = document.getElementById('rf-backdrop-preview');
@@ -122,6 +125,16 @@ function uploadRoomBackdrop() {
     status.style.color = '#ff8a80';
   };
   reader.readAsDataURL(file);
+  // Upload to GitHub
+  try {
+    const roomId = editingRoomId || 'new_' + Date.now();
+    const url = await window.lcStore.uploadRoomBackdropToGitHub(roomId, file);
+    if (url) {
+      tempBackdropUrl = url;
+    }
+  } catch (e) {
+    // Error already handled in uploadRoomBackdropToGitHub
+  }
 }
 
 function openCharModal(charId) {
