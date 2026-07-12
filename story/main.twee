@@ -1,4 +1,4 @@
-:: Room {"roomId":"999","lat":44.65,"lng":-63.59,"radius":30,"backdrop":"forest"}
+:: Room {"id":"999","lat":44.65,"lng":-63.59,"radius":30,"backdrop":"forest"}
 @bg garden.png
 A room, like any other
 
