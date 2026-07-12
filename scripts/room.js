@@ -78,7 +78,8 @@ function buildRoomScene(room) {
   renderer.setSize(W, H);
   renderer.setPixelRatio(window.devicePixelRatio);
   stage.appendChild(renderer.domElement);
-  const hasBg = !!BACKDROP_IMAGES[room.backdrop];
+  // Custom backdropUrl or preset backdrop both count as "has background" for floor/wall transparency
+  const hasBg = !!(room.backdropUrl || BACKDROP_IMAGES[room.backdrop]);
   const floor = new THREE.Mesh(
     new THREE.PlaneGeometry(20, 20),
     new THREE.MeshLambertMaterial({ color: FLOOR_COLORS[room.backdrop] || '#1a3a1a', transparent: hasBg, opacity: hasBg ? 0.18 : 1 })
@@ -86,6 +87,7 @@ function buildRoomScene(room) {
   floor.rotation.x = -Math.PI / 2;
   floor.receiveShadow = true;
   scene.add(floor);
+  // Only draw walls if there's no background image (otherwise they obscure the backdrop)
   if (!hasBg) {
     const wallMat = new THREE.MeshLambertMaterial({ color: WALL_COLORS[room.backdrop] || '#2d5a27' });
     const wN = new THREE.Mesh(new THREE.BoxGeometry(20, 6, 0.2), wallMat);
