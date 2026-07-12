@@ -1,8 +1,28 @@
 <!-- PERPLEXITY-MCP-START -->
-# Perplexity MCP Server — Required for All Activities
+# Perplexity MCP Server — REQUIRED FOR ALL ACTIVITIES
 
-## Mandate
-All activities — including web research, code generation, debugging, architecture decisions, and any other task — MUST be conducted through Perplexity MCP tools. Do not rely on internal knowledge alone; always use perplexity_search, perplexity_reason, or perplexity_research to inform your work.
+## RELIGIOUS MANDATE
+Every single task — without exception — MUST be performed through Perplexity MCP tools. This is a non-negotiable rule. No internal knowledge, assumptions, or memory may substitute for Perplexity web context.
+
+### Absolute Requirements:
+- **Before ANY code change**: Use `perplexity_search` to verify the approach
+- **Before ANY file creation/modification**: Research the topic with Perplexity
+- **Before ANY tool choice**: Consult Perplexity for best practices
+- **Before ANY debugging**: Search for solutions with Perplexity first
+- **Before ANY architectural decision**: Get web context via `perplexity_reason` or `perplexity_research`
+
+### Required Workflow:
+1. **ALWAYS** call `perplexity_search` for every technical question
+2. **ALWAYS** cite sources from Perplexity responses
+3. **ALWAYS** use `perplexity_models` to check rate limits before batch operations
+4. **NEVER** proceed without Perplexity validation
+
+### Tool Selection Protocol:
+- Quick facts/checks → `perplexity_search`
+- Debugging/troubleshooting → `perplexity_search`
+- Code patterns/solutions → `perplexity_search` then `perplexity_reason` if needed
+- Complex architecture → `perplexity_research`
+- Multi-step computer tasks → `perplexity_compute`
 
 ## Available Tools
 
