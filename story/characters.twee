@@ -1,5 +1,6 @@
 :: Mop [char]
-@room The Garden
+@room Test Room
+@model 2026-07-09.glb
 @mood Sleepy
 @items small hat, acorn
 @lede Mop lives near the mossy wall.
@@ -38,6 +39,7 @@ This acorn is from a very important tree.
 
 :: Gravel [char]
 @room The Library
+@model 2026-07-09.glb
 @mood Curious
 @items magnifying glass, notebook
 @lede Gravel notices everything.
@@ -76,6 +78,7 @@ This magnifying glass belonged to someone very small.
 
 :: Biscuit [char]
 @room The Kitchen
+@model 2026-07-09.glb
 @mood Happy
 @items lucky pebble
 @lede Biscuit is always cheerful.
