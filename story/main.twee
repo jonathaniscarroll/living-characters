@@ -4,7 +4,7 @@ A room for testing.
 
 :: Pebble {"roomId":"room_Test Room","mood":"Happy","items":["small rock","lucky leaf"]}
 
-:: Mop {"roomId":"room_Test Room","mood":"Happy","items":["small rock","lucky leaf"]}
+:: Mop {"roomId":"room_Test Room","mood":"Happy","items":["small rock","lucky leaf"],"glbUrl":"2026-07-09.glb"}
 
 :: Pebble-hello
 Oh! A visitor. Hello!
