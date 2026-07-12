@@ -616,6 +616,7 @@ function openRoomModal(roomId){ return window.lcModals.openRoomModal(roomId); }
 function closeRoomModal(){ return window.lcModals.closeRoomModal(); }
 function saveRoom(){ return window.lcModals.saveRoom(); }
 function uploadRoomBackdrop(){ return window.lcModals.uploadRoomBackdrop(); }
+function initRoomPickerMap(){ return window.lcModals.initRoomPickerMap(); }
 
 function buildRoomChipPicker(selectedIds) { return window.lcModals.buildRoomChipPicker(selectedIds); }
 function getSelectedRoomIds() { return window.lcModals.getSelectedRoomIds(); }
@@ -674,8 +675,18 @@ document.addEventListener('drop',e=>{
 function save(){ return window.lcStore.save(); }
 function loadLocal(){ return window.lcStore.loadLocal(); }
 
-window.addEventListener('load', () => {
+window.addEventListener('load', async () => {
   loadLocal();
+  // Auto-load story from story/main.twee if no data in localStorage
+  if (rooms.length === 0 && characters.length === 0 && objects.length === 0) {
+    try {
+      const res = await fetch('./story/main.twee');
+      if (res.ok) {
+        const src = await res.text();
+        importTweeSource(src, true);
+      }
+    } catch (_) {}
+  }
   initMap();
   updateCompass();
 });

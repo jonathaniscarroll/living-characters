@@ -38,6 +38,8 @@ function openRoomModal(roomId) {
     document.getElementById('rf-backdrop-status').textContent = '';
   }
   document.getElementById('room-modal-overlay').classList.add('open');
+  // Initialize the room picker map if not yet created
+  setTimeout(initRoomPickerMap, 100);
 }
 
 function closeRoomModal() {
@@ -68,6 +70,36 @@ function saveRoom() {
   renderMapPins();
   updateCompass();
   save();
+}
+
+// ── Phase 2: Room picker map (Leaflet mini-map in room modal) ─────────────
+let roomPickerMap = null;
+let roomPickerMarker = null;
+function initRoomPickerMap() {
+  const el = document.getElementById('room-latlng-map');
+  if (!el || el._leaflet_id) return; // already initialized
+  roomPickerMap = L.map(el, { zoomControl: true, attributionControl: false }).setView([44.65, -63.59], 13);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(roomPickerMap);
+  roomPickerMap.on('click', e => {
+    document.getElementById('rf-lat').value = e.latlng.lat.toFixed(6);
+    document.getElementById('rf-lng').value = e.latlng.lng.toFixed(6);
+    if (roomPickerMarker) roomPickerMarker.setLatLng(e.latlng);
+    else roomPickerMarker = L.marker(e.latlng).addTo(roomPickerMap);
+  });
+  // Watch lat/lng inputs for manual entry
+  document.getElementById('rf-lat').addEventListener('input', updateRoomPickerMarker);
+  document.getElementById('rf-lng').addEventListener('input', updateRoomPickerMarker);
+  // Force Leaflet to recalculate size after modal opens
+  setTimeout(() => roomPickerMap.invalidateSize(), 300);
+}
+function updateRoomPickerMarker() {
+  const lat = parseFloat(document.getElementById('rf-lat').value);
+  const lng = parseFloat(document.getElementById('rf-lng').value);
+  if (!Number.isNaN(lat) && !Number.isNaN(lng) && roomPickerMap) {
+    if (roomPickerMarker) roomPickerMarker.setLatLng([lat, lng]);
+    else roomPickerMarker = L.marker([lat, lng]).addTo(roomPickerMap);
+    roomPickerMap.panTo([lat, lng]);
+  }
 }
 
 function uploadRoomBackdrop() {
