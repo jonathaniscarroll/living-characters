@@ -13,6 +13,6 @@ I found a tiny door under the big root.
 
 :: Gravel {"roomId":"999","mood":"Happy","items":[],"glbUrl":"2026-07-09.glb"}
 
-:: Room2 {"id":"room_1783824600681","lat":44.650757,"lng":-63.592279,"radius":30,"backdrop":"dark"}
+:: Room2 {"id":"room_1783824600681","lat":44.650757,"lng":-63.592279,"radius":30,"backdrop":"room2"}
 the second room
 
