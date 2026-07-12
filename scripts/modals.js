@@ -105,7 +105,7 @@ function updateRoomPickerMarker() {
   }
 }
 
-async function uploadRoomBackdrop() {
+function uploadRoomBackdrop() {
   const input = document.getElementById('rf-backdrop-input');
   const status = document.getElementById('rf-backdrop-status');
   const preview = document.getElementById('rf-backdrop-preview');
@@ -118,6 +118,13 @@ async function uploadRoomBackdrop() {
     preview.style.display = 'block';
     status.textContent = `✓ "${file.name}" is ready to use!`;
     status.style.color = 'var(--accent2)';
+    // Upload to GitHub after preview loads
+    window.lcStore.uploadRoomBackdropToGitHub(editingRoomId || 'room_' + Date.now(), file).then(url => {
+      if (url) {
+        tempBackdropUrl = url;
+        status.textContent = `✓ "${file.name}" uploaded to repo!`;
+      }
+    }).catch(() => {});
   };
   reader.onerror = () => {
     tempBackdropData = null;
@@ -125,16 +132,6 @@ async function uploadRoomBackdrop() {
     status.style.color = '#ff8a80';
   };
   reader.readAsDataURL(file);
-  // Upload to GitHub
-  try {
-    const roomId = editingRoomId || 'new_' + Date.now();
-    const url = await window.lcStore.uploadRoomBackdropToGitHub(roomId, file);
-    if (url) {
-      tempBackdropUrl = url;
-    }
-  } catch (e) {
-    // Error already handled in uploadRoomBackdropToGitHub
-  }
 }
 
 function openCharModal(charId) {
