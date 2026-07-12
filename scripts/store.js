@@ -249,7 +249,7 @@ window.addEventListener('DOMContentLoaded', () => {
   const saved = localStorage.getItem('lc_gh_token');
   if (saved) {
     document.getElementById('gh-token-input').value = saved;
-    setGhStatus('token loaded — syncing…', 'ok');
+    // Silently seed SHA in background — token is optional, app works without it
     seedGhFileSha(saved);
   }
 });
