@@ -696,7 +696,7 @@ function buildRoomScene(room){
         const scale=2/maxDim;
         model.scale.setScalar(scale);
         box.setFromObject(model);
-        model.position.set(cx,-box.min.y,cz);
+        model.position.set(cx,0,cz);
         model.castShadow=true;
         model.rotation.y=Math.PI;
         scene.add(model);
