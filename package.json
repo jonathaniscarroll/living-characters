@@ -1,0 +1,24 @@
+{
+  "name": "living-characters",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Living Characters is a browser-based facilitator tool for building a location-aware story world where characters, rooms, and objects can be composed into a live scene. The app runs entirely in the browser as a static web experience, so it can be used locally or hosted on a simple static server.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jonathaniscarroll/living-characters.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/jonathaniscarroll/living-characters/issues"
+  },
+  "homepage": "https://github.com/jonathaniscarroll/living-characters#readme",
+  "dependencies": {
+    "three": "^0.185.1"
+  }
+}
