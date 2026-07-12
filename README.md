@@ -6,27 +6,38 @@ Runs in any modern browser. No install. No backend. One facilitator machine.
 
 ---
 
-## ✅ What's working now (July 2026)
+## ✅ Current progress (July 2026)
+
+The project is now a working browser-based world builder with a full facilitator workflow for rooms, characters, objects, export/import, and cloud sync. The main app shell has also been split into modular scripts to make future work easier to maintain.
+
+### What works now
 
 | Feature | Status |
 |---|---|
 | Pannable/zoomable Leaflet map with room circles and character pins | ✅ |
-| Add / edit rooms with GPS coordinates, radius, backdrop | ✅ |
-| Add / edit characters with photo, Mixamo GIF, GLB URL, mood, items, dialogue | ✅ |
-| Three.js room scene — floor, walls, mood rings, name labels | ✅ |
-| GLB model loading via `window.GLTFLoader` with `AnimationMixer` (idle clip) | ✅ |
-| Fallback: sprite (photo/GIF) → coloured box when no model | ✅ |
+| Add / edit rooms with GPS coordinates, radius, and backdrop | ✅ |
+| Add / edit characters with photo, Mixamo GIF, GLB URL, mood, items, and dialogue | ✅ |
+| Add / edit room objects with names, descriptions, position, rotation, scale, and GLB URL | ✅ |
+| Three.js room scene with floor, walls, mood rings, and room labels | ✅ |
+| GLB model loading via `window.GLTFLoader` with `AnimationMixer` support | ✅ |
+| Fallback rendering for photos/GIFs and simple placeholder objects | ✅ |
 | Click character in room → talk panel with dialogue passage buttons | ✅ |
 | Mood ring pulse when a character speaks | ✅ |
 | Twee export (`.twee` download) and import (drag-drop or file picker) | ✅ |
 | GitHub cloud save / load (`story/main.twee`) via token | ✅ |
-| SHA auto-seeded on load — no more 409 conflicts | ✅ |
-| Binary media stripped from Twee export (kept in `localStorage` only) | ✅ |
+| SHA auto-seeded on load to avoid GitHub sync conflicts | ✅ |
+| Binary media stripped from Twee export and kept in browser storage | ✅ |
 | GPS proximity → auto-open room | ✅ |
 | Simulate mode (cycles through rooms) | ✅ |
 | Compass panel showing nearest rooms | ✅ |
 | Facilitator / Visitor mode toggle | ✅ |
-| Drag-drop `.twee` import | ✅ |
+| Modular app structure via `scripts/` modules for storage, map, room, cards, and modals | ✅ |
+
+### Recent implementation milestones
+
+- Phase 2 room-object support is now in place, including clickable object descriptions and object placement in the room scene.
+- The app no longer relies on a single large inline script block; core runtime logic has been split into dedicated modules.
+- The GitHub sync path is working with a token-based save/load workflow and Twee-based persistence.
 
 ### ✅ Phase 0 — GLTFLoader bug fix
 `buildRoomScene` now uses `window.GLTFLoader` (not `THREE.GLTFLoader`). 3D scanned characters load correctly.
@@ -67,11 +78,16 @@ Characters now carry `roomIds[]` (canonical) + `roomId` (first entry, backwards-
 
 ```
 living-characters/
-  index.html               ← single-file tool: map + Three.js + editor
+  index.html               ← app shell + UI entry point
+  scripts/
+    store.js               ← persistence, Twee encode/decode, GitHub sync
+    map.js                 ← Leaflet map, pins, GPS, compass, simulation
+    room.js                ← Three.js room scene, object rendering, inspect overlay
+    card.js                ← character card and talk panel logic
+    modals.js              ← room, character, and object modal workflows
   story/
     main.twee              ← cloud save/load target (rooms + characters + objects, no binary media)
-  media/                   ← character assets (GLB scans, GIFs, backdrop images)
-  2026-07-09.glb           ← photogrammetry scan (root-level, referenced by glbUrl)
+  media/                   ← uploaded content such as backdrop images, GLBs, and media assets
 ```
 
 ### Data shapes
@@ -147,7 +163,33 @@ Token with `repo` scope — entered once, stored in `localStorage`.
 
 ## Roadmap
 
-### 🔧 Phase 2 remaining — Room objects
+### Phase 4 — Better content upload workflow
+
+The next major improvement is a first-class asset upload system for all media that currently depends on manual file handling or pasted URLs.
+
+#### Planned features
+
+- Drag-and-drop upload for room backdrop images
+- Drag-and-drop upload for object GLBs and character GLBs
+- A simple asset library / upload panel inside the facilitator UI
+- Automatic file naming, storage, and preview generation
+- Per-room/per-character/per-object asset attachment from the editor
+- Optional GitHub-backed or local asset sync so uploaded files travel with the world
+
+#### Proposed workflow
+
+1. Open the facilitator UI and choose “Upload content”
+2. Drop or select one or more files: backdrop images, object GLBs, or character GLBs
+3. The project stores them in the workspace/media area (or a future cloud asset store)
+4. The editor then attaches the uploaded asset to the relevant room/character/object in one click
+
+#### Priority content types
+
+- Room backdrop images for the room scene
+- Object GLBs for placeable props
+- Character GLBs for 3D character models
+
+### Phase 2 remaining — Room objects
 
 | Step | What | Status |
 |---|---|---|
@@ -158,19 +200,12 @@ Token with `repo` scope — entered once, stored in `localStorage`.
 - Characters comment on object state (`:: Pebble-item-chest`)
 - Drag-to-reposition in facilitator mode
 
----
+### Phase 5 — Content-driven world polish
 
-### Phase 3 — Code modularisation
-
-The `index.html` is ~1 800 lines. Recommended splits (non-breaking):
-
-| File | Contents |
-|---|---|
-| `scripts/store.js` | `save()`, `loadLocal()`, `ghLoad()`, `ghSave()`, Twee encode/decode |
-| `scripts/map.js` | Leaflet init, `renderMapPins()`, tooltip, proximity/GPS |
-| `scripts/room.js` | Three.js scene, `buildRoomScene()`, `destroyRoomScene()`, `animate()` |
-| `scripts/card.js` | `openCard()`, `closeCard()`, talk panel |
-| `scripts/modals.js` | Character + room + object modals, file preview |
+- Better preview thumbnails for uploaded assets
+- Asset reuse across multiple rooms/characters
+- Validation for unsupported file types and oversized uploads
+- Simple import/export of asset bundles
 
 ---
 
