@@ -274,7 +274,6 @@
     <div class="modal-section-title">👤 Who are they?</div>
     <div class="field"><label>Character name</label><input id="cf-name" type="text" placeholder="e.g. Mop, Gravel, Biscuit..." /></div>
 
-    <!-- ── Phase 1 step 5: multi-room chip picker replaces single <select> ── -->
     <div class="field">
       <label>Which room(s) do they visit? <span style="font-weight:400;text-transform:none;letter-spacing:0">(tap to toggle)</span></label>
       <div class="room-chips" id="cf-room-chips"></div>
@@ -309,7 +308,7 @@
 
 <div id="drop-overlay">
   <div>📄 Drop .twee file to import</div>
-  <div class="drop-sub">Rooms and characters will be loaded</div>
+  <div class="drop-sub">Rooms, characters and objects will be loaded</div>
 </div>
 
 <div id="tooltip">
@@ -371,13 +370,13 @@ async function ghLoad() {
     ghFileSha = data.sha;
     const src = decodeBase64Unicode(data.content.replace(/\n/g, ''));
     importTweeSource(src, true);
-    setGhStatus('Loaded ✓  (' + rooms.length + ' rooms, ' + characters.length + ' chars)', 'ok');
+    setGhStatus('Loaded ✓  (' + rooms.length + ' rooms, ' + characters.length + ' chars, ' + objects.length + ' objects)', 'ok');
   } catch(e) { setGhStatus('Load failed: ' + e.message, 'err'); }
 }
 async function ghSave() {
   const token = getToken();
   if (!token) { setGhStatus('Enter a GitHub token first', 'err'); return; }
-  const src = buildTweeSource(rooms, characters);
+  const src = buildTweeSource(rooms, characters, objects);
   const encoded = btoa(unescape(encodeURIComponent(src)));
   const msg = document.getElementById('gh-commit-input').value.trim() || 'Update living-characters world via tool';
   setGhStatus('Saving…');
@@ -426,7 +425,8 @@ const PROMPT_TYPES = [
 const FLOOR_COLORS = { forest:'#1a3a1a', stone:'#2a2a3a', water:'#0a2a3a', wood:'#3a2a1a', grass:'#1a3a10', dark:'#0a0a0a' };
 const WALL_COLORS  = { forest:'#2d5a27', stone:'#3a3a5a', water:'#0f3d5c', wood:'#5a3d1a', grass:'#2d5a20', dark:'#1a1a1a' };
 
-let rooms=[], characters=[], selectedChar=null, editingRoomId=null, editingCharId=null;
+// ── Phase 2 step 1: objects[] is the new top-level state array ────────────────
+let rooms=[], characters=[], objects=[], selectedChar=null, editingRoomId=null, editingCharId=null;
 let tempPhotoData=null, tempAnimData=null;
 let map, roomPickerMap, roomPickerMarker;
 let gpsWatchId=null, userLat=null, userLng=null;
@@ -450,9 +450,10 @@ function renderMapPins() {
     }).addTo(map);
     circle._lcPin = true;
     const chars = characters.filter(c => (c.roomIds || [c.roomId]).includes(room.id));
+    const objs  = objects.filter(o => o.roomId === room.id);
     const icon = L.divIcon({ className:'', html:
       `<div style="background:#16213e;border:2px solid #f5a623;border-radius:8px;padding:4px 8px;font-size:11px;font-weight:700;color:#f5a623;white-space:nowrap;cursor:pointer;">
-        🏠 ${room.name}<br><span style="font-size:9px;color:#a0a0b0">${chars.length} character${chars.length!==1?'s':''}</span>
+        🏠 ${room.name}<br><span style="font-size:9px;color:#a0a0b0">${chars.length} char${chars.length!==1?'s':''} · ${objs.length} obj${objs.length!==1?'s':''}</span>
       </div>`, iconAnchor:[0,0] });
     const marker = L.marker([room.lat, room.lng], { icon }).addTo(map);
     marker._lcPin = true;
@@ -823,7 +824,6 @@ function saveRoom(){
   closeRoomModal();renderMapPins();updateCompass();save();map.panTo([lat,lng]);
 }
 
-// ── Phase 1 step 5: populate chip picker ─────────────────────────────────────
 function buildRoomChipPicker(selectedIds) {
   const container = document.getElementById('cf-room-chips');
   const hint = document.getElementById('cf-room-chips-hint');
@@ -851,11 +851,8 @@ function openCharModal(charId){
   document.getElementById('cf-name').value=ch?ch.name:'';
   document.getElementById('cf-items').value=ch?(ch.items||[]).join(', '):'';
   document.getElementById('cf-glb-url').value=ch?(ch.glbUrl||''):'';
-
-  // ── build chip picker with pre-selected rooms ──
   const currentIds = ch ? (ch.roomIds || (ch.roomId ? [ch.roomId] : [])) : [];
   buildRoomChipPicker(currentIds);
-
   const pp=document.getElementById('cf-photo-preview');
   if(ch&&ch.photoData){pp.src=ch.photoData;pp.style.display='block';tempPhotoData=ch.photoData;}
   else{pp.src='';pp.style.display='none';}
@@ -904,7 +901,7 @@ function previewFile(inputId,previewId,dataKey){
 }
 function saveCharacter(){
   const name=document.getElementById('cf-name').value.trim();
-  const roomIds=getSelectedRoomIds();          // ← multi-room from chip picker
+  const roomIds=getSelectedRoomIds();
   const primaryRoomId=roomIds[0]||'';
   const items=document.getElementById('cf-items').value.split(',').map(s=>s.trim()).filter(Boolean);
   const glbUrl=document.getElementById('cf-glb-url').value.trim();
@@ -922,12 +919,25 @@ function saveCharacter(){
   closeCharModal();renderMapPins();save();
 }
 
-function buildTweeSource(rooms, chars) {
+// ── Phase 2 step 1: Twee I/O extended for *-object passages ──────────────────
+function buildTweeSource(rooms, chars, objs) {
   let out = '';
   rooms.forEach(room => {
     out += `:: ${room.name} {"id":"${room.id}","lat":${room.lat},"lng":${room.lng},"radius":${room.radius},"backdrop":"${room.backdrop}"}\n`;
     out += room.lede ? room.lede + '\n' : '';
     out += '\n';
+    // objects in this room
+    (objs||[]).filter(o => o.roomId === room.id).forEach(obj => {
+      const meta = { roomId: obj.roomId, scale: obj.scale||1 };
+      if (obj.glbUrl) meta.glbUrl = obj.glbUrl;
+      if (obj.position) { meta.x = obj.position.x; meta.y = obj.position.y||0; meta.z = obj.position.z; }
+      if (obj.rotation) meta.rotY = obj.rotation.y||0;
+      if (obj.interactable !== undefined) meta.interactable = obj.interactable;
+      out += `:: ${obj.name}-object ${JSON.stringify(meta)}\n`;
+      out += obj.description ? obj.description + '\n' : '';
+      out += '\n';
+    });
+    // characters in this room
     chars.filter(c => (c.roomIds || [c.roomId]).includes(room.id)).forEach(ch => {
       const meta = { roomIds: ch.roomIds || [ch.roomId], mood: ch.mood, items: (ch.items||[]) };
       if (ch.glbUrl) meta.glbUrl = ch.glbUrl;
@@ -937,17 +947,17 @@ function buildTweeSource(rooms, chars) {
   });
   return out;
 }
-function buildTweeStandalone(rooms, chars) {
+function buildTweeStandalone(rooms, chars, objs) {
   return ':: StoryTitle\nLiving Characters World\n\n:: StoryData\n{"ifid":"C15CE33F-61F6-4909-BB59-73EE7A3D57B1"}\n\n'
-    + buildTweeSource(rooms, chars);
+    + buildTweeSource(rooms, chars, objs);
 }
 function previewTwee(){
-  document.getElementById('twee-source').textContent=buildTweeStandalone(rooms,characters);
+  document.getElementById('twee-source').textContent=buildTweeStandalone(rooms,characters,objects);
   document.getElementById('twee-preview-overlay').classList.add('open');
 }
 function closeTweePreview(){document.getElementById('twee-preview-overlay').classList.remove('open');}
 function downloadTwee(){
-  const blob=new Blob([buildTweeStandalone(rooms,characters)],{type:'text/plain'});
+  const blob=new Blob([buildTweeStandalone(rooms,characters,objects)],{type:'text/plain'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='living-characters.twee';a.click();
 }
 function triggerImport(){document.getElementById('twee-import-input').click();}
@@ -957,7 +967,7 @@ function handleImportFile(event){
   event.target.value='';
 }
 function importTweeSource(src,silent){
-  const lines=src.split('\n'),newRooms=[],newChars=[];
+  const lines=src.split('\n'),newRooms=[],newChars=[],newObjs=[];
   let i=0;
   while(i<lines.length){
     const line=lines[i];
@@ -971,21 +981,35 @@ function importTweeSource(src,silent){
       if(meta.lat!==undefined){
         const roomId=meta.id||('room_'+passName.replace(/\s+/g,'_'));
         newRooms.push({id:roomId,name:passName,lede:body,lat:meta.lat,lng:meta.lng,radius:meta.radius||30,backdrop:meta.backdrop||'forest'});
-      }else if((meta.roomIds!==undefined||meta.roomId!==undefined)&&!passName.includes('-')){
+      } else if(passName.endsWith('-object')){
+        // ── Phase 2 step 1: parse *-object passages ──
+        const objName = passName.slice(0,-7).trim();
+        newObjs.push({
+          id: 'obj_' + objName.replace(/\s+/g,'_') + '_' + Date.now(),
+          roomId: meta.roomId || '',
+          name: objName,
+          glbUrl: meta.glbUrl || '',
+          position: { x: meta.x||0, y: meta.y||0, z: meta.z||0 },
+          rotation: { y: meta.rotY||0 },
+          scale: meta.scale||1,
+          description: body,
+          interactable: meta.interactable !== false
+        });
+      } else if((meta.roomIds!==undefined||meta.roomId!==undefined)&&!passName.includes('-')){
         const roomIds=Array.isArray(meta.roomIds)?meta.roomIds:(meta.roomId?[meta.roomId]:[]);
         const primaryRoomId=roomIds[0]||meta.roomId;
         newChars.push({id:'char_'+passName.replace(/\s+/g,'_'),name:passName,roomId:primaryRoomId,roomIds,mood:meta.mood||'Happy',items:meta.items||[],passages:[],photoData:null,animData:null,glbUrl:meta.glbUrl||null});
-      }else if(passName.includes('-')){
+      } else if(passName.includes('-')){
         const [charName,...tp]=passName.split('-'),type=tp.join('-');
         const ch=newChars.find(c=>c.name===charName);
         if(ch)ch.passages.push({type,text:body});
       }
     }else i++;
   }
-  if(newRooms.length||newChars.length){
-    rooms=newRooms;characters=newChars;
+  if(newRooms.length||newChars.length||newObjs.length){
+    rooms=newRooms;characters=newChars;objects=newObjs;
     renderMapPins();updateCompass();save();
-    if(!silent)alert(`Imported ${newRooms.length} rooms and ${newChars.length} characters.`);
+    if(!silent)alert(`Imported ${newRooms.length} rooms, ${newChars.length} characters and ${newObjs.length} objects.`);
   }else if(!silent)alert('No rooms or characters found in that .twee file.');
 }
 
@@ -997,17 +1021,25 @@ document.addEventListener('drop',e=>{
   const reader=new FileReader();reader.onload=ev=>importTweeSource(ev.target.result);reader.readAsText(file);
 });
 
+// ── Phase 2 step 1: save/loadLocal include objects[] ─────────────────────────
 function save(){
-  try{localStorage.setItem('lc_rooms',JSON.stringify(rooms));localStorage.setItem('lc_chars',JSON.stringify(characters));}catch(e){}
+  try{
+    localStorage.setItem('lc_rooms',JSON.stringify(rooms));
+    localStorage.setItem('lc_chars',JSON.stringify(characters));
+    localStorage.setItem('lc_objects',JSON.stringify(objects));
+  }catch(e){}
 }
 function loadLocal(){
   try{
-    const r=localStorage.getItem('lc_rooms'),c=localStorage.getItem('lc_chars');
+    const r=localStorage.getItem('lc_rooms'),c=localStorage.getItem('lc_chars'),o=localStorage.getItem('lc_objects');
     if(r)rooms=JSON.parse(r);
-    if(c)characters=JSON.parse(c);
-    characters.forEach(ch=>{
-      if(!ch.roomIds||!Array.isArray(ch.roomIds)) ch.roomIds=ch.roomId?[ch.roomId]:[];
-    });
+    if(c){
+      characters=JSON.parse(c);
+      characters.forEach(ch=>{
+        if(!ch.roomIds||!Array.isArray(ch.roomIds)) ch.roomIds=ch.roomId?[ch.roomId]:[];
+      });
+    }
+    if(o) objects=JSON.parse(o);
   }catch(e){}
 }
 
