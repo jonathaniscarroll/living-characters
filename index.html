@@ -302,6 +302,15 @@
         <option value="dark">🌑 Dark cave</option>
       </select>
     </div>
+    <div class="field"><label>Or upload a custom backdrop</label>
+      <div class="file-row">
+        <img id="rf-backdrop-preview" class="file-preview" src="" style="display:none" />
+        <label class="file-btn" for="rf-backdrop-input">📸 Upload backdrop image</label>
+        <input id="rf-backdrop-input" type="file" accept="image/*" style="display:none" onchange="uploadRoomBackdrop()" />
+      </div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:5px">Tap to pick a background image from your device for this room.</div>
+      <div id="rf-backdrop-status" style="font-size:11px;color:var(--accent2);margin-top:5px"></div>
+    </div>
     <div class="modal-actions">
       <button class="mbtn cancel" onclick="closeRoomModal()">Cancel</button>
       <button class="mbtn save"   onclick="saveRoom()">Save Room</button>
@@ -361,7 +370,15 @@
     <div class="modal-section-title">📦 What is it?</div>
     <div class="field"><label>Object name</label><input id="of-name" type="text" placeholder="e.g. Mossy log, Giant mushroom..." /></div>
     <div class="field"><label>Description (shows on hover)</label><textarea id="of-desc" rows="2" placeholder="An old log covered in soft moss."></textarea></div>
-    <div class="field"><label>.GLB Model URL</label><input id="of-glb" type="text" placeholder="https://..." /></div>
+    <div class="field"><label>3D model</label>
+      <div class="file-row">
+        <label class="file-btn" for="of-glb-input">✨ Upload .glb file</label>
+        <input id="of-glb-input" type="file" accept=".glb,model/gltf-binary" style="display:none" onchange="uploadObjectGlb()" />
+      </div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:5px">Tap to pick a 3D model from your device. You can also paste a web link if you already have one.</div>
+      <input id="of-glb" type="text" placeholder="https://... (or paste a .glb URL)" style="margin-top:6px" />
+      <div id="of-glb-status" style="font-size:11px;color:var(--accent2);margin-top:5px"></div>
+    </div>
     <div class="field">
       <label>Position (X, Z) and Scale</label>
       <div style="display:flex;gap:8px">
@@ -498,7 +515,7 @@ const FLOOR_COLORS = { forest:'#1a3a1a', stone:'#2a2a3a', water:'#0a2a3a', wood:
 const WALL_COLORS  = { forest:'#2d5a27', stone:'#3a3a5a', water:'#0f3d5c', wood:'#5a3d1a', grass:'#2d5a20', dark:'#1a1a1a' };
 
 var rooms=[], characters=[], objects=[], selectedChar=null, editingRoomId=null, editingCharId=null, editingObjId=null;
-var tempPhotoData=null, tempAnimData=null;
+var tempPhotoData=null, tempAnimData=null, tempGlbData=null, tempBackdropData=null, tempObjectGlbData=null;
 var map, roomPickerMap, roomPickerMarker;
 var gpsWatchId=null, userLat=null, userLng=null;
 var simActive=false, simInterval=null, facilitatorMode=true, activeRoomId=null;
@@ -550,6 +567,7 @@ function spawnTestRoom(){ return window.lcMap.spawnTestRoom(); }
 function openRoomModal(roomId){ return window.lcModals.openRoomModal(roomId); }
 function closeRoomModal(){ return window.lcModals.closeRoomModal(); }
 function saveRoom(){ return window.lcModals.saveRoom(); }
+function uploadRoomBackdrop(){ return window.lcModals.uploadRoomBackdrop(); }
 
 function buildRoomChipPicker(selectedIds) { return window.lcModals.buildRoomChipPicker(selectedIds); }
 function getSelectedRoomIds() { return window.lcModals.getSelectedRoomIds(); }
@@ -558,6 +576,7 @@ function togglePromptPill(btn){ return window.lcModals.togglePromptPill(btn); }
 function closeCharModal(){ return window.lcModals.closeCharModal(); }
 function previewFile(inputId,previewId,dataKey){ return window.lcModals.previewFile(inputId,previewId,dataKey); }
 function uploadCharacterGlb(){ return window.lcModals.uploadCharacterGlb(); }
+function uploadObjectGlb(){ return window.lcModals.uploadObjectGlb ? window.lcModals.uploadObjectGlb() : undefined; }
 function saveCharacter(){ return window.lcModals.saveCharacter(); }
 
 function buildTweeSource(rooms, chars, objs) {
@@ -621,6 +640,7 @@ function editActiveRoom() {
 
 function openObjModal(objId) {
   editingObjId = objId;
+  tempObjectGlbData = null;
   const overlay = document.getElementById('obj-modal-overlay');
   if(objId) {
     const obj = objects.find(o=>o.id===objId);
@@ -632,6 +652,15 @@ function openObjModal(objId) {
     document.getElementById('of-pz').value = obj.pz || 0;
     document.getElementById('of-scale').value = obj.scale || 1;
     document.getElementById('of-delete').style.display = 'block';
+    const glbStatus = document.getElementById('of-glb-status');
+    if (obj.glbUrl && obj.glbUrl.startsWith('data:')) {
+      tempObjectGlbData = obj.glbUrl;
+      glbStatus.textContent = '✓ Your 3D model is ready to save.';
+    } else if (obj.glbUrl) {
+      glbStatus.textContent = '✓ Using a web link for this object.';
+    } else {
+      glbStatus.textContent = '';
+    }
   } else {
     document.getElementById('obj-modal-title').textContent = 'Add Object';
     document.getElementById('of-name').value = '';
@@ -641,6 +670,7 @@ function openObjModal(objId) {
     document.getElementById('of-pz').value = '0';
     document.getElementById('of-scale').value = '1';
     document.getElementById('of-delete').style.display = 'none';
+    document.getElementById('of-glb-status').textContent = '';
   }
   overlay.classList.add('open');
 }
@@ -648,6 +678,8 @@ function openObjModal(objId) {
 function closeObjModal() {
   document.getElementById('obj-modal-overlay').classList.remove('open');
   editingObjId = null;
+  tempObjectGlbData = null;
+  document.getElementById('of-glb-status').textContent = '';
 }
 
 function saveObject() {
@@ -655,12 +687,13 @@ function saveObject() {
   if(!name) return alert('Needs a name');
   if(!activeRoomId) return alert('Open a room first to add an object.');
 
+  const glbUrl = tempObjectGlbData || document.getElementById('of-glb').value.trim();
   const obj = {
     id: editingObjId || ('obj_' + Date.now() + Math.random().toString(36).substr(2,5)),
     roomId: activeRoomId,
     name: name,
     desc: document.getElementById('of-desc').value.trim(),
-    glbUrl: document.getElementById('of-glb').value.trim(),
+    glbUrl: glbUrl,
     px: parseFloat(document.getElementById('of-px').value)||0,
     pz: parseFloat(document.getElementById('of-pz').value)||0,
     scale: parseFloat(document.getElementById('of-scale').value)||1
@@ -687,6 +720,33 @@ function deleteObject() {
   renderMapPins();
   const room = rooms.find(r=>r.id===activeRoomId);
   if(room) buildRoomScene(room);
+}
+
+function uploadObjectGlb() {
+  const input = document.getElementById('of-glb-input');
+  const status = document.getElementById('of-glb-status');
+  const urlField = document.getElementById('of-glb');
+  const file = input.files && input.files[0];
+  if (!file) return;
+  const name = file.name.toLowerCase();
+  if (!name.endsWith('.glb')) {
+    status.textContent = 'That file does not look like a .glb model. Please try another one.';
+    status.style.color = '#ff8a80';
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = e => {
+    tempObjectGlbData = e.target.result;
+    urlField.value = '';
+    status.textContent = `✓ "${file.name}" is ready to use!`;
+    status.style.color = 'var(--accent2)';
+  };
+  reader.onerror = () => {
+    tempObjectGlbData = null;
+    status.textContent = 'That file could not be read. Please try again.';
+    status.style.color = '#ff8a80';
+  };
+  reader.readAsDataURL(file);
 }
 </script>
 

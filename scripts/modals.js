@@ -17,6 +17,7 @@ function getSelectedRoomIds() {
 
 function openRoomModal(roomId) {
   editingRoomId = roomId;
+  tempBackdropData = null;
   const room = roomId ? rooms.find(r => r.id === roomId) : null;
   document.getElementById('room-modal-title').textContent = room ? 'Edit Room' : 'Add a Room';
   document.getElementById('rf-name').value = room ? room.name : '';
@@ -25,12 +26,25 @@ function openRoomModal(roomId) {
   document.getElementById('rf-lng').value = room ? room.lng : '';
   document.getElementById('rf-radius').value = room ? room.radius : '30';
   document.getElementById('rf-backdrop').value = room ? room.backdrop : 'forest';
+  const bp = document.getElementById('rf-backdrop-preview');
+  if (room && room.backdropData) {
+    bp.src = room.backdropData;
+    bp.style.display = 'block';
+    tempBackdropData = room.backdropData;
+    document.getElementById('rf-backdrop-status').textContent = '✓ Your backdrop image is ready to save.';
+  } else {
+    bp.src = '';
+    bp.style.display = 'none';
+    document.getElementById('rf-backdrop-status').textContent = '';
+  }
   document.getElementById('room-modal-overlay').classList.add('open');
 }
 
 function closeRoomModal() {
   document.getElementById('room-modal-overlay').classList.remove('open');
   editingRoomId = null;
+  tempBackdropData = null;
+  document.getElementById('rf-backdrop-status').textContent = '';
 }
 
 function saveRoom() {
@@ -40,10 +54,13 @@ function saveRoom() {
   const lng = parseFloat(document.getElementById('rf-lng').value);
   const radius = parseFloat(document.getElementById('rf-radius').value) || 30;
   const backdrop = document.getElementById('rf-backdrop').value;
+  const backdropData = tempBackdropData || undefined;
   if (!name || Number.isNaN(lat) || Number.isNaN(lng)) return alert('Needs a name and coordinates.');
   const data = { id: editingRoomId || ('room_' + Date.now()), name, lede, lat, lng, radius, backdrop };
+  if (backdropData) data.backdropData = backdropData;
   if (editingRoomId) {
-    rooms = rooms.map(r => r.id === editingRoomId ? data : r);
+    const existing = rooms.find(r => r.id === editingRoomId);
+    if (existing) Object.assign(existing, data);
   } else {
     rooms.push(data);
   }
@@ -51,6 +68,28 @@ function saveRoom() {
   renderMapPins();
   updateCompass();
   save();
+}
+
+function uploadRoomBackdrop() {
+  const input = document.getElementById('rf-backdrop-input');
+  const status = document.getElementById('rf-backdrop-status');
+  const preview = document.getElementById('rf-backdrop-preview');
+  const file = input.files && input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    tempBackdropData = e.target.result;
+    preview.src = e.target.result;
+    preview.style.display = 'block';
+    status.textContent = `✓ "${file.name}" is ready to use!`;
+    status.style.color = 'var(--accent2)';
+  };
+  reader.onerror = () => {
+    tempBackdropData = null;
+    status.textContent = 'That file could not be read. Please try again.';
+    status.style.color = '#ff8a80';
+  };
+  reader.readAsDataURL(file);
 }
 
 function openCharModal(charId) {
@@ -199,6 +238,7 @@ window.lcModals = {
   openRoomModal,
   closeRoomModal,
   saveRoom,
+  uploadRoomBackdrop,
   openCharModal,
   closeCharModal,
   togglePromptPill,
@@ -213,6 +253,7 @@ export {
   openRoomModal,
   closeRoomModal,
   saveRoom,
+  uploadRoomBackdrop,
   openCharModal,
   closeCharModal,
   togglePromptPill,
