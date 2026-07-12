@@ -21,12 +21,13 @@ When editing a room, you can upload a custom backdrop image:
 
 1. Click **📸 Upload backdrop image** in the room modal.
 2. Select an image file from your device.
-3. If you have a GitHub token entered, the image will be uploaded to `media/room-backdrops/{roomId}.png` in the repository.
-4. The image becomes the background of that room's Three.js scene when you open it.
-5. The backdrop URL is stored on the room object as `backdropUrl` and persisted in localStorage.
+3. The image is immediately stored as `backdropData` (base64) on the room and used right away — no GitHub token required.
+4. If you have a GitHub token entered, the image will also be uploaded to `media/room-backdrops/{roomId}.png` in the repository and the `backdropUrl` will be updated once that completes.
+5. The backdrop becomes the background of that room's Three.js scene when you open it.
 
 **Priority order for room backgrounds:**
-- Custom `backdropUrl` (uploaded or manually entered)
+- `backdropData` — local base64 (set immediately on upload, works offline)
+- `backdropUrl` — remote URL (set after successful GitHub upload)
 - Preset backdrop style (forest, stone, water, etc.)
 
 ### Object Placement in Room Scenes
@@ -34,7 +35,26 @@ When editing a room, you can upload a custom backdrop image:
 - Click **Move Objects** in the room toolbar to enable object movement mode.
 - In move mode, click an object to select it (cursor changes to grabbing), then click a new floor position to place it.
 - Objects are constrained to the floor plane (Y=0) for easy placement.
-- Lighting is now evened out with increased ambient light so materials render consistently regardless of angle.
+- Lighting is evened out with increased ambient light so materials render consistently regardless of angle.
+
+## Known Issues Fixed (July 2026)
+
+### Image upload button crash
+**Root cause:** `uploadRoomBackdrop()` in `modals.js` called `window.lcStore.uploadRoomBackdropToGitHub()` unconditionally. If no GitHub token was set, or if the module hadn't fully registered `lcStore` yet, this threw a `TypeError` and crashed the upload flow before the file was even read.
+
+**Fix:** The function now checks that `window.lcStore` exists and that `uploadRoomBackdropToGitHub` is a function before calling it. It also guards against an empty file input (e.g. user opens the picker and cancels). The base64 preview and `tempBackdropData` / `tempBackdropUrl` are always set first from the `FileReader`, so the room works immediately regardless of GitHub status.
+
+### Backdrop images not displaying in Three.js room scenes
+**Two root causes:**
+
+1. `openRoom()` only checked `room.backdropUrl` for the CSS background on `#room-stage`. Locally-uploaded images are stored as `room.backdropData` (base64) — `backdropUrl` is only set after a GitHub upload completes. So locally-uploaded backdrops never appeared.
+
+2. `buildRoomScene()` used a broken `OrthographicCamera` frustum: `new THREE.OrthographicCamera(W/-200, H/200, H/200, H/-200, ...)`. The right/left bounds mixed up `W` and `H` with `/200` as a scale, which produced a skewed or clipped view. The canvas still rendered, but the scene geometry was distorted.
+
+**Fixes:**
+- `openRoom()` now checks `room.backdropData || room.backdropUrl` as the CSS `backgroundImage` source, with `backdropData` taking priority.
+- `buildRoomScene()` uses a correct aspect-ratio frustum: `OrthographicCamera(-viewSize*aspect/2, viewSize*aspect/2, viewSize/2, -viewSize/2, 1, 1000)`.
+- `hasBg` in `buildRoomScene` now also checks `room.backdropData` so floor transparency is correctly applied for locally-uploaded images.
 
 ## Quick start
 
