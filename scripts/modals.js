@@ -1,10 +1,16 @@
 function buildRoomChipPicker(selectedIds = []) {
   const container = document.getElementById('cf-room-chips');
+  const hint = document.getElementById('cf-room-chips-hint');
   container.innerHTML = '';
+  if (!rooms.length) {
+    if (hint) hint.style.display = '';
+    return;
+  }
+  if (hint) hint.style.display = 'none';
   rooms.forEach(room => {
     const chip = document.createElement('button');
     chip.className = 'room-chip' + (selectedIds.includes(room.id) ? ' active' : '');
-    chip.textContent = '🏠 ' + room.name;
+    chip.textContent = '\uD83C\uDFE0 ' + room.name;
     chip.dataset.roomId = room.id;
     chip.onclick = () => chip.classList.toggle('active');
     container.appendChild(chip);
@@ -27,13 +33,12 @@ function openRoomModal(roomId) {
   document.getElementById('rf-radius').value = room ? room.radius : '30';
   document.getElementById('rf-backdrop').value = room ? room.backdrop : 'forest';
   const bp = document.getElementById('rf-backdrop-preview');
-  // Support both backdropData (base64 local) and backdropUrl (remote)
   const existingPreview = (room && room.backdropData) ? room.backdropData : ((room && room.backdropUrl) ? room.backdropUrl : null);
   if (existingPreview) {
     bp.src = existingPreview;
     bp.style.display = 'block';
     if (room.backdropData) tempBackdropData = room.backdropData;
-    document.getElementById('rf-backdrop-status').textContent = '✓ Your backdrop image is ready to save.';
+    document.getElementById('rf-backdrop-status').textContent = '\u2713 Your backdrop image is ready to save.';
   } else {
     bp.src = '';
     bp.style.display = 'none';
@@ -108,7 +113,6 @@ function uploadRoomBackdrop() {
   const input = document.getElementById('rf-backdrop-input');
   const status = document.getElementById('rf-backdrop-status');
   const preview = document.getElementById('rf-backdrop-preview');
-  // Guard: file input may be empty (e.g. user cancelled)
   if (!input || !input.files || !input.files[0]) return;
   const file = input.files[0];
   const reader = new FileReader();
@@ -116,22 +120,17 @@ function uploadRoomBackdrop() {
     tempBackdropData = e.target.result;
     preview.src = e.target.result;
     preview.style.display = 'block';
-    status.textContent = `✓ "${file.name}" is ready to use!`;
+    status.textContent = `\u2713 "${file.name}" is ready to use!`;
     status.style.color = 'var(--accent2)';
-    // Also store as backdropUrl immediately so the room scene can use it
-    // without waiting for a GitHub upload
     tempBackdropUrl = e.target.result;
-    // Attempt GitHub upload in background; update URL if it succeeds
     const targetRoomId = editingRoomId || ('room_' + Date.now());
     if (window.lcStore && typeof window.lcStore.uploadRoomBackdropToGitHub === 'function') {
       window.lcStore.uploadRoomBackdropToGitHub(targetRoomId, file).then(url => {
         if (url) {
           tempBackdropUrl = url;
-          status.textContent = `✓ "${file.name}" uploaded to repo!`;
+          status.textContent = `\u2713 "${file.name}" uploaded to repo!`;
         }
-      }).catch(() => {
-        // GitHub upload failed — local base64 copy is still usable
-      });
+      }).catch(() => {});
     }
   };
   reader.onerror = () => {
@@ -163,9 +162,9 @@ function openCharModal(charId) {
   const glbStatus = document.getElementById('cf-glb-status');
   if (ch && ch.glbUrl && ch.glbUrl.startsWith('data:')) {
     tempGlbData = ch.glbUrl;
-    glbStatus.textContent = '✓ Your 3D model is ready to save.';
+    glbStatus.textContent = '\u2713 Your 3D model is ready to save.';
   } else if (ch && ch.glbUrl) {
-    glbStatus.textContent = '✓ Using a web link for this character.';
+    glbStatus.textContent = '\u2713 Using a web link for this character.';
   } else {
     glbStatus.textContent = '';
   }
@@ -199,6 +198,13 @@ function openCharModal(charId) {
       </div>`;
     db.appendChild(row);
   });
+  // Highlight room chips section if no rooms available (new character)
+  const hint = document.getElementById('cf-room-chips-hint');
+  if (hint && !rooms.length) {
+    hint.style.display = '';
+    hint.style.color = 'var(--accent)';
+    hint.textContent = '\u26A0\uFE0F Create a room first before adding a character.';
+  }
   document.getElementById('char-modal-overlay').classList.add('open');
 }
 
@@ -231,7 +237,7 @@ function uploadCharacterGlb() {
   reader.onload = e => {
     tempGlbData = e.target.result;
     urlField.value = '';
-    status.textContent = `✓ "${file.name}" is ready to use!`;
+    status.textContent = `\u2713 "${file.name}" is ready to use!`;
     status.style.color = 'var(--accent2)';
   };
   reader.onerror = () => {
@@ -258,11 +264,34 @@ function previewFile(inputId, previewId, dataKey) {
 
 function saveCharacter() {
   const name = document.getElementById('cf-name').value.trim();
+  if (!name) { alert('Please give the character a name.'); return; }
+
   const roomIds = getSelectedRoomIds();
+
+  // Room is mandatory when creating a new character
+  if (!editingCharId && !roomIds.length) {
+    // Visually highlight the room chips section
+    const chips = document.getElementById('cf-room-chips');
+    const hint = document.getElementById('cf-room-chips-hint');
+    if (chips) {
+      chips.style.outline = '2px solid var(--accent)';
+      chips.style.borderRadius = '8px';
+      chips.style.padding = '6px';
+      setTimeout(() => { chips.style.outline = ''; chips.style.padding = ''; }, 2000);
+    }
+    if (hint) {
+      hint.style.display = '';
+      hint.style.color = 'var(--accent)';
+      hint.textContent = '\u26A0\uFE0F Please choose at least one room for this character.';
+      setTimeout(() => { hint.textContent = ''; hint.style.color = ''; }, 3000);
+    }
+    alert('Please choose at least one room before saving.');
+    return;
+  }
+
   const primaryRoomId = roomIds[0] || '';
   const items = document.getElementById('cf-items').value.split(',').map(s => s.trim()).filter(Boolean);
   const glbUrl = tempGlbData || document.getElementById('cf-glb-url').value.trim();
-  if (!name) { alert('Please give the character a name.'); return; }
   const activeMoodBtn = document.querySelector('#mood-picker .mood-opt.active');
   const moodLabel = MOODS.find(m => activeMoodBtn && activeMoodBtn.textContent.includes(m.emoji))?.label || 'Happy';
   const passages = [];
@@ -289,6 +318,7 @@ window.lcModals = {
   closeRoomModal,
   saveRoom,
   uploadRoomBackdrop,
+  initRoomPickerMap,
   openCharModal,
   closeCharModal,
   togglePromptPill,
@@ -304,6 +334,7 @@ export {
   closeRoomModal,
   saveRoom,
   uploadRoomBackdrop,
+  initRoomPickerMap,
   openCharModal,
   closeCharModal,
   togglePromptPill,

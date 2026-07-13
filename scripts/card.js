@@ -43,8 +43,10 @@ function closeCard() {
 
 function editSelectedChar() {
   if (!selectedChar) return;
+  // Capture the id before closeCard() nulls selectedChar
+  const charId = selectedChar.id;
   closeCard();
-  openCharModal(selectedChar.id);
+  openCharModal(charId);
 }
 
 function deleteSelectedChar() {
@@ -73,7 +75,7 @@ function openTalkPanel(ch) {
   const passages = ch.passages || [];
   document.getElementById('talk-char-name').textContent = ch.name;
   const bubble = document.getElementById('talk-bubble');
-  bubble.textContent = 'Tap a prompt below to hear what they say…';
+  bubble.textContent = 'Tap a prompt below to hear what they say\u2026';
   bubble.className = 'empty';
   const btnsEl = document.getElementById('talk-btns');
   btnsEl.innerHTML = '';
@@ -89,7 +91,7 @@ function openTalkPanel(ch) {
       btn.onclick = () => {
         btnsEl.querySelectorAll('.talk-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
-        bubble.textContent = p.text || '…';
+        bubble.textContent = p.text || '\u2026';
         bubble.className = '';
         pulseMoodRing(ch.id);
       };
