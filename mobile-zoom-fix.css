@@ -1,0 +1,59 @@
+/*
+  mobile-zoom-fix.css
+  -------------------
+  Prevents iOS Safari from zooming the page UI when interacting
+  with the Leaflet map. Include this AFTER the main styles in index.html.
+
+  Changes vs original:
+    1. html/body get overscroll-behavior:none (kills rubber-band bounce)
+    2. #map gets touch-action:none so Leaflet owns all touch events
+    3. On mobile (<=640px), #gh-bar is hidden by default and revealed
+       via the ⚙ toggle button (.gh-toggle)
+    4. --map-top on mobile drops to 44px when gh-bar is hidden
+*/
+
+html, body {
+  overscroll-behavior: none;
+  touch-action: pan-x pan-y;
+}
+
+#map {
+  touch-action: none;
+}
+
+@media (max-width: 640px) {
+  :root {
+    --ghbar-h: 0px;
+    --map-top: 44px;
+  }
+
+  #gh-bar {
+    display: none;
+  }
+
+  #gh-bar.mobile-open {
+    display: flex;
+  }
+
+  /* When gh-bar is open, bump map down */
+  body.ghbar-open #map,
+  body.ghbar-open #room-view,
+  body.ghbar-open #card {
+    top: 80px;
+  }
+
+  /* Larger tap targets on mobile */
+  .hbtn {
+    min-height: 40px;
+    font-size: 11px;
+    padding: 5px 8px;
+  }
+
+  /* Prevent iOS auto-zoom on input focus (font-size must be >=16px) */
+  .field input,
+  .field select,
+  .field textarea,
+  .prompt-input {
+    font-size: 16px !important;
+  }
+}

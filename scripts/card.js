@@ -1,3 +1,5 @@
+// card.js — character card, talk panel, close-up GLB on talk
+
 function openCard(charId) {
   selectedChar = characters.find(c => c.id === charId);
   if (!selectedChar) return;
@@ -7,13 +9,9 @@ function openCard(charId) {
   const animEl = document.getElementById('card-anim');
   animEl.innerHTML = '';
   if (selectedChar.animData) {
-    const img = document.createElement('img');
-    img.src = selectedChar.animData;
-    animEl.appendChild(img);
+    const img = document.createElement('img'); img.src = selectedChar.animData; animEl.appendChild(img);
   } else if (selectedChar.photoData) {
-    const img = document.createElement('img');
-    img.src = selectedChar.photoData;
-    animEl.appendChild(img);
+    const img = document.createElement('img'); img.src = selectedChar.photoData; animEl.appendChild(img);
   } else {
     animEl.innerHTML = '<div class="placeholder">🧸</div>';
   }
@@ -24,10 +22,7 @@ function openCard(charId) {
   const il = document.getElementById('card-items-list');
   il.innerHTML = '';
   (selectedChar.items || []).forEach(item => {
-    const c = document.createElement('div');
-    c.className = 'item-chip';
-    c.textContent = item;
-    il.appendChild(c);
+    const c = document.createElement('div'); c.className = 'item-chip'; c.textContent = item; il.appendChild(c);
   });
   const pl = document.getElementById('card-passage-list');
   pl.innerHTML = '';
@@ -55,10 +50,7 @@ function editSelectedChar() {
 function deleteSelectedChar() {
   if (!selectedChar || !confirm('Remove ' + selectedChar.name + '?')) return;
   characters = characters.filter(c => c.id !== selectedChar.id);
-  closeCard();
-  renderMapPins();
-  updateCompass();
-  save();
+  closeCard(); renderMapPins(); updateCompass(); save();
 }
 
 function talkToSelectedChar() {
@@ -66,9 +58,13 @@ function talkToSelectedChar() {
   const primaryRoomId = (selectedChar.roomIds && selectedChar.roomIds[0]) || selectedChar.roomId;
   if (primaryRoomId && !document.getElementById('room-view').classList.contains('open')) {
     openRoom(primaryRoomId);
-    setTimeout(() => openTalkPanel(selectedChar), 400);
+    setTimeout(() => {
+      openTalkPanel(selectedChar);
+      if (window.lcRoom?.spawnTalkCloseUp) window.lcRoom.spawnTalkCloseUp(selectedChar);
+    }, 450);
   } else {
     openTalkPanel(selectedChar);
+    if (window.lcRoom?.spawnTalkCloseUp) window.lcRoom.spawnTalkCloseUp(selectedChar);
   }
   closeCard();
 }
@@ -105,6 +101,7 @@ function openTalkPanel(ch) {
 
 function closeTalkPanel() {
   document.getElementById('talk-panel').classList.remove('open');
+  if (window.lcRoom?.dismissTalkCloseUp) window.lcRoom.dismissTalkCloseUp();
 }
 
 function pulseMoodRing(charId) {
@@ -124,23 +121,11 @@ function pulseMoodRing(charId) {
 }
 
 window.lcCard = {
-  openCard,
-  closeCard,
-  editSelectedChar,
-  deleteSelectedChar,
-  talkToSelectedChar,
-  openTalkPanel,
-  closeTalkPanel,
-  pulseMoodRing
+  openCard, closeCard, editSelectedChar, deleteSelectedChar,
+  talkToSelectedChar, openTalkPanel, closeTalkPanel, pulseMoodRing
 };
 
 export {
-  openCard,
-  closeCard,
-  editSelectedChar,
-  deleteSelectedChar,
-  talkToSelectedChar,
-  openTalkPanel,
-  closeTalkPanel,
-  pulseMoodRing
+  openCard, closeCard, editSelectedChar, deleteSelectedChar,
+  talkToSelectedChar, openTalkPanel, closeTalkPanel, pulseMoodRing
 };
