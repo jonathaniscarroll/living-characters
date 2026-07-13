@@ -386,7 +386,9 @@
     <div class="field"><label>3D character model (GLB)</label>
       <div class="file-row">
         <label class="file-btn" for="cf-glb-input">✨ Upload .glb file</label>
-        <input id="cf-glb-input" type="file" accept=".glb,model/gltf-binary" style="display:none" onchange="uploadCharacterGlb()" />
+        <!-- accept: .glb extension + application/octet-stream for iOS Safari compatibility -->
+        <!-- iOS ignores model/gltf-binary (unrecognised MIME); octet-stream lets Files.app show .glb files -->
+        <input id="cf-glb-input" type="file" accept=".glb,application/octet-stream" style="display:none" onchange="uploadCharacterGlb()" />
       </div>
       <div style="font-size:11px;color:var(--text-muted);margin-top:5px">Tap to pick a 3D model from your device. You can also paste a web link if you already have one.</div>
       <input id="cf-glb-url" type="text" placeholder="...or paste a .glb URL for 3-D model" style="margin-top:6px" />
@@ -412,7 +414,9 @@
     <div class="field"><label>3D model</label>
       <div class="file-row">
         <label class="file-btn" for="of-glb-input">✨ Upload .glb file</label>
-        <input id="of-glb-input" type="file" accept=".glb,model/gltf-binary" style="display:none" onchange="uploadObjectGlb()" />
+        <!-- accept: .glb extension + application/octet-stream for iOS Safari compatibility -->
+        <!-- iOS ignores model/gltf-binary (unrecognised MIME); octet-stream lets Files.app show .glb files -->
+        <input id="of-glb-input" type="file" accept=".glb,application/octet-stream" style="display:none" onchange="uploadObjectGlb()" />
       </div>
       <div style="font-size:11px;color:var(--text-muted);margin-top:5px">Tap to pick a 3D model from your device. You can also paste a web link if you already have one.</div>
       <input id="of-glb" type="text" placeholder="https://... (or paste a .glb URL)" style="margin-top:6px" />
