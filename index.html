@@ -26,6 +26,9 @@
   <script type="module" src="./scripts/room.js"></script>
   <script type="module" src="./scripts/card.js"></script>
   <script type="module" src="./scripts/modals.js"></script>
+  <!-- FBX → GLB conversion + shared upload helper -->
+  <script type="module" src="./scripts/fbx-to-glb.js"></script>
+  <script type="module" src="./scripts/upload-helpers.js"></script>
 
   <style>
     :root {
@@ -100,9 +103,7 @@
     #room-stage{flex:1;position:relative;overflow:hidden;background:#1a3a10 center/cover no-repeat;}
     #room-stage canvas{display:block;width:100%!important;height:100%!important;position:absolute;top:0;left:0;}
     .char-label{position:absolute;pointer-events:none;background:rgba(10,15,30,.85);color:var(--text);font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;backdrop-filter:blur(4px);white-space:nowrap;transform:translate(-50%,0);z-index:10;}
-    /* object labels are slightly dimmer */
     .obj-label{position:absolute;pointer-events:none;background:rgba(10,15,30,.65);color:var(--text-muted);font-size:9px;font-weight:600;padding:2px 6px;border-radius:20px;backdrop-filter:blur(4px);white-space:nowrap;transform:translate(-50%,0);z-index:9;}
-    /* object inspect bubble */
     #obj-inspect{position:absolute;bottom:80px;left:50%;transform:translateX(-50%);z-index:55;background:rgba(10,15,30,.93);border:1px solid var(--border);border-radius:10px;padding:10px 16px;max-width:260px;text-align:center;pointer-events:none;opacity:0;transition:opacity .2s;}
     #obj-inspect.show{opacity:1;}
     #obj-inspect .oi-name{font-size:13px;font-weight:800;color:var(--accent2);}
@@ -151,13 +152,13 @@
     .mbtn{flex:1;padding:10px;border-radius:8px;border:none;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;}
     .mbtn.save{background:var(--accent);color:#fff;} .mbtn.cancel{background:rgba(255,255,255,.08);color:var(--text);}
     .mbtn.danger{background:rgba(233,69,96,.18);color:var(--accent);}
-    .file-row{display:flex;gap:8px;align-items:center;}
+    .file-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
     .file-preview{width:52px;height:52px;border-radius:8px;object-fit:cover;background:#0a0f1e;flex-shrink:0;}
-    .file-btn{flex:1;padding:8px 12px;border-radius:8px;background:rgba(255,255,255,.06);border:1px dashed #ffffff28;color:var(--text-muted);font-size:12px;font-family:inherit;cursor:pointer;text-align:center;}
+    .file-btn{flex:1;padding:8px 12px;border-radius:8px;background:rgba(255,255,255,.06);border:1px dashed #ffffff28;color:var(--text-muted);font-size:12px;font-family:inherit;cursor:pointer;text-align:center;min-width:120px;}
+    .file-btn:hover{border-color:var(--accent2);color:var(--accent2);}
     .mood-picker{display:flex;gap:8px;flex-wrap:wrap;}
     .mood-opt{padding:4px 12px;border-radius:20px;border:1px solid transparent;font-size:12px;cursor:pointer;background:rgba(255,255,255,.06);}
     .mood-opt.active{border-color:var(--accent2);background:rgba(245,166,35,.15);}
-    /* ── multi-room chip picker ── */
     .room-chips{display:flex;flex-wrap:wrap;gap:7px;}
     .room-chip{padding:5px 12px;border-radius:20px;border:1.5px solid var(--border);font-size:12px;font-weight:600;cursor:pointer;background:rgba(255,255,255,.05);color:var(--text-muted);transition:background .12s,border-color .12s,color .12s;user-select:none;}
     .room-chip:hover{border-color:#ffffff40;color:var(--text);}
@@ -176,10 +177,8 @@
     #tooltip{position:fixed;z-index:1500;background:rgba(10,15,30,.92);backdrop-filter:blur(8px);border:1px solid var(--border);border-radius:10px;padding:10px 14px;pointer-events:none;opacity:0;transition:opacity .12s;max-width:200px;}
     #tooltip.show{opacity:1;}
     #tooltip .tt-name{font-size:13px;font-weight:800;} #tooltip .tt-loc{font-size:10px;color:var(--text-muted);text-transform:uppercase;} #tooltip .tt-mood{font-size:11px;margin-top:3px;}
-    /* ── Phase 2: Toast notification ── */
     #toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);z-index:1600;background:rgba(10,15,30,.95);border:1px solid var(--border);border-radius:10px;padding:10px 20px;font-size:13px;font-weight:600;backdrop-filter:blur(8px);opacity:0;transition:opacity .25s;pointer-events:none;white-space:nowrap;}
     #toast.show{opacity:1;}
-    /* ── Phase 2: Asset browser ── */
     #asset-browser { display:grid; grid-template-columns:repeat(auto-fill,minmax(100px,1fr)); gap:10px; margin:8px 0; max-height:240px; overflow-y:auto; }
     .asset-card { background:rgba(255,255,255,.06); border:1px solid var(--border); border-radius:8px; padding:6px; text-align:center; cursor:pointer; transition:border-color .15s,background .15s; }
     .asset-card:hover { border-color:var(--accent2); background:rgba(245,166,35,.1); }
@@ -189,7 +188,6 @@
     #asset-tabs { display:flex; gap:6px; margin-bottom:8px; }
     .asset-tab { font-size:11px; padding:4px 10px; border-radius:20px; border:1px solid var(--border); background:transparent; color:var(--text-muted); cursor:pointer; font-family:inherit; }
     .asset-tab.active { border-color:var(--accent2); color:var(--accent2); background:rgba(245,166,35,.1); }
-    /* ── Phase 2: interactable toggle ── */
     .toggle-row { display:flex; align-items:center; gap:10px; }
     .toggle-switch { position:relative; width:40px; height:22px; background:#ffffff20; border-radius:11px; cursor:pointer; transition:background .2s; flex-shrink:0; }
     .toggle-switch.active { background:var(--accent2); }
@@ -198,15 +196,12 @@
     #drop-overlay{position:fixed;inset:0;z-index:2000;background:rgba(0,0,80,.75);backdrop-filter:blur(6px);display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;opacity:0;transition:opacity .2s;color:#fff;font-size:22px;gap:12px;}
     #drop-overlay.active{opacity:1;pointer-events:all;}
     #drop-overlay .drop-sub{font-size:13px;color:#a0c8ff;}
-
-    /* ── Phase 2 Step 7: room toolbar ── */
     .room-toolbar{margin-left:auto;display:flex;gap:6px;align-items:center;}
     .room-tbtn{font-size:11px;padding:4px 9px;border-radius:6px;border:none;cursor:pointer;font-family:inherit;font-weight:600;white-space:nowrap;}
     .room-tbtn.add-obj{background:#2a2060;color:#c9b8ff;border:1px solid #5a4a90;}
     .room-tbtn.edit-room{background:rgba(255,255,255,.08);color:var(--text-muted);}
-.room-tbtn.move-obj{background:#4a2060;color:#d9b8ff;border:1px solid #7a4a9a;}
-.room-tbtn:hover{opacity:.8;}
-    /* ── Phase 2 Step 7: object list panel ── */
+    .room-tbtn.move-obj{background:#4a2060;color:#d9b8ff;border:1px solid #7a4a9a;}
+    .room-tbtn:hover{opacity:.8;}
     #obj-list-panel{position:absolute;top:8px;right:8px;z-index:40;background:rgba(10,15,30,.88);border:1px solid var(--border);border-radius:10px;padding:8px 10px;min-width:150px;max-width:220px;max-height:220px;overflow-y:auto;display:none;flex-direction:column;gap:5px;}
     #obj-list-panel.show{display:flex;}
     #obj-list-panel h5{font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--text-muted);margin-bottom:2px;}
@@ -214,14 +209,13 @@
     .obj-list-row .obj-list-name{flex:1;color:var(--text);font-weight:600;}
     .obj-list-edit{background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:12px;padding:1px 4px;border-radius:4px;}
     .obj-list-edit:hover{color:var(--accent2);}
+    /* FBX conversion progress bar */
+    .fbx-progress{height:3px;border-radius:2px;background:rgba(255,255,255,.1);margin-top:4px;overflow:hidden;display:none;}
+    .fbx-progress-bar{height:100%;background:var(--accent2);width:0%;transition:width .15s;}
     ::-webkit-scrollbar{width:6px;} ::-webkit-scrollbar-track{background:transparent;} ::-webkit-scrollbar-thumb{background:#ffffff20;border-radius:3px;}
   </style>
   <link rel="stylesheet" href="mobile-zoom-fix.css" />
-
-<!-- just before </body> -->
-  
 </head>
-<!-- just before </body> -->
 <script src="mobile-zoom-fix.js"></script>
 
 <body>
@@ -276,7 +270,6 @@
     </div>
   </div>
   <div id="room-stage">
-    <!-- Phase 2 step 2: object inspect bubble -->
     <div id="obj-inspect">
       <div class="oi-name" id="oi-name"></div>
       <div class="oi-desc" id="oi-desc"></div>
@@ -354,7 +347,6 @@
         <label class="file-btn" for="rf-backdrop-input">📸 Upload backdrop image</label>
         <input id="rf-backdrop-input" type="file" accept="image/*" style="display:none" onchange="uploadRoomBackdrop()" />
       </div>
-      <div style="font-size:11px;color:var(--text-muted);margin-top:5px">Tap to pick a background image from your device for this room.</div>
       <div id="rf-backdrop-status" style="font-size:11px;color:var(--accent2);margin-top:5px"></div>
     </div>
     <div class="modal-actions">
@@ -364,6 +356,9 @@
   </div>
 </div>
 
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- CHARACTER MODAL                                            -->
+<!-- ══════════════════════════════════════════════════════════ -->
 <div class="modal-overlay" id="char-modal-overlay">
   <div class="modal-box">
     <h2 id="char-modal-title">Add a Character</h2>
@@ -383,6 +378,7 @@
         <input id="cf-photo-input" type="file" accept="image/*" style="display:none" onchange="previewFile('cf-photo-input','cf-photo-preview','photoData')" />
       </div>
     </div>
+
     <div class="field"><label>Mixamo animation (GIF)</label>
       <div class="file-row">
         <img id="cf-anim-preview" class="file-preview" src="" style="display:none" />
@@ -390,17 +386,28 @@
         <input id="cf-anim-input" type="file" accept="image/gif,image/png,image/jpeg" style="display:none" onchange="previewFile('cf-anim-input','cf-anim-preview','animData')" />
       </div>
     </div>
-    <div class="field"><label>3D character model (GLB)</label>
+
+    <div class="field">
+      <label>3D character model (.glb or .fbx)</label>
       <div class="file-row">
-        <label class="file-btn" for="cf-glb-input">✨ Upload .glb file</label>
-        <!-- accept: .glb extension + application/octet-stream for iOS Safari compatibility -->
-        <!-- iOS ignores model/gltf-binary (unrecognised MIME); octet-stream lets Files.app show .glb files -->
-        <input id="cf-glb-input" type="file" accept=".glb,application/octet-stream" style="display:none" onchange="uploadCharacterGlb()" />
+        <!-- Primary upload button — accepts GLB and FBX -->
+        <label class="file-btn" for="cf-glb-input">✨ Upload .glb or .fbx</label>
+        <input id="cf-glb-input" type="file"
+               accept=".glb,.fbx,application/octet-stream"
+               style="display:none"
+               onchange="uploadCharacterGlb()" />
       </div>
-      <div style="font-size:11px;color:var(--text-muted);margin-top:5px">Tap to pick a 3D model from your device. You can also paste a web link if you already have one.</div>
-      <input id="cf-glb-url" type="text" placeholder="...or paste a .glb URL for 3-D model" style="margin-top:6px" />
-      <div id="cf-glb-status" style="font-size:11px;color:var(--accent2);margin-top:5px"></div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:4px">
+        .glb files load instantly · .fbx files are auto-converted to GLB in your browser
+      </div>
+      <!-- progress bar (shown during FBX conversion) -->
+      <div class="fbx-progress" id="cf-fbx-progress">
+        <div class="fbx-progress-bar" id="cf-fbx-progress-bar"></div>
+      </div>
+      <div id="cf-glb-status" style="font-size:11px;color:var(--accent2);margin-top:4px"></div>
+      <input id="cf-glb-url" type="text" placeholder="…or paste a .glb URL" style="margin-top:6px" />
     </div>
+
     <div class="field"><label>Mood</label><div class="mood-picker" id="mood-picker"></div></div>
     <div class="field"><label>Items (comma-separated)</label><input id="cf-items" type="text" placeholder="small hat, acorn, lucky pebble" /></div>
     <div class="modal-section-title">💬 What do they say?</div>
@@ -412,23 +419,36 @@
   </div>
 </div>
 
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- OBJECT MODAL                                               -->
+<!-- ══════════════════════════════════════════════════════════ -->
 <div class="modal-overlay" id="obj-modal-overlay">
   <div class="modal-box">
     <h2 id="obj-modal-title">Add an Object</h2>
     <div class="modal-section-title">📦 What is it?</div>
     <div class="field"><label>Object name</label><input id="of-name" type="text" placeholder="e.g. Mossy log, Giant mushroom..." /></div>
-    <div class="field"><label>Description (shows on hover)</label><textarea id="of-desc" rows="2" placeholder="An old log covered in soft moss."></textarea></div>
-    <div class="field"><label>3D model</label>
+    <div class="field"><label>Description (shows on tap)</label><textarea id="of-desc" rows="2" placeholder="An old log covered in soft moss."></textarea></div>
+
+    <div class="field">
+      <label>3D model (.glb or .fbx)</label>
       <div class="file-row">
-        <label class="file-btn" for="of-glb-input">✨ Upload .glb file</label>
-        <!-- accept: .glb extension + application/octet-stream for iOS Safari compatibility -->
-        <!-- iOS ignores model/gltf-binary (unrecognised MIME); octet-stream lets Files.app show .glb files -->
-        <input id="of-glb-input" type="file" accept=".glb,application/octet-stream" style="display:none" onchange="uploadObjectGlb()" />
+        <label class="file-btn" for="of-glb-input">✨ Upload .glb or .fbx</label>
+        <input id="of-glb-input" type="file"
+               accept=".glb,.fbx,application/octet-stream"
+               style="display:none"
+               onchange="uploadObjectGlb()" />
       </div>
-      <div style="font-size:11px;color:var(--text-muted);margin-top:5px">Tap to pick a 3D model from your device. You can also paste a web link if you already have one.</div>
-      <input id="of-glb" type="text" placeholder="https://... (or paste a .glb URL)" style="margin-top:6px" />
-      <div id="of-glb-status" style="font-size:11px;color:var(--accent2);margin-top:5px"></div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:4px">
+        .glb files load instantly · .fbx files are auto-converted to GLB in your browser
+      </div>
+      <!-- progress bar (shown during FBX conversion) -->
+      <div class="fbx-progress" id="of-fbx-progress">
+        <div class="fbx-progress-bar" id="of-fbx-progress-bar"></div>
+      </div>
+      <div id="of-glb-status" style="font-size:11px;color:var(--accent2);margin-top:4px"></div>
+      <input id="of-glb" type="text" placeholder="…or paste a .glb URL" style="margin-top:6px" />
     </div>
+
     <div class="field">
       <label>Position (X, Z) and Scale</label>
       <div style="display:flex;gap:8px">
@@ -437,6 +457,7 @@
         <input id="of-scale" type="number" step="0.1" placeholder="Scale (1.0)" style="flex:1" value="1" />
       </div>
     </div>
+
     <div class="modal-actions">
       <button class="mbtn cancel" onclick="closeObjModal()">Cancel</button>
       <button class="mbtn save"   onclick="saveObject()">Save Object</button>
@@ -461,7 +482,6 @@
 <input id="twee-import-input" type="file" accept=".twee,.txt" style="display:none" onchange="handleImportFile(event)" />
 
 <script>
-// Constants shared with module scripts; kept for inline <script> compat
 const GH_OWNER  = 'jonathaniscarroll';
 const GH_REPO   = 'living-characters';
 const GH_PATH   = 'story/main.twee';
@@ -499,7 +519,7 @@ var simActive=false, simInterval=null, facilitatorMode=true, activeRoomId=null;
 var threeScene=null, threeRenderer=null, threeCamera=null, threeAnimFrameId=null;
 var glbMixers=[];
 
-// ── Phase 2: Toast notification ─────────────────────────────────────────────
+// ── Toast ────────────────────────────────────────────────────────────────────
 let toastTimeout = null;
 function showToast(msg, type) {
   const el = document.getElementById('toast');
@@ -511,16 +531,16 @@ function showToast(msg, type) {
   toastTimeout = setTimeout(() => el.classList.remove('show'), 3000);
 }
 
-// ── Phase 2: Asset browser ──────────────────────────────────────────────────
+// ── Asset browser (backdrop picker) ─────────────────────────────────────────
 const ASSET_LIBRARY = {
   backdrops: [
     { name: 'Forest', url: './garden.png' },
-    { name: 'Room', url: './room2.png' },
+    { name: 'Room',   url: './room2.png' },
   ],
   glbModels: [
-    { name: 'Soldier', url: 'https://threejs.org/examples/models/gltf/Soldier.glb' },
-    { name: 'Parrot', url: 'https://threejs.org/examples/models/gltf/Parrot.glb' },
-    { name: 'Duck', url: 'https://threejs.org/examples/models/gltf/Duck/glTF/Duck.gltf' },
+    { name: 'Soldier',  url: 'https://threejs.org/examples/models/gltf/Soldier.glb' },
+    { name: 'Parrot',   url: 'https://threejs.org/examples/models/gltf/Parrot.glb' },
+    { name: 'Duck',     url: 'https://threejs.org/examples/models/gltf/Duck/glTF/Duck.gltf' },
   ]
 };
 function openAssetBrowser(targetField) {
@@ -547,16 +567,14 @@ function openAssetBrowser(targetField) {
     const items = ASSET_LIBRARY[tab] || [];
     browser.innerHTML = items.map(a => `
       <div class="asset-card" data-url="${a.url}" data-name="${a.name}">
-        ${tab === 'backdrops' ? `<img src="${a.url}" alt="${a.name}" onerror="this.outerHTML='<div style=\\'width:100%;aspect-ratio:1;display:flex;align-items:center;justify-content:center;font-size:32px\\'>📦</div>'">` : `<div style="width:100%;aspect-ratio:1;display:flex;align-items:center;justify-content:center;font-size:32px;background:#0a0f1e;border-radius:4px;">📦</div>`}
+        ${tab === 'backdrops' ? `<img src="${a.url}" alt="${a.name}" onerror="this.outerHTML='<div style=\'width:100%;aspect-ratio:1;display:flex;align-items:center;justify-content:center;font-size:32px\'>📦</div>'">` : `<div style="width:100%;aspect-ratio:1;display:flex;align-items:center;justify-content:center;font-size:32px;background:#0a0f1e;border-radius:4px;">📦</div>`}
         <div class="asset-label">${a.name}</div>
       </div>`).join('');
     browser.querySelectorAll('.asset-card').forEach(card => {
       card.onclick = () => {
-        const url = card.dataset.url;
-        const name = card.dataset.name;
         const field = document.getElementById(targetField);
-        if (field) field.value = url;
-        showToast('✓ Selected: ' + name);
+        if (field) field.value = card.dataset.url;
+        showToast('✓ Selected: ' + card.dataset.name);
         overlay.remove();
       };
     });
@@ -572,7 +590,7 @@ function openAssetBrowser(targetField) {
   renderAssets('backdrops');
 }
 
-// ── Phase 2 step 2: object inspect bubble helpers ────────────────────────────
+// ── Obj inspect bubble ───────────────────────────────────────────────────────
 let objInspectTimeout = null;
 function showObjInspect(name, desc) {
   const el = document.getElementById('obj-inspect');
@@ -587,9 +605,7 @@ function hideObjInspect() {
   document.getElementById('obj-inspect').classList.remove('show');
 }
 
-// ── Phase 2: Global wrappers for script imports ─────────────────────────
-// Module scripts export via window.lcStore/lcMap/lcCard/lcRoom/lcModals.
-// These global aliases let inline onclick/oninput attributes find them.
+// ── Module wrappers (inline onclick → module fns) ────────────────────────────
 function ghLoad(){ return window.lcStore.ghLoad(); }
 function ghSave(){ return window.lcStore.ghSave(); }
 function onTokenInput(){ return window.lcStore.onTokenInput(); }
@@ -617,6 +633,7 @@ function closeRoom(){ return window.lcRoom.closeRoom(); }
 function buildRoomScene(room){ return window.lcRoom.buildRoomScene(room); }
 function destroyRoomScene(){ return window.lcRoom.destroyRoomScene(); }
 function onRoomObjectClick(e){ return window.lcRoom.onRoomObjectClick(e); }
+function enableRoomEdit(){ return window.lcRoom.enableRoomEdit(); }
 
 function startGPS(){ return window.lcMap.startGPS(); }
 function startSim(){ return window.lcMap.startSim(); }
@@ -631,15 +648,12 @@ function closeRoomModal(){ return window.lcModals.closeRoomModal(); }
 function saveRoom(){ return window.lcModals.saveRoom(); }
 function uploadRoomBackdrop(){ return window.lcModals.uploadRoomBackdrop(); }
 function initRoomPickerMap(){ return window.lcModals.initRoomPickerMap(); }
-
 function buildRoomChipPicker(selectedIds) { return window.lcModals.buildRoomChipPicker(selectedIds); }
 function getSelectedRoomIds() { return window.lcModals.getSelectedRoomIds(); }
 function openCharModal(charId){ return window.lcModals.openCharModal(charId); }
 function togglePromptPill(btn){ return window.lcModals.togglePromptPill(btn); }
 function closeCharModal(){ return window.lcModals.closeCharModal(); }
 function previewFile(inputId,previewId,dataKey){ return window.lcModals.previewFile(inputId,previewId,dataKey); }
-function uploadCharacterGlb(){ return window.lcModals.uploadCharacterGlb(); }
-function uploadObjectGlb(){ return window.lcModals.uploadObjectGlb ? window.lcModals.uploadObjectGlb() : undefined; }
 function saveCharacter(){ return window.lcModals.saveCharacter(); }
 
 function buildTweeSource(rooms, chars, objs) {
@@ -653,7 +667,6 @@ function buildTweeSource(rooms, chars, objs) {
       if (obj.glbUrl) meta.glbUrl = obj.glbUrl;
       if (obj.position) { meta.x = obj.position.x; meta.y = obj.position.y||0; meta.z = obj.position.z; }
       if (obj.rotation) meta.rotY = obj.rotation.y||0;
-      if (obj.interactable !== undefined) meta.interactable = obj.interactable;
       out += `:: ${obj.name}-object ${JSON.stringify(meta)}\n`;
       out += obj.description ? obj.description + '\n' : '';
       out += '\n';
@@ -691,23 +704,82 @@ function loadLocal(){ return window.lcStore.loadLocal(); }
 
 window.addEventListener('load', async () => {
   loadLocal();
-  // Auto-load story from story/main.twee if no data in localStorage
   if (rooms.length === 0 && characters.length === 0 && objects.length === 0) {
     try {
       const res = await fetch('./story/main.twee');
-      if (res.ok) {
-        const src = await res.text();
-        importTweeSource(src, true);
-      }
+      if (res.ok) { const src = await res.text(); importTweeSource(src, true); }
     } catch (_) {}
   }
   initMap();
   updateCompass();
 });
 
-// ── Objects ──────────────────────────────────────────────────────────────
+// ── Shared progress bar helper ───────────────────────────────────────────────
+function setFbxProgress(barId, wrapId, pct) {
+  const wrap = document.getElementById(wrapId);
+  const bar  = document.getElementById(barId);
+  if (!wrap || !bar) return;
+  if (pct === null) { wrap.style.display = 'none'; bar.style.width = '0%'; return; }
+  wrap.style.display = 'block';
+  bar.style.width = Math.round(pct * 100) + '%';
+}
+
+// ── Character model upload (GLB passthrough OR FBX → GLB conversion) ─────────
+async function uploadCharacterGlb() {
+  const input  = document.getElementById('cf-glb-input');
+  const file   = input.files && input.files[0];
+  if (!file) return;
+
+  // Wait for modules to be ready (they load async)
+  if (!window.handleModelUpload) {
+    document.getElementById('cf-glb-status').textContent = '⏳ Still loading — try again in a moment.';
+    return;
+  }
+
+  const isFbx = file.name.toLowerCase().endsWith('.fbx');
+  if (isFbx) {
+    // Show progress bar for FBX conversion
+    setFbxProgress('cf-fbx-progress-bar', 'cf-fbx-progress', 0);
+    const origUpload = window.handleModelUpload;
+    const dataUrl = await window.handleModelUpload(file, 'cf-glb-status', 'cf-glb-url', 'tempGlbData', pct => {
+      setFbxProgress('cf-fbx-progress-bar', 'cf-fbx-progress', pct);
+    });
+    setFbxProgress('cf-fbx-progress-bar', 'cf-fbx-progress', null);
+    if (dataUrl) tempGlbData = dataUrl;
+  } else {
+    const dataUrl = await window.handleModelUpload(file, 'cf-glb-status', 'cf-glb-url', 'tempGlbData');
+    if (dataUrl) tempGlbData = dataUrl;
+  }
+}
+
+// ── Object model upload ───────────────────────────────────────────────────────
+async function uploadObjectGlb() {
+  const input = document.getElementById('of-glb-input');
+  const file  = input.files && input.files[0];
+  if (!file) return;
+
+  if (!window.handleModelUpload) {
+    document.getElementById('of-glb-status').textContent = '⏳ Still loading — try again in a moment.';
+    return;
+  }
+
+  const isFbx = file.name.toLowerCase().endsWith('.fbx');
+  if (isFbx) {
+    setFbxProgress('of-fbx-progress-bar', 'of-fbx-progress', 0);
+    const dataUrl = await window.handleModelUpload(file, 'of-glb-status', 'of-glb', 'tempObjectGlbData', pct => {
+      setFbxProgress('of-fbx-progress-bar', 'of-fbx-progress', pct);
+    });
+    setFbxProgress('of-fbx-progress-bar', 'of-fbx-progress', null);
+    if (dataUrl) tempObjectGlbData = dataUrl;
+  } else {
+    const dataUrl = await window.handleModelUpload(file, 'of-glb-status', 'of-glb', 'tempObjectGlbData');
+    if (dataUrl) tempObjectGlbData = dataUrl;
+  }
+}
+
+// ── Object CRUD ───────────────────────────────────────────────────────────────
 function editActiveRoom() {
-  if(!activeRoomId) return;
+  if (!activeRoomId) return;
   openRoomModal(activeRoomId);
 }
 
@@ -715,36 +787,30 @@ function openObjModal(objId) {
   editingObjId = objId;
   tempObjectGlbData = null;
   const overlay = document.getElementById('obj-modal-overlay');
-  if(objId) {
-    const obj = objects.find(o=>o.id===objId);
+  if (objId) {
+    const obj = objects.find(o => o.id === objId);
     document.getElementById('obj-modal-title').textContent = 'Edit Object';
-    document.getElementById('of-name').value = obj.name;
-    document.getElementById('of-desc').value = obj.desc || '';
-    document.getElementById('of-glb').value = obj.glbUrl || '';
-    document.getElementById('of-px').value = obj.px || 0;
-    document.getElementById('of-pz').value = obj.pz || 0;
+    document.getElementById('of-name').value  = obj.name;
+    document.getElementById('of-desc').value  = obj.desc || '';
+    document.getElementById('of-glb').value   = (!obj.glbUrl || obj.glbUrl.startsWith('data:')) ? '' : obj.glbUrl;
+    document.getElementById('of-px').value    = obj.px || 0;
+    document.getElementById('of-pz').value    = obj.pz || 0;
     document.getElementById('of-scale').value = obj.scale || 1;
     document.getElementById('of-delete').style.display = 'block';
-    const glbStatus = document.getElementById('of-glb-status');
-    if (obj.glbUrl && obj.glbUrl.startsWith('data:')) {
-      tempObjectGlbData = obj.glbUrl;
-      glbStatus.textContent = '✓ Your 3D model is ready to save.';
-    } else if (obj.glbUrl) {
-      glbStatus.textContent = '✓ Using a web link for this object.';
-    } else {
-      glbStatus.textContent = '';
-    }
+    const st = document.getElementById('of-glb-status');
+    if (obj.glbUrl?.startsWith('data:')) { tempObjectGlbData = obj.glbUrl; st.textContent = '✓ 3D model ready.'; }
+    else if (obj.glbUrl)                 { st.textContent = '✓ Using URL: ' + obj.glbUrl.split('/').pop(); }
+    else                                 { st.textContent = ''; }
   } else {
     document.getElementById('obj-modal-title').textContent = 'Add Object';
-    document.getElementById('of-name').value = '';
-    document.getElementById('of-desc').value = '';
-    document.getElementById('of-glb').value = '';
+    ['of-name','of-desc','of-glb'].forEach(id => document.getElementById(id).value = '');
     document.getElementById('of-px').value = '0';
     document.getElementById('of-pz').value = '0';
     document.getElementById('of-scale').value = '1';
     document.getElementById('of-delete').style.display = 'none';
     document.getElementById('of-glb-status').textContent = '';
   }
+  setFbxProgress('of-fbx-progress-bar','of-fbx-progress', null);
   overlay.classList.add('open');
 }
 
@@ -753,73 +819,40 @@ function closeObjModal() {
   editingObjId = null;
   tempObjectGlbData = null;
   document.getElementById('of-glb-status').textContent = '';
+  setFbxProgress('of-fbx-progress-bar','of-fbx-progress', null);
 }
 
 function saveObject() {
   const name = document.getElementById('of-name').value.trim();
-  if(!name) return alert('Needs a name');
-  if(!activeRoomId) return alert('Open a room first to add an object.');
-
+  if (!name) return alert('Needs a name');
+  if (!activeRoomId) return alert('Open a room first to add an object.');
   const glbUrl = tempObjectGlbData || document.getElementById('of-glb').value.trim();
+  const existing = editingObjId ? objects.find(o => o.id === editingObjId) : null;
   const obj = {
     id: editingObjId || ('obj_' + Date.now() + Math.random().toString(36).substr(2,5)),
     roomId: activeRoomId,
-    name: name,
-    desc: document.getElementById('of-desc').value.trim(),
-    glbUrl: glbUrl,
-    px: parseFloat(document.getElementById('of-px').value)||0,
-    pz: parseFloat(document.getElementById('of-pz').value)||0,
-    scale: parseFloat(document.getElementById('of-scale').value)||1
+    name,
+    desc:  document.getElementById('of-desc').value.trim(),
+    glbUrl,
+    px:    parseFloat(document.getElementById('of-px').value) || 0,
+    pz:    parseFloat(document.getElementById('of-pz').value) || 0,
+    scale: parseFloat(document.getElementById('of-scale').value) || 1,
+    position: existing?.position || null,
+    rotation: existing?.rotation || null
   };
-
-  if(editingObjId) {
-    objects = objects.map(o => o.id===editingObjId ? obj : o);
-  } else {
-    objects.push(obj);
-  }
-
-  save();
-  closeObjModal();
-  renderMapPins();
-  const room = rooms.find(r=>r.id===activeRoomId);
-  if(room) buildRoomScene(room);
+  if (editingObjId) objects = objects.map(o => o.id === editingObjId ? obj : o);
+  else objects.push(obj);
+  save(); closeObjModal(); renderMapPins();
+  const room = rooms.find(r => r.id === activeRoomId);
+  if (room) buildRoomScene(room);
 }
 
 function deleteObject() {
-  if(!editingObjId || !confirm('Remove object?')) return;
-  objects = objects.filter(o=>o.id !== editingObjId);
-  save();
-  closeObjModal();
-  renderMapPins();
-  const room = rooms.find(r=>r.id===activeRoomId);
-  if(room) buildRoomScene(room);
-}
-
-function uploadObjectGlb() {
-  const input = document.getElementById('of-glb-input');
-  const status = document.getElementById('of-glb-status');
-  const urlField = document.getElementById('of-glb');
-  const file = input.files && input.files[0];
-  if (!file) return;
-  const name = file.name.toLowerCase();
-  if (!name.endsWith('.glb')) {
-    status.textContent = 'That file does not look like a .glb model. Please try another one.';
-    status.style.color = '#ff8a80';
-    return;
-  }
-  const reader = new FileReader();
-  reader.onload = e => {
-    tempObjectGlbData = e.target.result;
-    urlField.value = '';
-    status.textContent = `✓ "${file.name}" is ready to use!`;
-    status.style.color = 'var(--accent2)';
-  };
-  reader.onerror = () => {
-    tempObjectGlbData = null;
-    status.textContent = 'That file could not be read. Please try again.';
-    status.style.color = '#ff8a80';
-  };
-  reader.readAsDataURL(file);
+  if (!editingObjId || !confirm('Remove object?')) return;
+  objects = objects.filter(o => o.id !== editingObjId);
+  save(); closeObjModal(); renderMapPins();
+  const room = rooms.find(r => r.id === activeRoomId);
+  if (room) buildRoomScene(room);
 }
 </script>
 
