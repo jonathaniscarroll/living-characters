@@ -1,3 +1,8 @@
+// map.js — Leaflet map, GPS, proximity, compass, sim
+
+// Track which rooms the player is currently inside, to detect enter/exit edges
+let _insideRoomIds = new Set();
+
 function initMap() {
   map = L.map('map', { zoomControl: true }).setView([44.65, -63.59], 16);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -80,6 +85,7 @@ function startSim() {
   if (simActive) {
     clearInterval(simInterval);
     simActive = false;
+    _insideRoomIds.clear();
     document.getElementById('gps-status').textContent = 'Sim: stopped';
     return;
   }
@@ -97,14 +103,43 @@ function startSim() {
     idx++;
   };
   step();
-  simInterval = setInterval(step, 3000);
+  simInterval = setInterval(step, 4000);
 }
 
 function checkProximity() {
-  if (userLat === null) return;
+  if (userLat === null || facilitatorMode) return;
+
+  const nowInside = new Set();
   rooms.forEach(room => {
-    if (haversine(userLat, userLng, room.lat, room.lng) < (room.radius || 30) && !facilitatorMode) window.openRoom(room.id);
+    const dist = haversine(userLat, userLng, room.lat, room.lng);
+    if (dist < (room.radius || 30)) nowInside.add(room.id);
   });
+
+  // Entered rooms (were outside, now inside)
+  nowInside.forEach(roomId => {
+    if (!_insideRoomIds.has(roomId)) {
+      const room = rooms.find(r => r.id === roomId);
+      showToast('📍 Entering ' + (room ? room.name : 'room') + '…');
+      // Only open if no room is currently open, or this is a different room
+      if (activeRoomId !== roomId) {
+        window.openRoom(roomId);
+      }
+    }
+  });
+
+  // Exited rooms (were inside, now outside)
+  _insideRoomIds.forEach(roomId => {
+    if (!nowInside.has(roomId)) {
+      const room = rooms.find(r => r.id === roomId);
+      showToast('🚶 Left ' + (room ? room.name : 'room'));
+      // Close room view if the player left the active room
+      if (activeRoomId === roomId) {
+        window.closeRoom();
+      }
+    }
+  });
+
+  _insideRoomIds = nowInside;
 }
 
 function haversine(lat1, lng1, lat2, lng2) {
@@ -130,6 +165,8 @@ function updateCompass() {
 
 function toggleMode() {
   facilitatorMode = !facilitatorMode;
+  // Reset inside-tracking when switching modes so enter events fire cleanly
+  _insideRoomIds.clear();
   document.getElementById('mode-label').textContent = facilitatorMode ? 'Facilitator' : 'Visitor';
   document.querySelector('.hbtn.toggle-mode').textContent = facilitatorMode ? 'Projector' : 'Facilitator';
 }
