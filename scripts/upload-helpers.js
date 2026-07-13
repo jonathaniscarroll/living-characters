@@ -1,24 +1,30 @@
 /**
  * upload-helpers.js
  * -----------------
- * Shared file-upload helpers used by both character and object modals.
- * Handles .glb (passthrough) and .fbx (converts via fbx-to-glb.js).
- *
- * Exports:
- *   handleModelUpload(file, statusElId, urlFieldId, dataKey)
- *     - file        : File object from <input type=file>
- *     - statusElId  : id of status <div> to update with progress/errors
- *     - urlFieldId  : id of <input> to write data URL into (optional)
- *     - dataKey     : window global key to store data URL on (e.g. 'tempGlbData')
- *     returns Promise<string|null> — the data URL, or null on failure
+ * Shared file-upload helpers. Handles .glb (passthrough) and .fbx
+ * (lazy-imports fbx-to-glb.js on demand so timing is never an issue).
  */
 
-export async function handleModelUpload(file, statusElId, urlFieldId, dataKey) {
+// Lazy singleton — resolved the first time an FBX is uploaded
+let _fbxModule = null;
+async function getFbxConverter() {
+  if (_fbxModule) return _fbxModule;
+  // Dynamic import works regardless of when this module itself was loaded
+  _fbxModule = await import('./fbx-to-glb.js');
+  // Also expose on window for any direct callers
+  window.lcFbx = _fbxModule;
+  return _fbxModule;
+}
+
+export async function handleModelUpload(file, statusElId, urlFieldId, dataKey, onProgress) {
   const statusEl = document.getElementById(statusElId);
   const urlEl    = urlFieldId ? document.getElementById(urlFieldId) : null;
 
   function setStatus(msg, colour) {
-    if (statusEl) { statusEl.textContent = msg; if (colour) statusEl.style.color = colour; }
+    if (statusEl) {
+      statusEl.textContent = msg;
+      if (colour) statusEl.style.color = colour;
+    }
   }
   function storeResult(dataUrl) {
     if (dataKey) window[dataKey] = dataUrl;
@@ -29,35 +35,45 @@ export async function handleModelUpload(file, statusElId, urlFieldId, dataKey) {
   if (!file) return null;
   const name = file.name.toLowerCase();
 
-  // ── GLB / GLTF: passthrough ──
+  // ── GLB / GLTF: FileReader passthrough ──
   if (name.endsWith('.glb') || name.endsWith('.gltf')) {
-    setStatus('⌛ Reading…', 'var(--accent2)');
+    setStatus('\u231b Reading\u2026', 'var(--accent2)');
     return new Promise(resolve => {
       const reader = new FileReader();
       reader.onload = e => {
-        setStatus(`✓ "${file.name}" ready!`, 'var(--accent2)');
+        setStatus(`\u2713 "${file.name}" ready!`, 'var(--accent2)');
+        if (onProgress) onProgress(1);
         resolve(storeResult(e.target.result));
       };
       reader.onerror = () => {
-        setStatus('Could not read file — please try again.', '#ff8a80');
+        setStatus('Could not read file \u2014 please try again.', '#ff8a80');
         resolve(null);
       };
       reader.readAsDataURL(file);
     });
   }
 
-  // ── FBX: convert via lcFbx ──
+  // ── FBX: lazy-load converter then convert ──
   if (name.endsWith('.fbx')) {
-    if (!window.lcFbx) {
-      setStatus('FBX converter not loaded yet — try again in a moment.', '#ff8a80');
+    setStatus('\u23f3 Loading FBX converter\u2026', 'var(--accent2)');
+    let mod;
+    try {
+      mod = await getFbxConverter();
+    } catch (err) {
+      setStatus('Could not load FBX converter: ' + err.message, '#ff8a80');
       return null;
     }
-    setStatus('⏳ Converting FBX… (0%)', 'var(--accent2)');
+
+    setStatus('\u23f3 Converting FBX\u2026 (0%)', 'var(--accent2)');
     try {
-      const dataUrl = await window.lcFbx.convertFbxFileToGlbDataUrl(file, {
-        onProgress: pct => setStatus(`⏳ Converting FBX… (${Math.round(pct * 100)}%)`, 'var(--accent2)')
+      const dataUrl = await mod.convertFbxFileToGlbDataUrl(file, {
+        onProgress: pct => {
+          setStatus(`\u23f3 Converting FBX\u2026 (${Math.round(pct * 100)}%)`, 'var(--accent2)');
+          if (onProgress) onProgress(pct);
+        }
       });
-      setStatus(`✓ FBX converted — "${file.name}" ready!`, 'var(--accent2)');
+      setStatus(`\u2713 FBX converted \u2014 "${file.name}" ready!`, 'var(--accent2)');
+      if (onProgress) onProgress(1);
       return storeResult(dataUrl);
     } catch (err) {
       setStatus('FBX conversion failed: ' + err.message, '#ff8a80');
@@ -65,9 +81,10 @@ export async function handleModelUpload(file, statusElId, urlFieldId, dataKey) {
     }
   }
 
-  setStatus('Unsupported format. Please use .glb, .gltf, or .fbx', '#ff8a80');
+  setStatus('Unsupported format. Use .glb, .gltf, or .fbx', '#ff8a80');
   return null;
 }
 
+// Expose for inline onclick handlers in index.html
 window.handleModelUpload = handleModelUpload;
 export default handleModelUpload;
