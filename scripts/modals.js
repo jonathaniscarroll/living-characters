@@ -21,6 +21,21 @@ function getSelectedRoomIds() {
   return Array.from(document.querySelectorAll('#cf-room-chips .room-chip.active')).map(c => c.dataset.roomId);
 }
 
+// Camera presets — (X, Y, Z) positions that all lookAt(0,0,0)
+const CAM_PRESETS = [
+  { label: '🎲 Isometric', x: 9,  y: 9,  z: 9  },
+  { label: '👁 Front',     x: 0,  y: 4,  z: 14 },
+  { label: '↔ Side',      x: 14, y: 4,  z: 0  },
+  { label: '⬆ Top',       x: 0,  y: 18, z: 0.01 },
+  { label: '🎬 Low',      x: 6,  y: 2,  z: 10 },
+];
+
+function setCamPreset(x, y, z) {
+  document.getElementById('rf-cam-x').value = x;
+  document.getElementById('rf-cam-y').value = y;
+  document.getElementById('rf-cam-z').value = z;
+}
+
 function openRoomModal(roomId) {
   editingRoomId = roomId;
   tempBackdropData = null;
@@ -32,6 +47,10 @@ function openRoomModal(roomId) {
   document.getElementById('rf-lng').value = room ? room.lng : '';
   document.getElementById('rf-radius').value = room ? room.radius : '30';
   document.getElementById('rf-backdrop').value = room ? room.backdrop : 'forest';
+  // Camera position
+  document.getElementById('rf-cam-x').value = room?.cameraX ?? 9;
+  document.getElementById('rf-cam-y').value = room?.cameraY ?? 9;
+  document.getElementById('rf-cam-z').value = room?.cameraZ ?? 9;
   const bp = document.getElementById('rf-backdrop-preview');
   const existingPreview = (room && room.backdropData) ? room.backdropData : ((room && room.backdropUrl) ? room.backdropUrl : null);
   if (existingPreview) {
@@ -64,8 +83,17 @@ function saveRoom() {
   const backdrop = document.getElementById('rf-backdrop').value;
   const backdropData = tempBackdropData || undefined;
   const backdropUrl = typeof tempBackdropUrl !== 'undefined' ? tempBackdropUrl : undefined;
+  const cameraX = parseFloat(document.getElementById('rf-cam-x').value);
+  const cameraY = parseFloat(document.getElementById('rf-cam-y').value);
+  const cameraZ = parseFloat(document.getElementById('rf-cam-z').value);
   if (!name || Number.isNaN(lat) || Number.isNaN(lng)) return alert('Needs a name and coordinates.');
-  const data = { id: editingRoomId || ('room_' + Date.now()), name, lede, lat, lng, radius, backdrop };
+  const data = {
+    id: editingRoomId || ('room_' + Date.now()),
+    name, lede, lat, lng, radius, backdrop,
+    cameraX: Number.isNaN(cameraX) ? 9 : cameraX,
+    cameraY: Number.isNaN(cameraY) ? 9 : cameraY,
+    cameraZ: Number.isNaN(cameraZ) ? 9 : cameraZ,
+  };
   if (backdropData) data.backdropData = backdropData;
   if (backdropUrl) data.backdropUrl = backdropUrl;
   if (editingRoomId) {
@@ -79,9 +107,14 @@ function saveRoom() {
   renderMapPins();
   updateCompass();
   save();
+  // If this room is currently open, rebuild the scene with new camera
+  if (activeRoomId === data.id) {
+    const room = rooms.find(r => r.id === data.id);
+    if (room) buildRoomScene(room);
+  }
 }
 
-// ── Room picker map ──────────────────────────────────────────────────────────
+// ── Room picker map ────────────────────────────────────────────────────
 let roomPickerMap = null;
 let roomPickerMarker = null;
 function initRoomPickerMap() {
@@ -168,7 +201,6 @@ function openCharModal(charId) {
   } else {
     glbStatus.textContent = '';
   }
-  // Reset FBX progress bar
   const wrap = document.getElementById('cf-fbx-progress');
   const bar  = document.getElementById('cf-fbx-progress-bar');
   if (wrap) wrap.style.display = 'none';
@@ -292,6 +324,8 @@ function saveCharacter() {
 window.lcModals = {
   buildRoomChipPicker,
   getSelectedRoomIds,
+  CAM_PRESETS,
+  setCamPreset,
   openRoomModal,
   closeRoomModal,
   saveRoom,
@@ -307,6 +341,8 @@ window.lcModals = {
 export {
   buildRoomChipPicker,
   getSelectedRoomIds,
+  CAM_PRESETS,
+  setCamPreset,
   openRoomModal,
   closeRoomModal,
   saveRoom,

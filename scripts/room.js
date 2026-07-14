@@ -15,17 +15,11 @@ function hideObjInspect() {
 
 // ─────────────────────────────────────────────────────────────
 // GLTFLoader wrapper that handles data: URLs reliably
-// GLTFLoader.load() can fail on non-standard MIME types like
-// data:model/gltf-binary (produced by FBX conversion).
-// This helper decodes the base64 to an ArrayBuffer and calls
-// loader.parse() directly, which always works.
 // ─────────────────────────────────────────────────────────────
 function loadGlbUrl(url, onLoad, onError) {
   if (!window.GLTFLoader) { if (onError) onError(new Error('GLTFLoader not ready')); return; }
   const loader = new window.GLTFLoader();
-
   if (url.startsWith('data:')) {
-    // Strip the data URL header and decode base64 → ArrayBuffer
     try {
       const base64 = url.split(',')[1];
       const binary = atob(base64);
@@ -33,9 +27,7 @@ function loadGlbUrl(url, onLoad, onError) {
       const view = new Uint8Array(buf);
       for (let i = 0; i < binary.length; i++) view[i] = binary.charCodeAt(i);
       loader.parse(buf, '', onLoad, onError);
-    } catch (e) {
-      if (onError) onError(e);
-    }
+    } catch (e) { if (onError) onError(e); }
   } else {
     loader.load(url, onLoad, undefined, onError);
   }
@@ -370,8 +362,13 @@ function buildRoomScene(room) {
     -viewSize * aspect / 2, viewSize * aspect / 2,
      viewSize / 2, -viewSize / 2, 1, 1000
   );
-  camera.position.set(9, 9, 9);
-  camera.lookAt(0, 1, 0);
+
+  // Per-room camera position — always looks at origin (0,0,0)
+  const camX = room.cameraX ?? 9;
+  const camY = room.cameraY ?? 9;
+  const camZ = room.cameraZ ?? 9;
+  camera.position.set(camX, camY, camZ);
+  camera.lookAt(0, 0, 0);
 
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.setClearColor(0x000000, 0);
@@ -508,10 +505,8 @@ function buildRoomScene(room) {
         const size = new THREE.Vector3(); box.getSize(size);
         const scale = 2 / Math.max(size.x, size.y, size.z);
         model.scale.setScalar(scale);
-
         const box2 = new THREE.Box3().setFromObject(model);
         const floorOffset = -box2.min.y;
-
         model.position.set(cx, floorOffset, cz);
         model.rotation.y = Math.PI;
         model.castShadow = true;
@@ -519,11 +514,9 @@ function buildRoomScene(room) {
         scene.add(model);
         model.traverse(c => { if (c.isMesh) c._charId = ch.id; });
         charObjects.push({ obj: model, chId: ch.id, cx, cz });
-
         const mixer = new THREE.AnimationMixer(model);
         glbMixers.push(mixer);
         _initWanderAgent(ch.id, model, ring, cx, cz, mixer, gltf.animations);
-
         const box3 = new THREE.Box3().setFromObject(model);
         const lbl = document.createElement('div');
         lbl.className = 'char-label'; lbl.textContent = ch.name;
