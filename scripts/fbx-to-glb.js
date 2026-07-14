@@ -2,11 +2,11 @@
  * fbx-to-glb.js
  * -------------
  * Browser-side FBX → GLB conversion.
- * Preserves embedded FBX textures by drawing them onto a canvas so
- * GLTFExporter can serialise them without "No valid image data found".
  *
- * If a texture can't be drawn (e.g. cross-origin, corrupt), that mesh
- * falls back to a plain grey material — conversion never aborts.
+ * KEY FIX: FBXLoader resolves embedded textures asynchronously through its
+ * own internal LoadingManager. We inject our own manager and only run
+ * fixTexturesForExport + GLTFExporter inside manager.onLoad — guaranteeing
+ * every texture ImageBitmap is fully decoded before the exporter reads it.
  */
 
 import * as THREE from 'three';
@@ -18,16 +18,18 @@ export function isFbxFile(file) {
 }
 
 // ---------------------------------------------------------------------------
-// Convert any Three.js texture to a plain <canvas> the exporter can read
+// Convert any Three.js texture to a plain <canvas> the exporter can read.
+// GLTFExporter needs canvas.toDataURL() — it cannot handle ImageBitmap,
+// DataTexture raw buffers, or cross-origin images directly.
 // ---------------------------------------------------------------------------
 function textureToCanvas(texture) {
   try {
-    let src = texture.image;
+    const src = texture.image;
     if (!src) return null;
 
-    // DataTexture stores pixels in .data (Uint8Array) with .width/.height
-    if (src instanceof Uint8Array || src instanceof Uint8ClampedArray || ArrayBuffer.isView(src)) {
-      const w = texture.image.width  || (src.length / 4) ** 0.5 | 0;
+    // DataTexture: raw typed array with .width/.height on the texture
+    if (ArrayBuffer.isView(src) || src instanceof ArrayBuffer) {
+      const w = texture.image.width  || Math.sqrt((src.byteLength || src.length) / 4) | 0;
       const h = texture.image.height || w;
       if (!w || !h) return null;
       const canvas = document.createElement('canvas');
@@ -39,7 +41,7 @@ function textureToCanvas(texture) {
       return canvas;
     }
 
-    // ImageBitmap, HTMLImageElement, HTMLCanvasElement, ImageData…
+    // ImageBitmap, HTMLImageElement, HTMLCanvasElement, ImageData, VideoElement
     const w = src.width  || src.naturalWidth  || src.videoWidth  || 0;
     const h = src.height || src.naturalHeight || src.videoHeight || 0;
     if (!w || !h) return null;
@@ -47,7 +49,6 @@ function textureToCanvas(texture) {
     const canvas = document.createElement('canvas');
     canvas.width = w; canvas.height = h;
     const ctx = canvas.getContext('2d');
-
     if (src instanceof ImageData) {
       ctx.putImageData(src, 0, 0);
     } else {
@@ -60,43 +61,40 @@ function textureToCanvas(texture) {
 }
 
 // ---------------------------------------------------------------------------
-// Walk every mesh and make sure its textures have a canvas .image
-// so GLTFExporter can call canvas.toDataURL()
+// Walk every mesh and replace texture .image with a canvas so GLTFExporter
+// can call canvas.toDataURL(). Falls back to grey if a texture can't be read.
 // ---------------------------------------------------------------------------
 function fixTexturesForExport(group) {
-  const fallback = new THREE.MeshLambertMaterial({ color: 0xcccccc, side: THREE.DoubleSide });
+  const slots = ['map','normalMap','roughnessMap','metalnessMap',
+                 'emissiveMap','aoMap','alphaMap','lightMap'];
 
   group.traverse(child => {
     if (!child.isMesh) return;
 
     const mats = Array.isArray(child.material) ? child.material : [child.material];
-    const fixed = mats.map(mat => {
-      if (!mat) return fallback;
+    child.material = mats.map(mat => {
+      if (!mat) return new THREE.MeshLambertMaterial({ color: 0xcccccc, side: THREE.DoubleSide });
 
-      let ok = true;
-      // Check every texture slot that GLTFExporter cares about
-      const slots = ['map','normalMap','roughnessMap','metalnessMap',
-                     'emissiveMap','aoMap','alphaMap','lightMap'];
       slots.forEach(slot => {
         const tex = mat[slot];
         if (!tex) return;
         const canvas = textureToCanvas(tex);
         if (canvas) {
-          // Replace the image with the canvas — exporter calls canvas.toDataURL()
           tex.image = canvas;
           tex.needsUpdate = true;
         } else {
-          // Can't recover this texture slot — clear it
           mat[slot] = null;
         }
       });
 
-      // Ensure material is a type GLTFExporter handles well
-      if (!(mat instanceof THREE.MeshStandardMaterial) &&
-          !(mat instanceof THREE.MeshBasicMaterial) &&
-          !(mat instanceof THREE.MeshLambertMaterial)) {
-        // Phong etc. — promote to Standard, copy colour + main map
-        const std = new THREE.MeshStandardMaterial({
+      // Promote non-standard material types (e.g. MeshPhongMaterial) to
+      // MeshStandardMaterial which GLTFExporter handles reliably.
+      if (
+        !(mat instanceof THREE.MeshStandardMaterial) &&
+        !(mat instanceof THREE.MeshBasicMaterial) &&
+        !(mat instanceof THREE.MeshLambertMaterial)
+      ) {
+        return new THREE.MeshStandardMaterial({
           color:       mat.color       || new THREE.Color(0xcccccc),
           map:         mat.map         || null,
           normalMap:   mat.normalMap   || null,
@@ -106,44 +104,68 @@ function fixTexturesForExport(group) {
           transparent: mat.transparent || false,
           opacity:     mat.opacity     !== undefined ? mat.opacity : 1,
         });
-        return std;
       }
       return mat;
     });
-
-    child.material = Array.isArray(child.material) ? fixed : fixed[0];
+    // Unwrap single-element array
+    if (!Array.isArray(child.material) && Array.isArray(mats) && mats.length === 1) {
+      child.material = child.material[0] ?? child.material;
+    }
   });
 }
 
 // ---------------------------------------------------------------------------
-// Main export function
+// Main export — FBXLoader gets a LoadingManager so we can wait for ALL
+// async texture loads (embedded blobs) before exporting.
 // ---------------------------------------------------------------------------
 export async function convertFbxFileToGlbDataUrl(file, opts = {}) {
   const { animations = true, onProgress } = opts;
-
   if (onProgress) onProgress(0.05);
 
   const objectUrl = URL.createObjectURL(file);
+
   let group;
   try {
     group = await new Promise((resolve, reject) => {
-      new FBXLoader().load(
+      // Create a LoadingManager so we know when every embedded texture
+      // has finished loading — not just when the FBX parse is done.
+      const manager = new THREE.LoadingManager();
+
+      // onLoad fires after ALL items tracked by this manager finish.
+      // We resolve here, not in FBXLoader's onLoad, so textures are ready.
+      manager.onLoad = () => resolve(group_ref);
+      manager.onError = url => reject(new Error('LoadingManager error: ' + url));
+
+      // Temporary ref so onLoad closure can access it
+      let group_ref = null;
+
+      new FBXLoader(manager).load(
         objectUrl,
-        obj  => resolve(obj),
-        xhr  => { if (onProgress && xhr.total) onProgress(0.05 + 0.55 * xhr.loaded / xhr.total); },
-        err  => reject(new Error('FBXLoader: ' + (err?.message || String(err))))
+        obj => {
+          group_ref = obj;
+          // manager.onLoad will fire once all pending texture blobs resolve.
+          // If there are no textures the manager fires onLoad immediately after.
+        },
+        xhr => {
+          if (onProgress && xhr.total)
+            onProgress(0.05 + 0.45 * xhr.loaded / xhr.total);
+        },
+        err => reject(new Error('FBXLoader: ' + (err?.message || String(err))))
       );
     });
   } finally {
     URL.revokeObjectURL(objectUrl);
   }
-  if (onProgress) onProgress(0.65);
 
-  // Bake textures onto canvases so the exporter can read them
+  if (onProgress) onProgress(0.55);
+
+  // NOW all textures are fully decoded — safe to bake to canvases
   fixTexturesForExport(group);
 
+  if (onProgress) onProgress(0.65);
+
   // Auto-scale to unit height
-  const box = new THREE.Box3().setFromObject(group);
+  const box  = new THREE.Box3().setFromObject(group);
   const size = new THREE.Vector3();
   box.getSize(size);
   const maxDim = Math.max(size.x, size.y, size.z);
@@ -164,15 +186,16 @@ export async function convertFbxFileToGlbDataUrl(file, opts = {}) {
       { binary: true, animations: clips, includeCustomExtensions: false }
     );
   });
+
   if (onProgress) onProgress(0.92);
 
-  // ArrayBuffer → base-64 data URL
+  // ArrayBuffer → base-64 data URL (chunked to avoid stack overflow on large files)
   const uint8 = new Uint8Array(glbArrayBuffer);
   let binary = '';
   for (let i = 0; i < uint8.length; i += 8192)
     binary += String.fromCharCode(...uint8.subarray(i, i + 8192));
-  if (onProgress) onProgress(1);
 
+  if (onProgress) onProgress(1);
   return `data:model/gltf-binary;base64,${btoa(binary)}`;
 }
 
