@@ -81,7 +81,7 @@ function saveRoom() {
   save();
 }
 
-// ── Phase 2: Room picker map (Leaflet mini-map in room modal) ─────────────
+// ── Room picker map ──────────────────────────────────────────────────────────
 let roomPickerMap = null;
 let roomPickerMarker = null;
 function initRoomPickerMap() {
@@ -150,7 +150,7 @@ function openCharModal(charId) {
   document.getElementById('char-modal-title').textContent = ch ? 'Edit Character' : 'Add a Character';
   document.getElementById('cf-name').value = ch ? ch.name : '';
   document.getElementById('cf-items').value = ch ? (ch.items || []).join(', ') : '';
-  document.getElementById('cf-glb-url').value = ch ? (ch.glbUrl || '') : '';
+  document.getElementById('cf-glb-url').value = ch ? (ch.glbUrl && !ch.glbUrl.startsWith('data:') ? ch.glbUrl : '') : '';
   const currentIds = ch ? (ch.roomIds || (ch.roomId ? [ch.roomId] : [])) : [];
   buildRoomChipPicker(currentIds);
   const pp = document.getElementById('cf-photo-preview');
@@ -198,7 +198,6 @@ function openCharModal(charId) {
       </div>`;
     db.appendChild(row);
   });
-  // Highlight room chips section if no rooms available (new character)
   const hint = document.getElementById('cf-room-chips-hint');
   if (hint && !rooms.length) {
     hint.style.display = '';
@@ -221,31 +220,54 @@ function closeCharModal() {
   document.getElementById('cf-glb-status').textContent = '';
 }
 
-function uploadCharacterGlb() {
+// ── Character model upload: supports .glb, .gltf, .fbx via handleModelUpload ──
+async function uploadCharacterGlb() {
   const input = document.getElementById('cf-glb-input');
-  const status = document.getElementById('cf-glb-status');
-  const urlField = document.getElementById('cf-glb-url');
   const file = input.files && input.files[0];
   if (!file) return;
+
+  // Update the accept attribute label dynamically based on file picked
   const name = file.name.toLowerCase();
-  if (!name.endsWith('.glb')) {
-    status.textContent = 'That file does not look like a .glb model. Please try another one.';
+  if (!name.endsWith('.glb') && !name.endsWith('.gltf') && !name.endsWith('.fbx')) {
+    const status = document.getElementById('cf-glb-status');
+    status.textContent = 'Unsupported format. Use .glb, .gltf, or .fbx';
     status.style.color = '#ff8a80';
     return;
   }
-  const reader = new FileReader();
-  reader.onload = e => {
-    tempGlbData = e.target.result;
-    urlField.value = '';
-    status.textContent = `\u2713 "${file.name}" is ready to use!`;
-    status.style.color = 'var(--accent2)';
-  };
-  reader.onerror = () => {
-    tempGlbData = null;
-    status.textContent = 'That file could not be read. Please try again.';
-    status.style.color = '#ff8a80';
-  };
-  reader.readAsDataURL(file);
+
+  // handleModelUpload is exported by upload-helpers.js and available on window
+  const dataUrl = await window.handleModelUpload(
+    file,
+    'cf-glb-status',   // status element id
+    'cf-glb-url',      // url field to clear on upload
+    null,              // no window key — we capture the return value instead
+    null
+  );
+  if (dataUrl) tempGlbData = dataUrl;
+}
+
+// ── Object model upload: supports .glb, .gltf, .fbx via handleModelUpload ──
+async function uploadObjectGlb() {
+  const input = document.getElementById('of-glb-input');
+  if (!input) return;
+  const file = input.files && input.files[0];
+  if (!file) return;
+
+  const name = file.name.toLowerCase();
+  if (!name.endsWith('.glb') && !name.endsWith('.gltf') && !name.endsWith('.fbx')) {
+    const status = document.getElementById('of-glb-status');
+    if (status) { status.textContent = 'Unsupported format. Use .glb, .gltf, or .fbx'; status.style.color = '#ff8a80'; }
+    return;
+  }
+
+  const dataUrl = await window.handleModelUpload(
+    file,
+    'of-glb-status',
+    'of-glb',
+    null,
+    null
+  );
+  if (dataUrl) window._editingObjGlbData = dataUrl;
 }
 
 function previewFile(inputId, previewId, dataKey) {
@@ -267,10 +289,7 @@ function saveCharacter() {
   if (!name) { alert('Please give the character a name.'); return; }
 
   const roomIds = getSelectedRoomIds();
-
-  // Room is mandatory when creating a new character
   if (!editingCharId && !roomIds.length) {
-    // Visually highlight the room chips section
     const chips = document.getElementById('cf-room-chips');
     const hint = document.getElementById('cf-room-chips-hint');
     if (chips) {
@@ -324,6 +343,7 @@ window.lcModals = {
   togglePromptPill,
   previewFile,
   uploadCharacterGlb,
+  uploadObjectGlb,
   saveCharacter
 };
 
@@ -340,5 +360,6 @@ export {
   togglePromptPill,
   previewFile,
   uploadCharacterGlb,
+  uploadObjectGlb,
   saveCharacter
 };
