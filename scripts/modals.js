@@ -168,6 +168,11 @@ function openCharModal(charId) {
   } else {
     glbStatus.textContent = '';
   }
+  // Reset FBX progress bar
+  const wrap = document.getElementById('cf-fbx-progress');
+  const bar  = document.getElementById('cf-fbx-progress-bar');
+  if (wrap) wrap.style.display = 'none';
+  if (bar)  bar.style.width = '0%';
   const mp = document.getElementById('mood-picker');
   mp.innerHTML = '';
   MOODS.forEach(m => {
@@ -218,56 +223,10 @@ function closeCharModal() {
   tempAnimData = null;
   tempGlbData = null;
   document.getElementById('cf-glb-status').textContent = '';
-}
-
-// ── Character model upload: supports .glb, .gltf, .fbx via handleModelUpload ──
-async function uploadCharacterGlb() {
-  const input = document.getElementById('cf-glb-input');
-  const file = input.files && input.files[0];
-  if (!file) return;
-
-  // Update the accept attribute label dynamically based on file picked
-  const name = file.name.toLowerCase();
-  if (!name.endsWith('.glb') && !name.endsWith('.gltf') && !name.endsWith('.fbx')) {
-    const status = document.getElementById('cf-glb-status');
-    status.textContent = 'Unsupported format. Use .glb, .gltf, or .fbx';
-    status.style.color = '#ff8a80';
-    return;
-  }
-
-  // handleModelUpload is exported by upload-helpers.js and available on window
-  const dataUrl = await window.handleModelUpload(
-    file,
-    'cf-glb-status',   // status element id
-    'cf-glb-url',      // url field to clear on upload
-    null,              // no window key — we capture the return value instead
-    null
-  );
-  if (dataUrl) tempGlbData = dataUrl;
-}
-
-// ── Object model upload: supports .glb, .gltf, .fbx via handleModelUpload ──
-async function uploadObjectGlb() {
-  const input = document.getElementById('of-glb-input');
-  if (!input) return;
-  const file = input.files && input.files[0];
-  if (!file) return;
-
-  const name = file.name.toLowerCase();
-  if (!name.endsWith('.glb') && !name.endsWith('.gltf') && !name.endsWith('.fbx')) {
-    const status = document.getElementById('of-glb-status');
-    if (status) { status.textContent = 'Unsupported format. Use .glb, .gltf, or .fbx'; status.style.color = '#ff8a80'; }
-    return;
-  }
-
-  const dataUrl = await window.handleModelUpload(
-    file,
-    'of-glb-status',
-    'of-glb',
-    null,
-    null
-  );
-  if (dataUrl) window._editingObjGlbData = dataUrl;
+  const wrap = document.getElementById('cf-fbx-progress');
+  const bar  = document.getElementById('cf-fbx-progress-bar');
+  if (wrap) wrap.style.display = 'none';
+  if (bar)  bar.style.width = '0%';
 }
 
 function previewFile(inputId, previewId, dataKey) {
@@ -342,8 +301,6 @@ window.lcModals = {
   closeCharModal,
   togglePromptPill,
   previewFile,
-  uploadCharacterGlb,
-  uploadObjectGlb,
   saveCharacter
 };
 
@@ -359,7 +316,5 @@ export {
   closeCharModal,
   togglePromptPill,
   previewFile,
-  uploadCharacterGlb,
-  uploadObjectGlb,
   saveCharacter
 };
