@@ -341,15 +341,28 @@
         <option value="dark">🌑 Dark cave</option>
       </select>
     </div>
-    <div class="field"><label>Or upload a custom backdrop</label>
-      <div class="file-row">
-        <img id="rf-backdrop-preview" class="file-preview" src="" style="display:none" />
-        <label class="file-btn" for="rf-backdrop-input">📸 Upload backdrop image</label>
-        <input id="rf-backdrop-input" type="file" accept="image/*" style="display:none" onchange="uploadRoomBackdrop()" />
-      </div>
-      <div id="rf-backdrop-status" style="font-size:11px;color:var(--accent2);margin-top:5px"></div>
-    </div>
-    <div class="modal-actions">
+     <div class="field"><label>Or upload a custom backdrop</label>
+       <div class="file-row">
+         <img id="rf-backdrop-preview" class="file-preview" src="" style="display:none" />
+         <label class="file-btn" for="rf-backdrop-input">📸 Upload backdrop image</label>
+         <input id="rf-backdrop-input" type="file" accept="image/*" style="display:none" onchange="uploadRoomBackdrop()" />
+       </div>
+       <div id="rf-backdrop-status" style="font-size:11px;color:var(--accent2);margin-top:5px"></div>
+     </div>
+     <div class="modal-section-title">📷 Camera Position (X, Y, Z)</div>
+     <div class="field" style="display:flex;gap:6px">
+       <input id="rf-cam-x" type="number" step="0.5" placeholder="X" style="flex:1" value="9" />
+       <input id="rf-cam-y" type="number" step="0.5" placeholder="Y" style="flex:1" value="9" />
+       <input id="rf-cam-z" type="number" step="0.5" placeholder="Z" style="flex:1" value="9" />
+     </div>
+     <div class="field" style="display:flex;gap:4px;flex-wrap:wrap;margin-top:-4px">
+       <button type="button" class="file-btn" onclick="setCamPreset(9,9,9)" style="flex:1;min-width:90px;font-size:10px;padding:3px 6px">🎲 Iso</button>
+       <button type="button" class="file-btn" onclick="setCamPreset(0,4,14)" style="flex:1;min-width:90px;font-size:10px;padding:3px 6px">👁 Front</button>
+       <button type="button" class="file-btn" onclick="setCamPreset(14,4,0)" style="flex:1;min-width:90px;font-size:10px;padding:3px 6px">↔ Side</button>
+       <button type="button" class="file-btn" onclick="setCamPreset(0,18,0.01)" style="flex:1;min-width:90px;font-size:10px;padding:3px 6px">⬆ Top</button>
+       <button type="button" class="file-btn" onclick="setCamPreset(6,2,10)" style="flex:1;min-width:90px;font-size:10px;padding:3px 6px">🎬 Low</button>
+     </div>
+     <div class="modal-actions">
       <button class="mbtn cancel" onclick="closeRoomModal()">Cancel</button>
       <button class="mbtn save"   onclick="saveRoom()">Save Room</button>
     </div>
@@ -650,6 +663,7 @@ function uploadRoomBackdrop(){ return window.lcModals.uploadRoomBackdrop(); }
 function initRoomPickerMap(){ return window.lcModals.initRoomPickerMap(); }
 function buildRoomChipPicker(selectedIds) { return window.lcModals.buildRoomChipPicker(selectedIds); }
 function getSelectedRoomIds() { return window.lcModals.getSelectedRoomIds(); }
+function setCamPreset(x, y, z){ return window.lcModals.setCamPreset(x, y, z); }
 function openCharModal(charId){ return window.lcModals.openCharModal(charId); }
 function togglePromptPill(btn){ return window.lcModals.togglePromptPill(btn); }
 function closeCharModal(){ return window.lcModals.closeCharModal(); }
@@ -659,7 +673,11 @@ function saveCharacter(){ return window.lcModals.saveCharacter(); }
 function buildTweeSource(rooms, chars, objs) {
   let out = '';
   rooms.forEach(room => {
-    out += `:: ${room.name} {"id":"${room.id}","lat":${room.lat},"lng":${room.lng},"radius":${room.radius},"backdrop":"${room.backdrop}"}\n`;
+    const roomMeta = { id: room.id, lat: room.lat, lng: room.lng, radius: room.radius, backdrop: room.backdrop };
+    if (room.cameraX != null) roomMeta.cameraX = room.cameraX;
+    if (room.cameraY != null) roomMeta.cameraY = room.cameraY;
+    if (room.cameraZ != null) roomMeta.cameraZ = room.cameraZ;
+    out += `:: ${room.name} ${JSON.stringify(roomMeta)}\n`;
     out += room.lede ? room.lede + '\n' : '';
     out += '\n';
     (objs||[]).filter(o => o.roomId === room.id).forEach(obj => {

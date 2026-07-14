@@ -104,7 +104,11 @@ async function ghSave() {
 function buildTweeSource(roomsList, chars, objs) {
   let out = '';
   roomsList.forEach(room => {
-    out += `:: ${room.name} {"id":"${room.id}","lat":${room.lat},"lng":${room.lng},"radius":${room.radius},"backdrop":"${room.backdrop}"}\n`;
+    const roomMeta = { id: room.id, lat: room.lat, lng: room.lng, radius: room.radius, backdrop: room.backdrop };
+    if (room.cameraX != null) roomMeta.cameraX = room.cameraX;
+    if (room.cameraY != null) roomMeta.cameraY = room.cameraY;
+    if (room.cameraZ != null) roomMeta.cameraZ = room.cameraZ;
+    out += `:: ${room.name} ${JSON.stringify(roomMeta)}\n`;
     out += room.lede ? room.lede + '\n' : '';
     out += '\n';
     (objs || []).filter(o => o.roomId === room.id).forEach(obj => {
@@ -180,7 +184,18 @@ function importTweeSource(src, silent) {
       const body = bodyLines.join('\n').trim();
       if (meta.lat !== undefined) {
         const roomId = meta.id || ('room_' + passName.replace(/\s+/g, '_'));
-        newRooms.push({ id: roomId, name: passName, lede: body, lat: meta.lat, lng: meta.lng, radius: meta.radius || 30, backdrop: meta.backdrop || 'forest' });
+        newRooms.push({
+          id: roomId,
+          name: passName,
+          lede: body,
+          lat: meta.lat,
+          lng: meta.lng,
+          radius: meta.radius || 30,
+          backdrop: meta.backdrop || 'forest',
+          cameraX: meta.cameraX,
+          cameraY: meta.cameraY,
+          cameraZ: meta.cameraZ
+        });
       } else if (passName.endsWith('-object')) {
         const objName = passName.slice(0, -7).trim();
         newObjs.push({
