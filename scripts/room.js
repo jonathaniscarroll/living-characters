@@ -33,29 +33,41 @@ function loadGlbUrl(url, onLoad, onError) {
   }
 }
 
-function openRoom(roomId) {
-  const room = rooms.find(r => r.id === roomId);
-  if (!room) return;
-  activeRoomId = roomId;
-  document.getElementById('room-title').textContent = room.name;
-  document.getElementById('room-lede').textContent = room.lede || '';
+// ─────────────────────────────────────────────────────────────
+// Apply backdrop CSS to #room-stage consistently
+// Called both from openRoom and from buildRoomScene so the
+// background is always set before AND after the canvas lands.
+// ─────────────────────────────────────────────────────────────
+function applyRoomBackdrop(room) {
   const stage = document.getElementById('room-stage');
+  if (!stage) return;
   const backdropSrc = room.backdropData || room.backdropUrl || null;
   if (backdropSrc) {
     stage.style.backgroundImage = `url('${backdropSrc}')`;
     stage.style.backgroundSize = 'cover';
     stage.style.backgroundPosition = 'center';
+    stage.style.background = '';
   } else {
     const bgFile = BACKDROP_IMAGES[room.backdrop];
     if (bgFile) {
       stage.style.backgroundImage = `url('${MEDIA_URL}${bgFile}')`;
       stage.style.backgroundSize = 'cover';
       stage.style.backgroundPosition = 'center';
+      stage.style.background = '';
     } else {
       stage.style.backgroundImage = '';
       stage.style.background = FLOOR_COLORS[room.backdrop] || '#1a1a2e';
     }
   }
+}
+
+function openRoom(roomId) {
+  const room = rooms.find(r => r.id === roomId);
+  if (!room) return;
+  activeRoomId = roomId;
+  document.getElementById('room-title').textContent = room.name;
+  document.getElementById('room-lede').textContent = room.lede || '';
+  applyRoomBackdrop(room);
   document.getElementById('room-view').classList.add('open');
   if (!window.THREE || !window.GLTFLoader) { console.warn('3D viewer still loading.'); return; }
   setTimeout(() => buildRoomScene(room), 360);
@@ -350,6 +362,12 @@ function buildRoomScene(room) {
   destroyRoomScene();
   _wanderAgents = [];
 
+  // Re-apply backdrop CSS here too — destroyRoomScene clears it,
+  // and openRoom's 360 ms delay means the canvas lands after CSS
+  // was already applied, but a direct buildRoomScene call (e.g.
+  // after saving room edits) skips openRoom entirely.
+  applyRoomBackdrop(room);
+
   const stage = document.getElementById('room-stage');
   const W = stage.clientWidth  || window.innerWidth;
   const H = stage.clientHeight || (window.innerHeight - 86 - 44);
@@ -375,7 +393,10 @@ function buildRoomScene(room) {
   renderer.shadowMap.enabled = true;
   renderer.setSize(W, H);
   renderer.setPixelRatio(window.devicePixelRatio);
-  stage.appendChild(renderer.domElement);
+
+  // Insert canvas BEFORE any existing children so CSS background
+  // stays visible behind it (z-index stacking via DOM order).
+  stage.insertBefore(renderer.domElement, stage.firstChild);
 
   const hasBg = !!(room.backdropData || room.backdropUrl || BACKDROP_IMAGES[room.backdrop]);
   const floor = new THREE.Mesh(
@@ -729,14 +750,14 @@ function deleteObject() {
 }
 
 window.lcRoom = {
-  openRoom, closeRoom, buildRoomScene, destroyRoomScene,
+  openRoom, closeRoom, buildRoomScene, destroyRoomScene, applyRoomBackdrop,
   editActiveRoom, openObjModal, closeObjModal, saveObject, deleteObject,
   showObjInspect, hideObjInspect, enableRoomEdit, onRoomObjectClick,
   spawnTalkCloseUp, dismissTalkCloseUp
 };
 
 export {
-  openRoom, closeRoom, buildRoomScene, destroyRoomScene,
+  openRoom, closeRoom, buildRoomScene, destroyRoomScene, applyRoomBackdrop,
   editActiveRoom, openObjModal, closeObjModal, saveObject, deleteObject,
   showObjInspect, hideObjInspect, enableRoomEdit, onRoomObjectClick,
   spawnTalkCloseUp, dismissTalkCloseUp

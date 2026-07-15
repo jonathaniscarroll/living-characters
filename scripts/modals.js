@@ -310,6 +310,7 @@ function saveCharacter() {
     if (text) passages.push({ type: row.dataset.key, text });
   });
   const data = { name, roomId: primaryRoomId, roomIds, mood: moodLabel, items, passages, glbUrl, photoData: tempPhotoData, animData: tempAnimData };
+  const isNew = !editingCharId;
   if (editingCharId) {
     const ch = characters.find(c => c.id === editingCharId);
     if (ch) Object.assign(ch, data);
@@ -319,6 +320,17 @@ function saveCharacter() {
   closeCharModal();
   renderMapPins();
   save();
+
+  // Auto-commit to GitHub after every character save (new or edited)
+  const charLabel = isNew ? `Add character: ${name}` : `Update character: ${name}`;
+  const commitInput = document.getElementById('gh-commit-input');
+  const prevMsg = commitInput ? commitInput.value : '';
+  if (commitInput) commitInput.value = charLabel;
+  if (window.lcStore && typeof window.lcStore.ghSave === 'function') {
+    window.lcStore.ghSave().finally(() => {
+      if (commitInput) commitInput.value = prevMsg;
+    });
+  }
 }
 
 window.lcModals = {
