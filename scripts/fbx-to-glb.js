@@ -6,11 +6,14 @@
  * Strategy: give FBXLoader a custom LoadingManager so we can tell when
  * every embedded texture blob has fully decoded. We resolve only after
  * BOTH the FBX parse callback fires AND the manager signals all items done.
+ *
+ * NOTE: imports use explicit CDN URLs instead of bare 'three' specifiers
+ * because import-map availability varies across browser/serve contexts.
  */
 
-import * as THREE from 'three';
-import { FBXLoader }    from 'three/addons/loaders/FBXLoader.js';
-import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
+import * as THREE    from 'https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js';
+import { FBXLoader } from 'https://cdn.jsdelivr.net/npm/three@0.160.1/examples/jsm/loaders/FBXLoader.js';
+import { GLTFExporter } from 'https://cdn.jsdelivr.net/npm/three@0.160.1/examples/jsm/exporters/GLTFExporter.js';
 
 export function isFbxFile(file) {
   return !!file && file.name.toLowerCase().endsWith('.fbx');
