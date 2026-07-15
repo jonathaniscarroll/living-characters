@@ -34,31 +34,51 @@ function loadGlbUrl(url, onLoad, onError) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// Apply backdrop CSS to #room-stage consistently
-// Called both from openRoom and from buildRoomScene so the
-// background is always set before AND after the canvas lands.
+// Backdrop image map — keys must match the <option value="..."> 
+// entries in the room modal. Only list keys that have a real
+// file in media/. Everything else gets a solid floor colour.
+// Paths are relative to index.html (served from repo root).
+// ─────────────────────────────────────────────────────────────
+const ROOM_BACKDROP_FILES = {
+  grass:  './media/garden.png',
+  forest: './media/garden.png',
+  wood:   './media/room2.png',
+  stone:  './media/room2.png',
+  // water and dark have no image — they use FLOOR_COLORS only
+};
+
+// ─────────────────────────────────────────────────────────────
+// Apply backdrop CSS to #room-stage consistently.
+// Priority: uploaded data URL > GitHub-committed URL > named key
 // ─────────────────────────────────────────────────────────────
 function applyRoomBackdrop(room) {
   const stage = document.getElementById('room-stage');
   if (!stage) return;
-  const backdropSrc = room.backdropData || room.backdropUrl || null;
-  if (backdropSrc) {
-    stage.style.backgroundImage = `url('${backdropSrc}')`;
-    stage.style.backgroundSize = 'cover';
-    stage.style.backgroundPosition = 'center';
-    stage.style.background = '';
-  } else {
-    const bgFile = BACKDROP_IMAGES[room.backdrop];
-    if (bgFile) {
-      stage.style.backgroundImage = `url('${MEDIA_URL}${bgFile}')`;
-      stage.style.backgroundSize = 'cover';
-      stage.style.backgroundPosition = 'center';
-      stage.style.background = '';
-    } else {
-      stage.style.backgroundImage = '';
-      stage.style.background = FLOOR_COLORS[room.backdrop] || '#1a1a2e';
-    }
+
+  // Uploaded or GitHub-saved image takes top priority
+  const uploadedSrc = room.backdropData || room.backdropUrl || null;
+  if (uploadedSrc) {
+    stage.style.cssText += [
+      `background-image:url('${uploadedSrc}')`,
+      'background-size:cover',
+      'background-position:center',
+    ].join(';');
+    return;
   }
+
+  // Named backdrop key → relative media path
+  const bgFile = ROOM_BACKDROP_FILES[room.backdrop];
+  if (bgFile) {
+    stage.style.backgroundImage    = `url('${bgFile}')`;
+    stage.style.backgroundSize     = 'cover';
+    stage.style.backgroundPosition = 'center';
+    stage.style.backgroundColor    = '';
+    return;
+  }
+
+  // Solid colour fallback
+  stage.style.backgroundImage = '';
+  stage.style.background = FLOOR_COLORS[room.backdrop] || '#1a1a2e';
 }
 
 function openRoom(roomId) {
@@ -362,10 +382,6 @@ function buildRoomScene(room) {
   destroyRoomScene();
   _wanderAgents = [];
 
-  // Re-apply backdrop CSS here too — destroyRoomScene clears it,
-  // and openRoom's 360 ms delay means the canvas lands after CSS
-  // was already applied, but a direct buildRoomScene call (e.g.
-  // after saving room edits) skips openRoom entirely.
   applyRoomBackdrop(room);
 
   const stage = document.getElementById('room-stage');
@@ -381,7 +397,6 @@ function buildRoomScene(room) {
      viewSize / 2, -viewSize / 2, 1, 1000
   );
 
-  // Per-room camera position — always looks at origin (0,0,0)
   const camX = room.cameraX ?? 9;
   const camY = room.cameraY ?? 9;
   const camZ = room.cameraZ ?? 9;
@@ -394,11 +409,9 @@ function buildRoomScene(room) {
   renderer.setSize(W, H);
   renderer.setPixelRatio(window.devicePixelRatio);
 
-  // Insert canvas BEFORE any existing children so CSS background
-  // stays visible behind it (z-index stacking via DOM order).
   stage.insertBefore(renderer.domElement, stage.firstChild);
 
-  const hasBg = !!(room.backdropData || room.backdropUrl || BACKDROP_IMAGES[room.backdrop]);
+  const hasBg = !!(room.backdropData || room.backdropUrl || ROOM_BACKDROP_FILES[room.backdrop]);
   const floor = new THREE.Mesh(
     new THREE.PlaneGeometry(20, 20),
     new THREE.MeshLambertMaterial({
