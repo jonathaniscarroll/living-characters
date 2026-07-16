@@ -331,24 +331,15 @@
       <div id="room-latlng-map"></div>
     </div>
     <div class="field"><label>Trigger radius (metres)</label><input id="rf-radius" type="number" value="30" min="5" max="500" /></div>
-    <div class="field"><label>Backdrop style</label>
-      <select id="rf-backdrop">
-        <option value="forest">🌲 Forest</option>
-        <option value="stone">🪨 Stone hall</option>
-        <option value="water">🌊 Waterside</option>
-        <option value="wood">🪵 Wooden room</option>
-        <option value="grass">🌿 Garden</option>
-        <option value="dark">🌑 Dark cave</option>
-      </select>
+    <div class="field"><label>Room backdrop image</label>
+      <div class="file-row">
+        <img id="rf-backdrop-preview" class="file-preview" src="" style="display:none" />
+        <label class="file-btn" for="rf-backdrop-input">📸 Upload backdrop image</label>
+        <input id="rf-backdrop-input" type="file" accept="image/*" style="display:none" onchange="uploadRoomBackdrop()" />
+      </div>
+      <div id="rf-backdrop-status" style="font-size:11px;color:var(--accent2);margin-top:5px"></div>
+      <p style="font-size:10px;color:var(--text-muted);margin-top:4px">Each room uses the image you upload here as its backdrop. If you skip this, the room uses a simple colour + walls.</p>
     </div>
-     <div class="field"><label>Or upload a custom backdrop</label>
-       <div class="file-row">
-         <img id="rf-backdrop-preview" class="file-preview" src="" style="display:none" />
-         <label class="file-btn" for="rf-backdrop-input">📸 Upload backdrop image</label>
-         <input id="rf-backdrop-input" type="file" accept="image/*" style="display:none" onchange="uploadRoomBackdrop()" />
-       </div>
-       <div id="rf-backdrop-status" style="font-size:11px;color:var(--accent2);margin-top:5px"></div>
-     </div>
      <div class="modal-section-title">📷 Camera Position (X, Y, Z)</div>
      <div class="field" style="display:flex;gap:6px">
        <input id="rf-cam-x" type="number" step="0.5" placeholder="X" style="flex:1" value="9" />
@@ -553,7 +544,7 @@ const ASSET_LIBRARY = {
   glbModels: [
     { name: 'Soldier',  url: 'https://threejs.org/examples/models/gltf/Soldier.glb' },
     { name: 'Parrot',   url: 'https://threejs.org/examples/models/gltf/Parrot.glb' },
-    { name: 'Duck',     url: 'https://threejs.org/examples/models/gltf/Duck/glTF/Duck.gltf' },
+    { name: 'Duck',     url: 'https://threejs.org/examples/models/gltf/Duck.glTF/Duck.gltf' },
   ]
 };
 function openAssetBrowser(targetField) {
@@ -673,10 +664,12 @@ function saveCharacter(){ return window.lcModals.saveCharacter(); }
 function buildTweeSource(rooms, chars, objs) {
   let out = '';
   rooms.forEach(room => {
-    const roomMeta = { id: room.id, lat: room.lat, lng: room.lng, radius: room.radius, backdrop: room.backdrop };
+    const roomMeta = { id: room.id, lat: room.lat, lng: room.lng, radius: room.radius };
     if (room.cameraX != null) roomMeta.cameraX = room.cameraX;
     if (room.cameraY != null) roomMeta.cameraY = room.cameraY;
     if (room.cameraZ != null) roomMeta.cameraZ = room.cameraZ;
+    if (room.backdropData) roomMeta.backdropData = true;
+    if (room.backdropUrl) roomMeta.backdropUrl = room.backdropUrl;
     out += `:: ${room.name} ${JSON.stringify(roomMeta)}\n`;
     out += room.lede ? room.lede + '\n' : '';
     out += '\n';
