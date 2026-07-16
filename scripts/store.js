@@ -104,10 +104,12 @@ async function ghSave() {
 function buildTweeSource(roomsList, chars, objs) {
   let out = '';
   roomsList.forEach(room => {
-    const roomMeta = { id: room.id, lat: room.lat, lng: room.lng, radius: room.radius, backdrop: room.backdrop };
+    const roomMeta = { id: room.id, lat: room.lat, lng: room.lng, radius: room.radius };
     if (room.cameraX != null) roomMeta.cameraX = room.cameraX;
     if (room.cameraY != null) roomMeta.cameraY = room.cameraY;
     if (room.cameraZ != null) roomMeta.cameraZ = room.cameraZ;
+    // Persist the GitHub-committed backdrop URL so it survives a round-trip
+    if (room.backdropUrl) roomMeta.backdropUrl = room.backdropUrl;
     out += `:: ${room.name} ${JSON.stringify(roomMeta)}\n`;
     out += room.lede ? room.lede + '\n' : '';
     out += '\n';
@@ -191,7 +193,7 @@ function importTweeSource(src, silent) {
           lat: meta.lat,
           lng: meta.lng,
           radius: meta.radius || 30,
-          backdrop: meta.backdrop || 'forest',
+          backdropUrl: meta.backdropUrl || null,
           cameraX: meta.cameraX,
           cameraY: meta.cameraY,
           cameraZ: meta.cameraZ
@@ -244,7 +246,7 @@ function save() {
   } catch (e) {}
 }
 
-// ── Phase 2: Upload backdrop image to GitHub ─────────────────────────────────
+// ── Phase 2: Upload backdrop image to GitHub ───────────────────────────────────
 async function uploadRoomBackdropToGitHub(roomId, file) {
   const token = getToken();
   if (!token) {
@@ -316,7 +318,6 @@ window.addEventListener('DOMContentLoaded', () => {
   const saved = localStorage.getItem('lc_gh_token');
   if (saved) {
     document.getElementById('gh-token-input').value = saved;
-    // Silently seed SHA in background — token is optional, app works without it
     seedGhFileSha(saved);
   }
 });
