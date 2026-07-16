@@ -26,7 +26,6 @@
   <script type="module" src="./scripts/room.js"></script>
   <script type="module" src="./scripts/card.js"></script>
   <script type="module" src="./scripts/modals.js"></script>
-  <!-- FBX → GLB conversion + shared upload helper -->
   <script type="module" src="./scripts/fbx-to-glb.js"></script>
   <script type="module" src="./scripts/upload-helpers.js"></script>
 
@@ -39,7 +38,6 @@
     }
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
     html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;overflow:hidden;}
-    /* ── Mobile-first responsive base ── */
     :root{--header-h:44px;--ghbar-h:36px;--map-top:80px;--card-w:320px;}
     @media(max-width:640px){
       :root{--header-h:40px;--ghbar-h:32px;--map-top:72px;--card-w:100vw;}
@@ -63,6 +61,8 @@
     .hbtn.gh-load{background:#1c3a2a;color:#6fcf97;}
     .hbtn.gh-save{background:#3a2007;color:#f5a623;}
     .hbtn.toggle-mode{background:#ffffff18;color:var(--text);}
+    .hbtn.day-seg{background:#ffffff10;color:var(--text-muted);border:1px solid transparent;font-size:13px;padding:3px 5px;}
+    .hbtn.day-seg.active{background:rgba(245,166,35,.22);border-color:var(--accent2);color:var(--accent2);}
     #mode-label{font-size:10px;color:var(--text-muted);}
     @media(max-width:640px){#mode-label{font-size:8px;}}
     #gps-status{font-size:9px;color:#90caf9;max-width:100px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex-shrink:0;}
@@ -97,7 +97,7 @@
     #room-header{background:linear-gradient(90deg,#0f3460,#16213e);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;padding:0 10px;height:40px;flex-shrink:0;}
     @media(max-width:640px){#room-header{height:36px;padding:0 8px;gap:6px;}}
     #room-back{background:none;border:none;color:var(--accent2);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;padding:0;white-space:nowrap;}
-    #room-title{font-size:13px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;} 
+    #room-title{font-size:13px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
     #room-lede{font-size:10px;color:var(--text-muted);margin-left:auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:30vw;}
     @media(max-width:640px){#room-title{font-size:12px;}#room-lede{max-width:20vw;font-size:9px;}}
     #room-stage{flex:1;position:relative;overflow:hidden;background:#1a3a10 center/cover no-repeat;}
@@ -118,7 +118,7 @@
     #talk-btns{display:flex;flex-wrap:wrap;gap:8px;}
     .talk-btn{padding:7px 14px;border-radius:20px;border:1px solid var(--border);background:rgba(255,255,255,.06);color:var(--text);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:background .15s,border-color .15s;}
     .talk-btn:hover,.talk-btn.active{background:rgba(245,166,35,.2);border-color:var(--accent2);color:var(--accent2);}
-    #card{position:fixed;right:0;top:86px;bottom:0;width:340px;max-width:100vw;background:var(--surface);border-left:1px solid var(--border);display:flex;flex-direction:column;transform:translateX(100%);transition:transform .28s cubic-bezier(.16,1,.3,1);z-index:1300;overflow-y:auto;}
+    #card{position:fixed;right:0;top:80px;bottom:0;width:340px;max-width:100vw;background:var(--surface);border-left:1px solid var(--border);display:flex;flex-direction:column;transform:translateX(100%);transition:transform .28s cubic-bezier(.16,1,.3,1);z-index:1300;overflow-y:auto;}
     #card.open{transform:translateX(0);}
     #card-close{position:absolute;top:10px;right:12px;background:none;border:none;color:var(--text-muted);font-size:20px;cursor:pointer;}
     #card-anim{width:100%;aspect-ratio:1;background:#0a0f1e;display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;}
@@ -148,6 +148,7 @@
     .field input,.field select,.field textarea{background:rgba(255,255,255,.06);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--text);font-size:13px;font-family:inherit;outline:none;}
     .field input:focus,.field select:focus,.field textarea:focus{border-color:var(--accent);}
     .field textarea{resize:vertical;min-height:52px;}
+    .field select option{background:var(--surface);color:var(--text);}
     .modal-actions{display:flex;gap:10px;margin-top:4px;}
     .mbtn{flex:1;padding:10px;border-radius:8px;border:none;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;}
     .mbtn.save{background:var(--accent);color:#fff;} .mbtn.cancel{background:rgba(255,255,255,.08);color:var(--text);}
@@ -164,7 +165,17 @@
     .room-chip:hover{border-color:#ffffff40;color:var(--text);}
     .room-chip.active{background:rgba(245,166,35,.18);border-color:var(--accent2);color:var(--accent2);}
     .room-chips-hint{font-size:10px;color:var(--text-muted);margin-top:2px;}
+    /* Schedule editor */
+    .schedule-editor{display:flex;flex-direction:column;gap:6px;}
+    .schedule-segment{display:flex;align-items:center;gap:8px;}
+    .schedule-segment .seg-label{font-size:11px;color:var(--text-muted);width:72px;flex-shrink:0;}
+    .sch-pill{padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;background:rgba(255,255,255,.06);border:1px solid var(--border);color:var(--text-muted);}
+    .sch-pill.active{background:rgba(245,166,35,.2);border-color:var(--accent2);color:var(--accent2);}
+    /* Home/work selects row */
+    .hw-row{display:flex;gap:8px;}
+    .hw-row .field{flex:1;}
     #dialogue-builder{display:flex;flex-direction:column;gap:10px;}
+    #cf-object-usage{display:flex;flex-direction:column;gap:10px;}
     .prompt-row{display:flex;gap:6px;align-items:flex-start;}
     .prompt-pill{flex-shrink:0;padding:5px 10px;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer;background:rgba(255,255,255,.08);border:1px solid var(--border);color:var(--text-muted);white-space:nowrap;}
     .prompt-pill.active{background:rgba(245,166,35,.2);color:var(--accent2);border-color:var(--accent2);}
@@ -179,23 +190,6 @@
     #tooltip .tt-name{font-size:13px;font-weight:800;} #tooltip .tt-loc{font-size:10px;color:var(--text-muted);text-transform:uppercase;} #tooltip .tt-mood{font-size:11px;margin-top:3px;}
     #toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);z-index:1600;background:rgba(10,15,30,.95);border:1px solid var(--border);border-radius:10px;padding:10px 20px;font-size:13px;font-weight:600;backdrop-filter:blur(8px);opacity:0;transition:opacity .25s;pointer-events:none;white-space:nowrap;}
     #toast.show{opacity:1;}
-    #asset-browser { display:grid; grid-template-columns:repeat(auto-fill,minmax(100px,1fr)); gap:10px; margin:8px 0; max-height:240px; overflow-y:auto; }
-    .asset-card { background:rgba(255,255,255,.06); border:1px solid var(--border); border-radius:8px; padding:6px; text-align:center; cursor:pointer; transition:border-color .15s,background .15s; }
-    .asset-card:hover { border-color:var(--accent2); background:rgba(245,166,35,.1); }
-    .asset-card img { width:100%; aspect-ratio:1; object-fit:cover; border-radius:4px; background:#0a0f1e; }
-    .asset-card .asset-label { font-size:10px; color:var(--text-muted); margin-top:4px; }
-    .asset-card.selected { border-color:var(--accent2); background:rgba(245,166,35,.15); }
-    #asset-tabs { display:flex; gap:6px; margin-bottom:8px; }
-    .asset-tab { font-size:11px; padding:4px 10px; border-radius:20px; border:1px solid var(--border); background:transparent; color:var(--text-muted); cursor:pointer; font-family:inherit; }
-    .asset-tab.active { border-color:var(--accent2); color:var(--accent2); background:rgba(245,166,35,.1); }
-    .toggle-row { display:flex; align-items:center; gap:10px; }
-    .toggle-switch { position:relative; width:40px; height:22px; background:#ffffff20; border-radius:11px; cursor:pointer; transition:background .2s; flex-shrink:0; }
-    .toggle-switch.active { background:var(--accent2); }
-    .toggle-switch::after { content:''; position:absolute; top:2px; left:2px; width:18px; height:18px; background:#fff; border-radius:50%; transition:transform .2s; }
-    .toggle-switch.active::after { transform:translateX(18px); }
-    #drop-overlay{position:fixed;inset:0;z-index:2000;background:rgba(0,0,80,.75);backdrop-filter:blur(6px);display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;opacity:0;transition:opacity .2s;color:#fff;font-size:22px;gap:12px;}
-    #drop-overlay.active{opacity:1;pointer-events:all;}
-    #drop-overlay .drop-sub{font-size:13px;color:#a0c8ff;}
     .room-toolbar{margin-left:auto;display:flex;gap:6px;align-items:center;}
     .room-tbtn{font-size:11px;padding:4px 9px;border-radius:6px;border:none;cursor:pointer;font-family:inherit;font-weight:600;white-space:nowrap;}
     .room-tbtn.add-obj{background:#2a2060;color:#c9b8ff;border:1px solid #5a4a90;}
@@ -209,9 +203,11 @@
     .obj-list-row .obj-list-name{flex:1;color:var(--text);font-weight:600;}
     .obj-list-edit{background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:12px;padding:1px 4px;border-radius:4px;}
     .obj-list-edit:hover{color:var(--accent2);}
-    /* FBX conversion progress bar */
     .fbx-progress{height:3px;border-radius:2px;background:rgba(255,255,255,.1);margin-top:4px;overflow:hidden;display:none;}
     .fbx-progress-bar{height:100%;background:var(--accent2);width:0%;transition:width .15s;}
+    #drop-overlay{position:fixed;inset:0;z-index:2000;background:rgba(0,0,80,.75);backdrop-filter:blur(6px);display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;opacity:0;transition:opacity .2s;color:#fff;font-size:22px;gap:12px;}
+    #drop-overlay.active{opacity:1;pointer-events:all;}
+    #drop-overlay .drop-sub{font-size:13px;color:#a0c8ff;}
     ::-webkit-scrollbar{width:6px;} ::-webkit-scrollbar-track{background:transparent;} ::-webkit-scrollbar-thumb{background:#ffffff20;border-radius:3px;}
   </style>
   <link rel="stylesheet" href="mobile-zoom-fix.css" />
@@ -226,6 +222,12 @@
     <span id="gps-status">GPS: off</span>
     <button class="hbtn gps-btn"   onclick="startGPS()">📍 GPS</button>
     <button class="hbtn sim-btn"   onclick="startSim()">🚶 Simulate</button>
+    <!-- Day segment strip -->
+    <button class="hbtn day-seg active" data-seg="morning"   onclick="setDaySegment('morning')">🌅</button>
+    <button class="hbtn day-seg"        data-seg="midday"    onclick="setDaySegment('midday')">☀️</button>
+    <button class="hbtn day-seg"        data-seg="afternoon" onclick="setDaySegment('afternoon')">🌤</button>
+    <button class="hbtn day-seg"        data-seg="evening"   onclick="setDaySegment('evening')">🌇</button>
+    <button class="hbtn day-seg"        data-seg="night"     onclick="setDaySegment('night')">🌙</button>
     <button class="hbtn test-room" onclick="spawnTestRoom()">🧪 Test Room</button>
     <button class="hbtn add-room"  onclick="openRoomModal(null)">+ Room</button>
     <button class="hbtn add-char"  onclick="openCharModal(null)">+ Character</button>
@@ -305,6 +307,7 @@
   </div>
 </div>
 
+<!-- Twee preview -->
 <div class="modal-overlay" id="twee-preview-overlay">
   <div class="modal-box" style="gap:12px">
     <h2>📄 Twee Export Preview</h2>
@@ -316,6 +319,7 @@
   </div>
 </div>
 
+<!-- Room modal -->
 <div class="modal-overlay" id="room-modal-overlay">
   <div class="modal-box">
     <h2 id="room-modal-title">Add a Room</h2>
@@ -340,32 +344,31 @@
       <div id="rf-backdrop-status" style="font-size:11px;color:var(--accent2);margin-top:5px"></div>
       <p style="font-size:10px;color:var(--text-muted);margin-top:4px">Each room uses the image you upload here as its backdrop. If you skip this, the room uses a simple colour + walls.</p>
     </div>
-     <div class="modal-section-title">📷 Camera Position (X, Y, Z)</div>
-     <div class="field" style="display:flex;gap:6px">
-       <input id="rf-cam-x" type="number" step="0.5" placeholder="X" style="flex:1" value="9" />
-       <input id="rf-cam-y" type="number" step="0.5" placeholder="Y" style="flex:1" value="9" />
-       <input id="rf-cam-z" type="number" step="0.5" placeholder="Z" style="flex:1" value="9" />
-     </div>
-     <div class="field" style="display:flex;gap:4px;flex-wrap:wrap;margin-top:-4px">
-       <button type="button" class="file-btn" onclick="setCamPreset(9,9,9)" style="flex:1;min-width:90px;font-size:10px;padding:3px 6px">🎲 Iso</button>
-       <button type="button" class="file-btn" onclick="setCamPreset(0,4,14)" style="flex:1;min-width:90px;font-size:10px;padding:3px 6px">👁 Front</button>
-       <button type="button" class="file-btn" onclick="setCamPreset(14,4,0)" style="flex:1;min-width:90px;font-size:10px;padding:3px 6px">↔ Side</button>
-       <button type="button" class="file-btn" onclick="setCamPreset(0,18,0.01)" style="flex:1;min-width:90px;font-size:10px;padding:3px 6px">⬆ Top</button>
-       <button type="button" class="file-btn" onclick="setCamPreset(6,2,10)" style="flex:1;min-width:90px;font-size:10px;padding:3px 6px">🎬 Low</button>
-     </div>
-     <div class="modal-actions">
+    <div class="modal-section-title">📷 Camera Position (X, Y, Z)</div>
+    <div class="field" style="display:flex;gap:6px">
+      <input id="rf-cam-x" type="number" step="0.5" placeholder="X" style="flex:1" value="9" />
+      <input id="rf-cam-y" type="number" step="0.5" placeholder="Y" style="flex:1" value="9" />
+      <input id="rf-cam-z" type="number" step="0.5" placeholder="Z" style="flex:1" value="9" />
+    </div>
+    <div class="field" style="display:flex;gap:4px;flex-wrap:wrap;margin-top:-4px">
+      <button type="button" class="file-btn" onclick="setCamPreset(9,9,9)"    style="flex:1;min-width:90px;font-size:10px;padding:3px 6px">🎲 Iso</button>
+      <button type="button" class="file-btn" onclick="setCamPreset(0,4,14)"   style="flex:1;min-width:90px;font-size:10px;padding:3px 6px">👁 Front</button>
+      <button type="button" class="file-btn" onclick="setCamPreset(14,4,0)"   style="flex:1;min-width:90px;font-size:10px;padding:3px 6px">↔ Side</button>
+      <button type="button" class="file-btn" onclick="setCamPreset(0,18,0.01)" style="flex:1;min-width:90px;font-size:10px;padding:3px 6px">⬆ Top</button>
+      <button type="button" class="file-btn" onclick="setCamPreset(6,2,10)"   style="flex:1;min-width:90px;font-size:10px;padding:3px 6px">🎬 Low</button>
+    </div>
+    <div class="modal-actions">
       <button class="mbtn cancel" onclick="closeRoomModal()">Cancel</button>
       <button class="mbtn save"   onclick="saveRoom()">Save Room</button>
     </div>
   </div>
 </div>
 
-<!-- ══════════════════════════════════════════════════════════ -->
-<!-- CHARACTER MODAL                                            -->
-<!-- ══════════════════════════════════════════════════════════ -->
+<!-- Character modal -->
 <div class="modal-overlay" id="char-modal-overlay">
   <div class="modal-box">
     <h2 id="char-modal-title">Add a Character</h2>
+
     <div class="modal-section-title">👤 Who are they?</div>
     <div class="field"><label>Character name</label><input id="cf-name" type="text" placeholder="e.g. Mop, Gravel, Biscuit..." /></div>
 
@@ -373,6 +376,48 @@
       <label>Which room(s) do they visit? <span style="font-weight:400;text-transform:none;letter-spacing:0">(tap to toggle)</span></label>
       <div class="room-chips" id="cf-room-chips"></div>
       <div class="room-chips-hint" id="cf-room-chips-hint">No rooms added yet — create a room first.</div>
+    </div>
+
+    <!-- Home / Work selects -->
+    <div class="hw-row">
+      <div class="field">
+        <label>🏠 Home room</label>
+        <select id="cf-home-room" onchange="rebuildObjectUsagePrompts()"><option value="">— choose a room —</option></select>
+      </div>
+      <div class="field">
+        <label>💼 Work room</label>
+        <select id="cf-work-room" onchange="rebuildObjectUsagePrompts()"><option value="">— choose a room —</option></select>
+      </div>
+    </div>
+
+    <!-- Schedule editor -->
+    <div class="modal-section-title">🕐 Daily schedule</div>
+    <div class="schedule-editor">
+      <div class="schedule-segment" data-seg="morning">
+        <span class="seg-label">🌅 Morning</span>
+        <button class="sch-pill active" data-val="home"  onclick="pickSegment(this)">🏠 Home</button>
+        <button class="sch-pill"        data-val="work"  onclick="pickSegment(this)">💼 Work</button>
+      </div>
+      <div class="schedule-segment" data-seg="midday">
+        <span class="seg-label">☀️ Midday</span>
+        <button class="sch-pill"        data-val="home"  onclick="pickSegment(this)">🏠 Home</button>
+        <button class="sch-pill active" data-val="work"  onclick="pickSegment(this)">💼 Work</button>
+      </div>
+      <div class="schedule-segment" data-seg="afternoon">
+        <span class="seg-label">🌤 Afternoon</span>
+        <button class="sch-pill"        data-val="home"  onclick="pickSegment(this)">🏠 Home</button>
+        <button class="sch-pill active" data-val="work"  onclick="pickSegment(this)">💼 Work</button>
+      </div>
+      <div class="schedule-segment" data-seg="evening">
+        <span class="seg-label">🌇 Evening</span>
+        <button class="sch-pill active" data-val="home"  onclick="pickSegment(this)">🏠 Home</button>
+        <button class="sch-pill"        data-val="work"  onclick="pickSegment(this)">💼 Work</button>
+      </div>
+      <div class="schedule-segment" data-seg="night">
+        <span class="seg-label">🌙 Night</span>
+        <button class="sch-pill active" data-val="home"  onclick="pickSegment(this)">🏠 Home</button>
+        <button class="sch-pill"        data-val="work"  onclick="pickSegment(this)">💼 Work</button>
+      </div>
     </div>
 
     <div class="field"><label>Photo (felt / clay)</label>
@@ -394,28 +439,25 @@
     <div class="field">
       <label>3D character model (.glb or .fbx)</label>
       <div class="file-row">
-        <!-- Primary upload button — accepts GLB and FBX -->
         <label class="file-btn" for="cf-glb-input">✨ Upload .glb or .fbx</label>
-        <input id="cf-glb-input" type="file"
-               accept=".glb,.fbx,application/octet-stream"
-               style="display:none"
-               onchange="uploadCharacterGlb()" />
+        <input id="cf-glb-input" type="file" accept=".glb,.fbx,application/octet-stream" style="display:none" onchange="uploadCharacterGlb()" />
       </div>
-      <div style="font-size:11px;color:var(--text-muted);margin-top:4px">
-        .glb files load instantly · .fbx files are auto-converted to GLB in your browser
-      </div>
-      <!-- progress bar (shown during FBX conversion) -->
-      <div class="fbx-progress" id="cf-fbx-progress">
-        <div class="fbx-progress-bar" id="cf-fbx-progress-bar"></div>
-      </div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:4px">.glb files load instantly · .fbx files are auto-converted to GLB in your browser</div>
+      <div class="fbx-progress" id="cf-fbx-progress"><div class="fbx-progress-bar" id="cf-fbx-progress-bar"></div></div>
       <div id="cf-glb-status" style="font-size:11px;color:var(--accent2);margin-top:4px"></div>
       <input id="cf-glb-url" type="text" placeholder="…or paste a .glb URL" style="margin-top:6px" />
     </div>
 
     <div class="field"><label>Mood</label><div class="mood-picker" id="mood-picker"></div></div>
     <div class="field"><label>Items (comma-separated)</label><input id="cf-items" type="text" placeholder="small hat, acorn, lucky pebble" /></div>
+
     <div class="modal-section-title">💬 What do they say?</div>
     <div id="dialogue-builder"></div>
+
+    <div class="modal-section-title">🛠️ How do they use their space?</div>
+    <p style="font-size:10px;color:var(--text-muted);margin-bottom:4px">These prompts appear when a visitor taps an object while this character is in that room.</p>
+    <div id="cf-object-usage"></div>
+
     <div class="modal-actions">
       <button class="mbtn cancel" onclick="closeCharModal()">Cancel</button>
       <button class="mbtn save"   onclick="saveCharacter()">Save</button>
@@ -423,36 +465,24 @@
   </div>
 </div>
 
-<!-- ══════════════════════════════════════════════════════════ -->
-<!-- OBJECT MODAL                                               -->
-<!-- ══════════════════════════════════════════════════════════ -->
+<!-- Object modal -->
 <div class="modal-overlay" id="obj-modal-overlay">
   <div class="modal-box">
     <h2 id="obj-modal-title">Add an Object</h2>
     <div class="modal-section-title">📦 What is it?</div>
     <div class="field"><label>Object name</label><input id="of-name" type="text" placeholder="e.g. Mossy log, Giant mushroom..." /></div>
     <div class="field"><label>Description (shows on tap)</label><textarea id="of-desc" rows="2" placeholder="An old log covered in soft moss."></textarea></div>
-
     <div class="field">
       <label>3D model (.glb or .fbx)</label>
       <div class="file-row">
         <label class="file-btn" for="of-glb-input">✨ Upload .glb or .fbx</label>
-        <input id="of-glb-input" type="file"
-               accept=".glb,.fbx,application/octet-stream"
-               style="display:none"
-               onchange="uploadObjectGlb()" />
+        <input id="of-glb-input" type="file" accept=".glb,.fbx,application/octet-stream" style="display:none" onchange="uploadObjectGlb()" />
       </div>
-      <div style="font-size:11px;color:var(--text-muted);margin-top:4px">
-        .glb files load instantly · .fbx files are auto-converted to GLB in your browser
-      </div>
-      <!-- progress bar (shown during FBX conversion) -->
-      <div class="fbx-progress" id="of-fbx-progress">
-        <div class="fbx-progress-bar" id="of-fbx-progress-bar"></div>
-      </div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:4px">.glb files load instantly · .fbx files are auto-converted to GLB in your browser</div>
+      <div class="fbx-progress" id="of-fbx-progress"><div class="fbx-progress-bar" id="of-fbx-progress-bar"></div></div>
       <div id="of-glb-status" style="font-size:11px;color:var(--accent2);margin-top:4px"></div>
       <input id="of-glb" type="text" placeholder="…or paste a .glb URL" style="margin-top:6px" />
     </div>
-
     <div class="field">
       <label>Position (X, Z) and Scale</label>
       <div style="display:flex;gap:8px">
@@ -461,7 +491,6 @@
         <input id="of-scale" type="number" step="0.1" placeholder="Scale (1.0)" style="flex:1" value="1" />
       </div>
     </div>
-
     <div class="modal-actions">
       <button class="mbtn cancel" onclick="closeObjModal()">Cancel</button>
       <button class="mbtn save"   onclick="saveObject()">Save Object</button>
@@ -492,7 +521,6 @@ const GH_PATH   = 'story/main.twee';
 const GH_BRANCH = 'main';
 
 const MEDIA_URL = `https://raw.githubusercontent.com/${GH_OWNER}/${GH_REPO}/main/media/`;
-const BACKDROP_IMAGES = { room: './garden.png', room2: './room2.png' };
 const DEFAULT_GLB_URL = 'https://threejs.org/examples/models/gltf/Soldier.glb';
 
 const MOODS = [
@@ -523,6 +551,13 @@ var simActive=false, simInterval=null, facilitatorMode=true, activeRoomId=null;
 var threeScene=null, threeRenderer=null, threeCamera=null, threeAnimFrameId=null;
 var glbMixers=[];
 
+// ── Schedule pill helper (inline onclick) ────────────────────────────────────
+function pickSegment(btn) {
+  const seg = btn.closest('.schedule-segment');
+  seg.querySelectorAll('.sch-pill').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+}
+
 // ── Toast ────────────────────────────────────────────────────────────────────
 let toastTimeout = null;
 function showToast(msg, type) {
@@ -533,65 +568,6 @@ function showToast(msg, type) {
   el.classList.add('show');
   clearTimeout(toastTimeout);
   toastTimeout = setTimeout(() => el.classList.remove('show'), 3000);
-}
-
-// ── Asset browser (backdrop picker) ─────────────────────────────────────────
-const ASSET_LIBRARY = {
-  backdrops: [
-    { name: 'Forest', url: './garden.png' },
-    { name: 'Room',   url: './room2.png' },
-  ],
-  glbModels: [
-    { name: 'Soldier',  url: 'https://threejs.org/examples/models/gltf/Soldier.glb' },
-    { name: 'Parrot',   url: 'https://threejs.org/examples/models/gltf/Parrot.glb' },
-    { name: 'Duck',     url: 'https://threejs.org/examples/models/gltf/Duck.glTF/Duck.gltf' },
-  ]
-};
-function openAssetBrowser(targetField) {
-  const overlay = document.createElement('div');
-  overlay.className = 'modal-overlay open';
-  overlay.style.cssText = 'position:fixed;inset:0;z-index:1500;background:rgba(0,0,0,.65);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;';
-  overlay.innerHTML = `
-    <div class="modal-box" style="width:520px">
-      <h2>📚 Asset Library</h2>
-      <div id="asset-tabs">
-        <button class="asset-tab active" data-tab="backdrops">Backdrops</button>
-        <button class="asset-tab" data-tab="glb">3D Models</button>
-      </div>
-      <div id="asset-browser"></div>
-      <div class="modal-actions">
-        <button class="mbtn cancel" onclick="this.closest('.modal-overlay').remove()">Close</button>
-      </div>
-    </div>`;
-  document.body.appendChild(overlay);
-  const browser = overlay.querySelector('#asset-browser');
-  const tabs = overlay.querySelectorAll('.asset-tab');
-  let currentTab = 'backdrops';
-  function renderAssets(tab) {
-    const items = ASSET_LIBRARY[tab] || [];
-    browser.innerHTML = items.map(a => `
-      <div class="asset-card" data-url="${a.url}" data-name="${a.name}">
-        ${tab === 'backdrops' ? `<img src="${a.url}" alt="${a.name}" onerror="this.outerHTML='<div style=\'width:100%;aspect-ratio:1;display:flex;align-items:center;justify-content:center;font-size:32px\'>📦</div>'">` : `<div style="width:100%;aspect-ratio:1;display:flex;align-items:center;justify-content:center;font-size:32px;background:#0a0f1e;border-radius:4px;">📦</div>`}
-        <div class="asset-label">${a.name}</div>
-      </div>`).join('');
-    browser.querySelectorAll('.asset-card').forEach(card => {
-      card.onclick = () => {
-        const field = document.getElementById(targetField);
-        if (field) field.value = card.dataset.url;
-        showToast('✓ Selected: ' + card.dataset.name);
-        overlay.remove();
-      };
-    });
-  }
-  tabs.forEach(tab => {
-    tab.onclick = () => {
-      tabs.forEach(t => t.classList.remove('active'));
-      tab.classList.add('active');
-      currentTab = tab.dataset.tab;
-      renderAssets(currentTab);
-    };
-  });
-  renderAssets('backdrops');
 }
 
 // ── Obj inspect bubble ───────────────────────────────────────────────────────
@@ -617,11 +593,18 @@ function setGhStatus(m,c){ return window.lcStore.setGhStatus(m,c); }
 function getToken(){ return window.lcStore.getToken(); }
 function seedGhFileSha(t){ return window.lcStore.seedGhFileSha(t); }
 function decodeBase64Unicode(b){ return window.lcStore.decodeBase64Unicode(b); }
+function previewTwee(){ return window.lcStore.previewTwee(); }
+function closeTweePreview(){ return window.lcStore.closeTweePreview(); }
+function downloadTwee(){ return window.lcStore.downloadTwee(); }
+function triggerImport(){ return window.lcStore.triggerImport(); }
+function handleImportFile(e){ return window.lcStore.handleImportFile(e); }
+function save(){ return window.lcStore.save(); }
 
 function initMap() { return window.lcMap.initMap(); }
 function renderMapPins() { return window.lcMap.renderMapPins(); }
 function showTooltip(ch, evt) { return window.lcMap.showTooltip(ch, evt); }
 function hideTooltip() { return window.lcMap.hideTooltip(); }
+function setDaySegment(seg) { return window.lcMap.setDaySegment(seg); }
 
 function openCard(charId){ return window.lcCard.openCard(charId); }
 function closeCard(){ return window.lcCard.closeCard(); }
@@ -638,6 +621,11 @@ function buildRoomScene(room){ return window.lcRoom.buildRoomScene(room); }
 function destroyRoomScene(){ return window.lcRoom.destroyRoomScene(); }
 function onRoomObjectClick(e){ return window.lcRoom.onRoomObjectClick(e); }
 function enableRoomEdit(){ return window.lcRoom.enableRoomEdit(); }
+function editActiveRoom(){ return window.lcRoom.editActiveRoom ? window.lcRoom.editActiveRoom() : openRoomModal(activeRoomId); }
+function openObjModal(id){ return window.lcModals ? window.lcModals.openObjModal(id) : null; }
+function closeObjModal(){ return window.lcModals ? window.lcModals.closeObjModal() : null; }
+function saveObject(){ return window.lcModals ? window.lcModals.saveObject() : null; }
+function deleteObject(){ return window.lcModals ? window.lcModals.deleteObject() : null; }
 
 function startGPS(){ return window.lcMap.startGPS(); }
 function startSim(){ return window.lcMap.startSim(); }
@@ -647,224 +635,27 @@ function updateCompass(){ return window.lcMap.updateCompass(); }
 function toggleMode(){ return window.lcMap.toggleMode(); }
 function spawnTestRoom(){ return window.lcMap.spawnTestRoom(); }
 
-function openRoomModal(roomId){ return window.lcModals.openRoomModal(roomId); }
+function openRoomModal(id){ return window.lcModals.openRoomModal(id); }
 function closeRoomModal(){ return window.lcModals.closeRoomModal(); }
 function saveRoom(){ return window.lcModals.saveRoom(); }
 function uploadRoomBackdrop(){ return window.lcModals.uploadRoomBackdrop(); }
-function initRoomPickerMap(){ return window.lcModals.initRoomPickerMap(); }
-function buildRoomChipPicker(selectedIds) { return window.lcModals.buildRoomChipPicker(selectedIds); }
-function getSelectedRoomIds() { return window.lcModals.getSelectedRoomIds(); }
-function setCamPreset(x, y, z){ return window.lcModals.setCamPreset(x, y, z); }
-function openCharModal(charId){ return window.lcModals.openCharModal(charId); }
-function togglePromptPill(btn){ return window.lcModals.togglePromptPill(btn); }
+function setCamPreset(x,y,z){ return window.lcModals.setCamPreset(x,y,z); }
+
+function openCharModal(id){ return window.lcModals.openCharModal(id); }
 function closeCharModal(){ return window.lcModals.closeCharModal(); }
-function previewFile(inputId,previewId,dataKey){ return window.lcModals.previewFile(inputId,previewId,dataKey); }
 function saveCharacter(){ return window.lcModals.saveCharacter(); }
+function togglePromptPill(btn){ return window.lcModals.togglePromptPill(btn); }
+function previewFile(a,b,c){ return window.lcModals.previewFile(a,b,c); }
+function rebuildObjectUsagePrompts(){ return window.lcModals.rebuildObjectUsagePrompts(); }
 
-function buildTweeSource(rooms, chars, objs) {
-  let out = '';
-  rooms.forEach(room => {
-    const roomMeta = { id: room.id, lat: room.lat, lng: room.lng, radius: room.radius };
-    if (room.cameraX != null) roomMeta.cameraX = room.cameraX;
-    if (room.cameraY != null) roomMeta.cameraY = room.cameraY;
-    if (room.cameraZ != null) roomMeta.cameraZ = room.cameraZ;
-    if (room.backdropData) roomMeta.backdropData = true;
-    if (room.backdropUrl) roomMeta.backdropUrl = room.backdropUrl;
-    out += `:: ${room.name} ${JSON.stringify(roomMeta)}\n`;
-    out += room.lede ? room.lede + '\n' : '';
-    out += '\n';
-    (objs||[]).filter(o => o.roomId === room.id).forEach(obj => {
-      const meta = { roomId: obj.roomId, scale: obj.scale||1 };
-      if (obj.glbUrl) meta.glbUrl = obj.glbUrl;
-      if (obj.position) { meta.x = obj.position.x; meta.y = obj.position.y||0; meta.z = obj.position.z; }
-      if (obj.rotation) meta.rotY = obj.rotation.y||0;
-      out += `:: ${obj.name}-object ${JSON.stringify(meta)}\n`;
-      out += obj.description ? obj.description + '\n' : '';
-      out += '\n';
-    });
-    chars.filter(c => (c.roomIds || [c.roomId]).includes(room.id)).forEach(ch => {
-      const meta = { roomIds: ch.roomIds || [ch.roomId], mood: ch.mood, items: (ch.items||[]) };
-      if (ch.glbUrl) meta.glbUrl = ch.glbUrl;
-      out += `:: ${ch.name} ${JSON.stringify(meta)}\n\n`;
-      (ch.passages||[]).forEach(p => { out += `:: ${ch.name}-${p.type}\n${p.text}\n\n`; });
-    });
-  });
-  return out;
-}
-function buildTweeStandalone(rooms, chars, objs) {
-  return ':: StoryTitle\nLiving Characters World\n\n:: StoryData\n{"ifid":"C15CE33F-61F6-4909-BB59-73EE7A3D57B1"}\n\n'
-    + buildTweeSource(rooms, chars, objs);
-}
-function previewTwee(){ return window.lcStore.previewTwee(); }
-function closeTweePreview(){ return window.lcStore.closeTweePreview(); }
-function downloadTwee(){ return window.lcStore.downloadTwee(); }
-function triggerImport(){ return window.lcStore.triggerImport(); }
-function handleImportFile(event){ return window.lcStore.handleImportFile(event); }
-function importTweeSource(src,silent){ return window.lcStore.importTweeSource(src,silent); }
+function uploadCharacterGlb(){ return window.lcUpload ? window.lcUpload.uploadCharacterGlb() : null; }
+function uploadObjectGlb()   { return window.lcUpload ? window.lcUpload.uploadObjectGlb()    : null; }
 
-document.addEventListener('dragover',e=>{e.preventDefault();document.getElementById('drop-overlay').classList.add('active');});
-document.addEventListener('dragleave',e=>{if(!e.relatedTarget)document.getElementById('drop-overlay').classList.remove('active');});
-document.addEventListener('drop',e=>{
-  e.preventDefault();document.getElementById('drop-overlay').classList.remove('active');
-  const file=e.dataTransfer.files[0];if(!file)return;
-  const reader=new FileReader();reader.onload=ev=>importTweeSource(ev.target.result);reader.readAsText(file);
-});
-
-function save(){ return window.lcStore.save(); }
-function loadLocal(){ return window.lcStore.loadLocal(); }
-
-window.addEventListener('load', async () => {
-  loadLocal();
-  if (rooms.length === 0 && characters.length === 0 && objects.length === 0) {
-    try {
-      const res = await fetch('./story/main.twee');
-      if (res.ok) { const src = await res.text(); importTweeSource(src, true); }
-    } catch (_) {}
-  }
+window.addEventListener('DOMContentLoaded', () => {
+  window.lcStore.loadLocal();
   initMap();
   updateCompass();
 });
-
-// ── Shared progress bar helper ───────────────────────────────────────────────
-function setFbxProgress(barId, wrapId, pct) {
-  const wrap = document.getElementById(wrapId);
-  const bar  = document.getElementById(barId);
-  if (!wrap || !bar) return;
-  if (pct === null) { wrap.style.display = 'none'; bar.style.width = '0%'; return; }
-  wrap.style.display = 'block';
-  bar.style.width = Math.round(pct * 100) + '%';
-}
-
-// ── Character model upload (GLB passthrough OR FBX → GLB conversion) ─────────
-async function uploadCharacterGlb() {
-  const input  = document.getElementById('cf-glb-input');
-  const file   = input.files && input.files[0];
-  if (!file) return;
-
-  // Wait for modules to be ready (they load async)
-  if (!window.handleModelUpload) {
-    document.getElementById('cf-glb-status').textContent = '⏳ Still loading — try again in a moment.';
-    return;
-  }
-
-  const isFbx = file.name.toLowerCase().endsWith('.fbx');
-  if (isFbx) {
-    // Show progress bar for FBX conversion
-    setFbxProgress('cf-fbx-progress-bar', 'cf-fbx-progress', 0);
-    const origUpload = window.handleModelUpload;
-    const dataUrl = await window.handleModelUpload(file, 'cf-glb-status', 'cf-glb-url', 'tempGlbData', pct => {
-      setFbxProgress('cf-fbx-progress-bar', 'cf-fbx-progress', pct);
-    });
-    setFbxProgress('cf-fbx-progress-bar', 'cf-fbx-progress', null);
-    if (dataUrl) tempGlbData = dataUrl;
-  } else {
-    const dataUrl = await window.handleModelUpload(file, 'cf-glb-status', 'cf-glb-url', 'tempGlbData');
-    if (dataUrl) tempGlbData = dataUrl;
-  }
-}
-
-// ── Object model upload ───────────────────────────────────────────────────────
-async function uploadObjectGlb() {
-  const input = document.getElementById('of-glb-input');
-  const file  = input.files && input.files[0];
-  if (!file) return;
-
-  if (!window.handleModelUpload) {
-    document.getElementById('of-glb-status').textContent = '⏳ Still loading — try again in a moment.';
-    return;
-  }
-
-  const isFbx = file.name.toLowerCase().endsWith('.fbx');
-  if (isFbx) {
-    setFbxProgress('of-fbx-progress-bar', 'of-fbx-progress', 0);
-    const dataUrl = await window.handleModelUpload(file, 'of-glb-status', 'of-glb', 'tempObjectGlbData', pct => {
-      setFbxProgress('of-fbx-progress-bar', 'of-fbx-progress', pct);
-    });
-    setFbxProgress('of-fbx-progress-bar', 'of-fbx-progress', null);
-    if (dataUrl) tempObjectGlbData = dataUrl;
-  } else {
-    const dataUrl = await window.handleModelUpload(file, 'of-glb-status', 'of-glb', 'tempObjectGlbData');
-    if (dataUrl) tempObjectGlbData = dataUrl;
-  }
-}
-
-// ── Object CRUD ───────────────────────────────────────────────────────────────
-function editActiveRoom() {
-  if (!activeRoomId) return;
-  openRoomModal(activeRoomId);
-}
-
-function openObjModal(objId) {
-  editingObjId = objId;
-  tempObjectGlbData = null;
-  const overlay = document.getElementById('obj-modal-overlay');
-  if (objId) {
-    const obj = objects.find(o => o.id === objId);
-    document.getElementById('obj-modal-title').textContent = 'Edit Object';
-    document.getElementById('of-name').value  = obj.name;
-    document.getElementById('of-desc').value  = obj.desc || '';
-    document.getElementById('of-glb').value   = (!obj.glbUrl || obj.glbUrl.startsWith('data:')) ? '' : obj.glbUrl;
-    document.getElementById('of-px').value    = obj.px || 0;
-    document.getElementById('of-pz').value    = obj.pz || 0;
-    document.getElementById('of-scale').value = obj.scale || 1;
-    document.getElementById('of-delete').style.display = 'block';
-    const st = document.getElementById('of-glb-status');
-    if (obj.glbUrl?.startsWith('data:')) { tempObjectGlbData = obj.glbUrl; st.textContent = '✓ 3D model ready.'; }
-    else if (obj.glbUrl)                 { st.textContent = '✓ Using URL: ' + obj.glbUrl.split('/').pop(); }
-    else                                 { st.textContent = ''; }
-  } else {
-    document.getElementById('obj-modal-title').textContent = 'Add Object';
-    ['of-name','of-desc','of-glb'].forEach(id => document.getElementById(id).value = '');
-    document.getElementById('of-px').value = '0';
-    document.getElementById('of-pz').value = '0';
-    document.getElementById('of-scale').value = '1';
-    document.getElementById('of-delete').style.display = 'none';
-    document.getElementById('of-glb-status').textContent = '';
-  }
-  setFbxProgress('of-fbx-progress-bar','of-fbx-progress', null);
-  overlay.classList.add('open');
-}
-
-function closeObjModal() {
-  document.getElementById('obj-modal-overlay').classList.remove('open');
-  editingObjId = null;
-  tempObjectGlbData = null;
-  document.getElementById('of-glb-status').textContent = '';
-  setFbxProgress('of-fbx-progress-bar','of-fbx-progress', null);
-}
-
-function saveObject() {
-  const name = document.getElementById('of-name').value.trim();
-  if (!name) return alert('Needs a name');
-  if (!activeRoomId) return alert('Open a room first to add an object.');
-  const glbUrl = tempObjectGlbData || document.getElementById('of-glb').value.trim();
-  const existing = editingObjId ? objects.find(o => o.id === editingObjId) : null;
-  const obj = {
-    id: editingObjId || ('obj_' + Date.now() + Math.random().toString(36).substr(2,5)),
-    roomId: activeRoomId,
-    name,
-    desc:  document.getElementById('of-desc').value.trim(),
-    glbUrl,
-    px:    parseFloat(document.getElementById('of-px').value) || 0,
-    pz:    parseFloat(document.getElementById('of-pz').value) || 0,
-    scale: parseFloat(document.getElementById('of-scale').value) || 1,
-    position: existing?.position || null,
-    rotation: existing?.rotation || null
-  };
-  if (editingObjId) objects = objects.map(o => o.id === editingObjId ? obj : o);
-  else objects.push(obj);
-  save(); closeObjModal(); renderMapPins();
-  const room = rooms.find(r => r.id === activeRoomId);
-  if (room) buildRoomScene(room);
-}
-
-function deleteObject() {
-  if (!editingObjId || !confirm('Remove object?')) return;
-  objects = objects.filter(o => o.id !== editingObjId);
-  save(); closeObjModal(); renderMapPins();
-  const room = rooms.find(r => r.id === activeRoomId);
-  if (room) buildRoomScene(room);
-}
 </script>
 
 </body>

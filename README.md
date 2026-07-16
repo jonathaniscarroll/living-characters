@@ -7,15 +7,40 @@ Living Characters is a browser-based facilitator tool for building a location-aw
 The current implementation supports a full loop for creating and presenting a small story world:
 
 - Create and edit rooms with a name, description, GPS coordinates, trigger radius, and a custom uploaded backdrop image.
-- Create and edit characters with room membership, mood, items, dialogue passages, and optional image/animation/GLB media.
-- Add room objects with position, rotation, scale, and descriptive text.
+- Create and edit characters with room membership, mood, items, dialogue passages, home/work rooms, a daily schedule, and optional image/animation/GLB media.
+- Add room objects with position, rotation, scale, descriptive text, and optional context/usageTags.
 - Open a room in a Three.js stage to inspect characters and objects in context.
 - Open character cards and trigger prompt-based dialogue from the room scene or map.
+- Use the day-segment toolbar (🌅 ☀️ 🌤 🌇 🌙) to move the time of day forward, shifting characters between their home and work rooms.
 - Import and export the world as Twee text.
 - Sync the world to GitHub through a personal access token.
 - Persist the working world in browser storage so it can be resumed later.
 
-### Room Backdrops — upload only
+---
+
+## Day-segment system
+
+Each character has a **home room**, a **work room**, and a five-segment daily schedule (morning, midday, afternoon, evening, night). The toolbar emoji buttons set the current segment for the whole world. When a segment is active:
+
+- `getActiveRoomId(character)` returns the room that character is in right now (home or work, based on their schedule).
+- Map pins show each character at their scheduled room.
+- Opening a character card labels their location with 🏠 or 💼 and bubbles the matching home/work dialogue to the top.
+- The Talk panel auto-opens the context-appropriate passage and highlights its button.
+
+### Authoring a character's home/work context
+
+Inside the **Add/Edit Character** modal:
+
+1. Toggle room chips to select all rooms this character visits.
+2. Use the **🏠 Home room** and **💼 Work room** dropdowns (populated from the selected chips) to designate which is which.
+3. Use the **🕐 Daily schedule** section to set each time segment to Home or Work.
+4. Write **💬 What do they say?** prompts as usual for general dialogue.
+5. Write **🏠 At home they say…** and **💼 At work they say…** context passages — these appear automatically when visiting the character at the right room.
+6. The **🛠️ How do they use their space?** section auto-generates one textarea per object in their home/work rooms; these become `home-object-*` / `work-object-*` passages in the Twee export.
+
+---
+
+## Room Backdrops — upload only
 
 Room backgrounds come **only** from images you upload. There are no preset named backdrop styles (forest, cave, stone, etc.). The room modal shows a single upload control:
 
@@ -30,15 +55,34 @@ Room backgrounds come **only** from images you upload. There are no preset named
 - `backdropUrl` — committed GitHub URL (set after successful upload)
 - Flat colour + walls (fallback when no image has been uploaded)
 
-**Backdrop persistence across GitHub save/load:**
+---
 
-`backdropUrl` is written into each room's Twee metadata on save and read back on load, so images survive a full GitHub round-trip. After uploading a backdrop and saving to GitHub for the first time, subsequent loads will restore each room's correct image via its `raw.githubusercontent.com` URL.
-
-### Object Placement in Room Scenes
+## Object Placement in Room Scenes
 
 - Click **Move Objects** in the room toolbar to enable object movement mode.
 - In move mode, click an object to select it (cursor changes to grabbing), then click a new floor position to place it.
 - Objects are constrained to the floor plane (Y=0) for easy placement.
+
+---
+
+## Twee passage structure
+
+| Passage name | Meaning |
+|---|---|
+| `:: RoomName {meta}` | Room node with GPS, radius, backdropUrl |
+| `:: CharName {meta}` | Character node with roomIds, homeRoomId, workRoomId, schedule |
+| `:: CharName-hello` | Greeting dialogue |
+| `:: CharName-question` | Wonder/question dialogue |
+| `:: CharName-secret` | Secret dialogue |
+| `:: CharName-reaction` | Reaction dialogue |
+| `:: CharName-item` | Item dialogue |
+| `:: CharName-home` | What they say when visited at their home room |
+| `:: CharName-work` | What they say when visited at their work room |
+| `:: CharName-home-object-kettle` | How they use the kettle at home |
+| `:: CharName-work-object-toolbox` | How they use the toolbox at work |
+| `:: ObjectName-object {meta}` | Object node with roomId, position, scale, glbUrl |
+
+---
 
 ## Bugs Fixed (July 2026)
 
@@ -56,8 +100,6 @@ Room backgrounds come **only** from images you upload. There are no preset named
 2. `importTweeSource` did not read `backdropUrl` back when reconstructing room objects from the Twee file, so loaded rooms had no backdrop URL and all fell back to the same default.
 
 **Fix:** `buildTweeSource` now writes `backdropUrl` into each room's Twee metadata when present. `importTweeSource` now reads `backdropUrl: meta.backdropUrl || null` back into each room on parse.
-
-**Migration note:** Rooms saved before this fix won't have `backdropUrl` in their Twee file yet. Re-upload each room's backdrop via Edit Room → Upload, then do one Cloud Save to write the corrected metadata.
 
 ### Image upload button crash (prior fix)
 
@@ -79,138 +121,6 @@ Room backgrounds come **only** from images you upload. There are no preset named
 
 ---
 
-## Phased Implementation Plan: Home, Work, and Time-of-Day
-
-Characters can have a **home room** and a **work room**, move between them as the day progresses, and interact with objects in a way that reflects whether they are living there or working there. This plan describes how to build that in three discrete phases.
-
-### The through-line
-
-Each character gets a designated home room and a designated work room, a simple day schedule (e.g. morning at home, afternoon at work), and per-room object-usage prompts so that the same space — or the same prop — reads differently at different times of day. Facilitators author all of this from the character modal. The Twee export/import carries the full picture across sessions and devices.
-
----
-
-### Phase 1 — Data model and Twee extension
-
-**Goal:** Extend the character data shape and Twee round-trip so that home/work rooms and a schedule can be stored, exported, and imported without breaking any existing worlds.
-
-**Changes to `scripts/store.js`**
-
-1. In `buildTweeSource`, extend the character meta block to include the new fields:
-
-```js
-const meta = {
-  roomIds: ch.roomIds || [ch.roomId],
-  homeRoomId: ch.homeRoomId || null,
-  workRoomId: ch.workRoomId || null,
-  schedule: ch.schedule || null,
-  mood: ch.mood,
-  items: ch.items || [],
-  glbUrl: ch.glbUrl || null
-};
-```
-
-2. In `importTweeSource`, read those fields back from meta when hydrating `newChars`:
-
-```js
-newChars.push({
-  id: 'char_' + passName.replace(/\s+/g, '_'),
-  name: passName,
-  roomId: primaryRoomId,
-  roomIds,
-  homeRoomId: meta.homeRoomId || null,
-  workRoomId: meta.workRoomId || null,
-  schedule: meta.schedule || null,
-  mood: meta.mood || 'Happy',
-  items: meta.items || [],
-  passages: [],
-  photoData: null,
-  animData: null,
-  glbUrl: meta.glbUrl || null
-});
-```
-
-3. In `loadLocal`, add a migration guard so existing saved characters without these fields still load cleanly:
-
-```js
-characters.forEach(ch => {
-  if (!ch.roomIds || !Array.isArray(ch.roomIds)) ch.roomIds = ch.roomId ? [ch.roomId] : [];
-  if (!ch.homeRoomId) ch.homeRoomId = ch.roomIds[0] || null;
-  if (!ch.workRoomId) ch.workRoomId = ch.roomIds[0] || null;
-  if (!ch.schedule) ch.schedule = { morning: 'home', midday: 'work', afternoon: 'work', evening: 'home', night: 'home' };
-});
-```
-
-**New Twee passage types for home/work**
-
-| Passage type | Twee name | Meaning |
-|---|---|---|
-| `home` | `:: CharName-home` | General talk when at home |
-| `work` | `:: CharName-work` | General talk when at work |
-| `home-object-<slug>` | `:: CharName-home-object-kettle` | How this character uses the kettle at home |
-| `work-object-<slug>` | `:: CharName-work-object-toolbox` | How this character uses the toolbox at work |
-
-**Object data extension**
-
-```js
-{
-  context: 'home' | 'work' | 'both' | null,
-  usageTags: ['cooking', 'resting', 'fixing']
-}
-```
-
-**Acceptance criteria for Phase 1:**
-- A world with home/work data exports to Twee and re-imports with all fields intact.
-- Existing worlds without these fields load and save without any error or data loss.
-
----
-
-### Phase 2 — Character modal authoring
-
-**Goal:** Make all Phase 1 fields editable from the character modal.
-
-**2a. Home and work room selectors** — two `<select>` elements below the room chip picker, populated from the character's selected rooms.
-
-**2b. Time-of-day schedule editor** — a row of five segments (morning, midday, afternoon, evening, night) each with a Home / Work pill toggle.
-
-**2c. Home/work object-usage prompts** — one textarea per object in the home/work rooms, generating `home-object-*` / `work-object-*` passages.
-
-**Acceptance criteria for Phase 2:**
-- All fields persist to localStorage and survive a page reload.
-- Object-usage prompts appear only for objects in the chosen home/work rooms.
-
----
-
-### Phase 3 — Time-of-day presence and object interaction at runtime
-
-**Goal:** Use the schedule to drive which room each character appears in, and to surface context-aware dialogue.
-
-**3a.** Day-segment control in the facilitator toolbar (🌅 ☀️ 🌤 🌇 🌙).
-
-**3b.** `getActiveRoomId(character)` helper resolves the character's current room from their schedule.
-
-**3c.** `renderMapPins` uses `getActiveRoomId` to show characters in their scheduled room.
-
-**3d.** `buildRoomScene` only spawns characters scheduled to be in the active room.
-
-**3e.** Character card defaults to `home` or `work` passage based on current context.
-
-**3f.** Object tap in room scene surfaces the character's `home-object-*` / `work-object-*` passage if one exists.
-
----
-
-### Summary of file changes
-
-| File | Phase | What changes |
-|---|---|---|
-| `scripts/store.js` | 1 | Extend `buildTweeSource`, `importTweeSource`, `loadLocal` for `homeRoomId`, `workRoomId`, `schedule`; object meta for `context`, `usageTags` |
-| `scripts/modals.js` | 2 | Home/work selects, schedule editor, object-usage prompt rows, extend `saveCharacter` |
-| `index.html` | 2 | Home/work select markup, schedule editor markup, day-segment toolbar control |
-| `scripts/map.js` | 3 | Add `getActiveRoomId` helper, apply to `renderMapPins` |
-| `scripts/room.js` | 3 | Filter character spawns by active room, update object tap handler |
-| `scripts/card.js` | 3 | Context-aware default passage, object-usage list |
-
----
-
 ## Quick start
 
 This is a static web app — no build step required.
@@ -228,9 +138,9 @@ living-characters/
   index.html               # app shell and UI entry point
   scripts/
     store.js               # persistence, Twee import/export, GitHub save/load
-    map.js                 # Leaflet map, pins, GPS, compass, simulation
+    map.js                 # Leaflet map, pins, GPS, compass, simulation, day-segment
     room.js                # Three.js room stage, object rendering, inspect overlay
-    card.js                # character cards and talk panels
+    card.js                # character cards and talk panels (context-aware)
     modals.js              # room, character, and object editor workflows
   story/
     main.twee              # default target for GitHub-backed sync
@@ -241,7 +151,7 @@ living-characters/
 
 ## Design intent
 
-The app sits between a spatial story editor and a live facilitation tool. Rooms carry real-world coordinates and provide stage space, but characters are the primary unit of dramatic interaction. That makes it well suited to workshops, physical props, and facilitator-led experiences where the map and room scene are used as a shared stage.
+The app sits between a spatial story editor and a live facilitation tool. Rooms carry real-world coordinates and provide stage space, but characters are the primary unit of dramatic interaction. Characters now also have a time-of-day presence — they live somewhere and work somewhere, and the world shifts around them as the day progresses. That makes it well suited to workshops, physical props, and facilitator-led experiences where the map and room scene are used as a shared stage.
 
 ### OBJ to GLB Conversion (Local Tool)
 
