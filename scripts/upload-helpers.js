@@ -3,15 +3,14 @@
  * -----------------
  * Shared file-upload helpers. Handles .glb (passthrough) and .fbx
  * (lazy-imports fbx-to-glb.js on demand so timing is never an issue).
+ * Also registers window.lcUpload so inline onclick handlers in index.html work.
  */
 
 // Lazy singleton — resolved the first time an FBX is uploaded
 let _fbxModule = null;
 async function getFbxConverter() {
   if (_fbxModule) return _fbxModule;
-  // Dynamic import works regardless of when this module itself was loaded
   _fbxModule = await import('./fbx-to-glb.js');
-  // Also expose on window for any direct callers
   window.lcFbx = _fbxModule;
   return _fbxModule;
 }
@@ -37,16 +36,16 @@ export async function handleModelUpload(file, statusElId, urlFieldId, dataKey, o
 
   // ── GLB / GLTF: FileReader passthrough ──
   if (name.endsWith('.glb') || name.endsWith('.gltf')) {
-    setStatus('\u231b Reading\u2026', 'var(--accent2)');
+    setStatus('⌛ Reading…', 'var(--accent2)');
     return new Promise(resolve => {
       const reader = new FileReader();
       reader.onload = e => {
-        setStatus(`\u2713 "${file.name}" ready!`, 'var(--accent2)');
+        setStatus(`✓ "${file.name}" ready!`, 'var(--accent2)');
         if (onProgress) onProgress(1);
         resolve(storeResult(e.target.result));
       };
       reader.onerror = () => {
-        setStatus('Could not read file \u2014 please try again.', '#ff8a80');
+        setStatus('Could not read file — please try again.', '#ff8a80');
         resolve(null);
       };
       reader.readAsDataURL(file);
@@ -55,7 +54,7 @@ export async function handleModelUpload(file, statusElId, urlFieldId, dataKey, o
 
   // ── FBX: lazy-load converter then convert ──
   if (name.endsWith('.fbx')) {
-    setStatus('\u23f3 Loading FBX converter\u2026', 'var(--accent2)');
+    setStatus('⏳ Loading FBX converter…', 'var(--accent2)');
     let mod;
     try {
       mod = await getFbxConverter();
@@ -64,15 +63,15 @@ export async function handleModelUpload(file, statusElId, urlFieldId, dataKey, o
       return null;
     }
 
-    setStatus('\u23f3 Converting FBX\u2026 (0%)', 'var(--accent2)');
+    setStatus('⏳ Converting FBX… (0%)', 'var(--accent2)');
     try {
       const dataUrl = await mod.convertFbxFileToGlbDataUrl(file, {
         onProgress: pct => {
-          setStatus(`\u23f3 Converting FBX\u2026 (${Math.round(pct * 100)}%)`, 'var(--accent2)');
+          setStatus(`⏳ Converting FBX… (${Math.round(pct * 100)}%)`, 'var(--accent2)');
           if (onProgress) onProgress(pct);
         }
       });
-      setStatus(`\u2713 FBX converted \u2014 "${file.name}" ready!`, 'var(--accent2)');
+      setStatus(`✓ FBX converted — "${file.name}" ready!`, 'var(--accent2)');
       if (onProgress) onProgress(1);
       return storeResult(dataUrl);
     } catch (err) {
@@ -85,6 +84,50 @@ export async function handleModelUpload(file, statusElId, urlFieldId, dataKey, o
   return null;
 }
 
-// Expose for inline onclick handlers in index.html
+// ── Character GLB/FBX upload (wired to #cf-glb-input) ────────────────────────
+export async function uploadCharacterGlb() {
+  const input = document.getElementById('cf-glb-input');
+  if (!input || !input.files || !input.files[0]) return;
+  const file = input.files[0];
+
+  const progressEl = document.getElementById('cf-fbx-progress');
+  const barEl      = document.getElementById('cf-fbx-progress-bar');
+  if (progressEl) progressEl.style.display = 'block';
+
+  const result = await handleModelUpload(
+    file,
+    'cf-glb-status',
+    'cf-glb-url',
+    'tempGlbData',
+    pct => { if (barEl) barEl.style.width = Math.round(pct * 100) + '%'; }
+  );
+
+  if (!result && progressEl) progressEl.style.display = 'none';
+}
+
+// ── Object GLB/FBX upload (wired to #of-glb-input) ───────────────────────────
+export async function uploadObjectGlb() {
+  const input = document.getElementById('of-glb-input');
+  if (!input || !input.files || !input.files[0]) return;
+  const file = input.files[0];
+
+  const progressEl = document.getElementById('of-fbx-progress');
+  const barEl      = document.getElementById('of-fbx-progress-bar');
+  if (progressEl) progressEl.style.display = 'block';
+
+  const result = await handleModelUpload(
+    file,
+    'of-glb-status',
+    'of-glb',
+    'tempObjectGlbData',
+    pct => { if (barEl) barEl.style.width = Math.round(pct * 100) + '%'; }
+  );
+
+  if (!result && progressEl) progressEl.style.display = 'none';
+}
+
+// ── Expose on window so inline onclick handlers (index.html) resolve ─────────
+window.lcUpload = { uploadCharacterGlb, uploadObjectGlb, handleModelUpload };
 window.handleModelUpload = handleModelUpload;
+
 export default handleModelUpload;
