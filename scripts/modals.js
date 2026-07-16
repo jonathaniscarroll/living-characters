@@ -46,7 +46,6 @@ function openRoomModal(roomId) {
   document.getElementById('rf-lat').value = room ? room.lat : '';
   document.getElementById('rf-lng').value = room ? room.lng : '';
   document.getElementById('rf-radius').value = room ? room.radius : '30';
-  document.getElementById('rf-backdrop').value = room ? room.backdrop : 'forest';
   // Camera position
   document.getElementById('rf-cam-x').value = room?.cameraX ?? 9;
   document.getElementById('rf-cam-y').value = room?.cameraY ?? 9;
@@ -80,7 +79,6 @@ function saveRoom() {
   const lat = parseFloat(document.getElementById('rf-lat').value);
   const lng = parseFloat(document.getElementById('rf-lng').value);
   const radius = parseFloat(document.getElementById('rf-radius').value) || 30;
-  const backdrop = document.getElementById('rf-backdrop').value;
   const backdropData = tempBackdropData || undefined;
   const backdropUrl = typeof tempBackdropUrl !== 'undefined' ? tempBackdropUrl : undefined;
   const cameraX = parseFloat(document.getElementById('rf-cam-x').value);
@@ -89,7 +87,7 @@ function saveRoom() {
   if (!name || Number.isNaN(lat) || Number.isNaN(lng)) return alert('Needs a name and coordinates.');
   const data = {
     id: editingRoomId || ('room_' + Date.now()),
-    name, lede, lat, lng, radius, backdrop,
+    name, lede, lat, lng, radius,
     cameraX: Number.isNaN(cameraX) ? 9 : cameraX,
     cameraY: Number.isNaN(cameraY) ? 9 : cameraY,
     cameraZ: Number.isNaN(cameraZ) ? 9 : cameraZ,
