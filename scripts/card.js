@@ -1,133 +1,135 @@
-// card.js — character card, talk panel, close-up GLB on talk
+// card.js — character cards and talk panel
+
+let _selectedCharId = null;
 
 function openCard(charId) {
-  selectedChar = characters.find(c => c.id === charId);
-  if (!selectedChar) return;
-  const mood = MOODS.find(m => m.label === selectedChar.mood) || MOODS[0];
-  const roomIds = selectedChar.roomIds || [selectedChar.roomId];
-  const roomNames = roomIds.map(id => rooms.find(r => r.id === id)?.name).filter(Boolean);
+  _selectedCharId = charId;
+  selectedChar = charId;
+  const ch = characters.find(c => c.id === charId);
+  if (!ch) return;
+  const mood = MOODS.find(m => m.label === ch.mood) || MOODS[0];
   const animEl = document.getElementById('card-anim');
-  animEl.innerHTML = '';
-  if (selectedChar.animData) {
-    const img = document.createElement('img'); img.src = selectedChar.animData; animEl.appendChild(img);
-  } else if (selectedChar.photoData) {
-    const img = document.createElement('img'); img.src = selectedChar.photoData; animEl.appendChild(img);
+  if (ch.animData) {
+    animEl.innerHTML = `<img src="${ch.animData}" alt="${ch.name} animation" style="max-width:100%;max-height:100%;object-fit:contain;">`;
+  } else if (ch.photoData) {
+    animEl.innerHTML = `<img src="${ch.photoData}" alt="${ch.name}" style="max-width:100%;max-height:100%;object-fit:contain;">`;
   } else {
     animEl.innerHTML = '<div class="placeholder">🧸</div>';
   }
-  document.getElementById('card-name').textContent = selectedChar.name;
-  document.getElementById('card-location').textContent = roomNames.length ? '📍 ' + roomNames.join(' · ') : '';
+  document.getElementById('card-name').textContent = ch.name;
+
+  // Show scheduled location
+  const activeRoomId = window.lcMap ? window.lcMap.getActiveRoomId(ch) : ((ch.roomIds && ch.roomIds[0]) || ch.roomId);
+  const room = rooms.find(r => r.id === activeRoomId);
+  const isHome = activeRoomId === ch.homeRoomId;
+  const isWork = activeRoomId === ch.workRoomId;
+  const contextLabel = isHome ? ' 🏠' : isWork ? ' 💼' : '';
+  document.getElementById('card-location').textContent = (room ? room.name : '') + contextLabel;
+
   document.getElementById('card-mood-dot').style.background = mood.color;
   document.getElementById('card-mood-text').textContent = mood.emoji + ' ' + mood.label;
-  const il = document.getElementById('card-items-list');
-  il.innerHTML = '';
-  (selectedChar.items || []).forEach(item => {
-    const c = document.createElement('div'); c.className = 'item-chip'; c.textContent = item; il.appendChild(c);
+  const itemsList = document.getElementById('card-items-list');
+  itemsList.innerHTML = (ch.items || []).map(it => `<span class="item-chip">${it}</span>`).join('');
+
+  // Build dialogue — surface home/work passage first if contextually appropriate
+  const passList = document.getElementById('card-passage-list');
+  passList.innerHTML = '';
+  const contextType = isHome ? 'home' : isWork ? 'work' : null;
+  const orderedPassages = [...(ch.passages || [])];
+  if (contextType) {
+    // Bubble the context passage to the top
+    const ctxIdx = orderedPassages.findIndex(p => p.type === contextType);
+    if (ctxIdx > 0) {
+      const [ctx] = orderedPassages.splice(ctxIdx, 1);
+      orderedPassages.unshift(ctx);
+    }
+  }
+  orderedPassages.forEach(p => {
+    if (!p.text) return;
+    const block = document.createElement('div');
+    block.className = 'dialogue-block';
+    block.innerHTML = `<div class="passage-type">${p.type}</div><div class="passage-text">${p.text}</div>`;
+    passList.appendChild(block);
   });
-  const pl = document.getElementById('card-passage-list');
-  pl.innerHTML = '';
-  (selectedChar.passages || []).forEach(p => {
-    const pt = PROMPT_TYPES.find(t => t.key === p.type) || { label: p.type };
-    const b = document.createElement('div');
-    b.className = 'dialogue-block';
-    b.innerHTML = `<div class="passage-type">${pt.label}</div><div class="passage-text">${p.text || '<em>nothing yet</em>'}</div>`;
-    pl.appendChild(b);
-  });
+
   document.getElementById('card').classList.add('open');
 }
 
 function closeCard() {
   document.getElementById('card').classList.remove('open');
+  _selectedCharId = null;
   selectedChar = null;
+  closeTalkPanel();
 }
 
 function editSelectedChar() {
-  if (!selectedChar) return;
-  // Capture the id before closeCard() nulls selectedChar
-  const charId = selectedChar.id;
+  if (!_selectedCharId) return;
   closeCard();
-  openCharModal(charId);
+  window.lcModals.openCharModal(_selectedCharId);
 }
 
 function deleteSelectedChar() {
-  if (!selectedChar || !confirm('Remove ' + selectedChar.name + '?')) return;
-  characters = characters.filter(c => c.id !== selectedChar.id);
-  closeCard(); renderMapPins(); updateCompass(); save();
+  if (!_selectedCharId) return;
+  if (!confirm('Remove this character?')) return;
+  characters = characters.filter(c => c.id !== _selectedCharId);
+  closeCard();
+  window.renderMapPins();
+  window.save();
 }
 
 function talkToSelectedChar() {
-  if (!selectedChar) return;
-  const primaryRoomId = (selectedChar.roomIds && selectedChar.roomIds[0]) || selectedChar.roomId;
-  if (primaryRoomId && !document.getElementById('room-view').classList.contains('open')) {
-    openRoom(primaryRoomId);
-    setTimeout(() => {
-      openTalkPanel(selectedChar);
-      if (window.lcRoom?.spawnTalkCloseUp) window.lcRoom.spawnTalkCloseUp(selectedChar);
-    }, 450);
-  } else {
-    openTalkPanel(selectedChar);
-    if (window.lcRoom?.spawnTalkCloseUp) window.lcRoom.spawnTalkCloseUp(selectedChar);
-  }
-  closeCard();
+  const ch = characters.find(c => c.id === _selectedCharId);
+  if (!ch) return;
+  openTalkPanel(ch);
 }
 
 function openTalkPanel(ch) {
-  const passages = ch.passages || [];
   document.getElementById('talk-char-name').textContent = ch.name;
   const bubble = document.getElementById('talk-bubble');
-  bubble.textContent = 'Tap a prompt below to hear what they say\u2026';
+  bubble.textContent = 'Tap a prompt below to hear what they say…';
   bubble.className = 'empty';
-  const btnsEl = document.getElementById('talk-btns');
-  btnsEl.innerHTML = '';
-  if (!passages.length) {
-    bubble.textContent = ch.name + ' has nothing to say yet. Edit them to add dialogue!';
-    bubble.className = '';
-  } else {
-    passages.forEach(p => {
-      const pt = PROMPT_TYPES.find(t => t.key === p.type) || { label: p.type, key: p.type };
-      const btn = document.createElement('button');
-      btn.className = 'talk-btn';
-      btn.textContent = pt.label;
-      btn.onclick = () => {
-        btnsEl.querySelectorAll('.talk-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        bubble.textContent = p.text || '\u2026';
-        bubble.className = '';
-        pulseMoodRing(ch.id);
-      };
-      btnsEl.appendChild(btn);
-    });
+  const btns = document.getElementById('talk-btns');
+  btns.innerHTML = '';
+
+  // Determine context for this character right now
+  const activeRoomId = window.lcMap ? window.lcMap.getActiveRoomId(ch) : ((ch.roomIds && ch.roomIds[0]) || ch.roomId);
+  const isHome = activeRoomId === ch.homeRoomId;
+  const isWork = activeRoomId === ch.workRoomId;
+  const contextType = isHome ? 'home' : isWork ? 'work' : null;
+
+  const passages = (ch.passages || []).filter(p => p.text);
+  passages.forEach(p => {
+    const btn = document.createElement('button');
+    btn.className = 'talk-btn' + (p.type === contextType ? ' active' : '');
+    btn.textContent = p.type.replace(/-/g, ' ');
+    btn.onclick = () => {
+      bubble.textContent = p.text;
+      bubble.className = '';
+      btns.querySelectorAll('.talk-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    };
+    btns.appendChild(btn);
+  });
+
+  // If there's a context-appropriate passage, auto-show it
+  if (contextType) {
+    const ctxPassage = passages.find(p => p.type === contextType);
+    if (ctxPassage) {
+      bubble.textContent = ctxPassage.text;
+      bubble.className = '';
+    }
   }
+
   document.getElementById('talk-panel').classList.add('open');
 }
 
 function closeTalkPanel() {
   document.getElementById('talk-panel').classList.remove('open');
-  if (window.lcRoom?.dismissTalkCloseUp) window.lcRoom.dismissTalkCloseUp();
 }
 
 function pulseMoodRing(charId) {
-  if (!threeScene) return;
-  threeScene.traverse(obj => {
-    if (obj._moodRingCharId === charId) {
-      const t0 = performance.now();
-      const pulse = () => {
-        const t = (performance.now() - t0) / 400;
-        if (t > 1) { obj.scale.setScalar(1); return; }
-        obj.scale.setScalar(1 + 0.4 * Math.sin(t * Math.PI));
-        requestAnimationFrame(pulse);
-      };
-      pulse();
-    }
-  });
+  // future: animate the mood ring for a specific character pin
 }
 
-window.lcCard = {
-  openCard, closeCard, editSelectedChar, deleteSelectedChar,
-  talkToSelectedChar, openTalkPanel, closeTalkPanel, pulseMoodRing
-};
-
-export {
-  openCard, closeCard, editSelectedChar, deleteSelectedChar,
-  talkToSelectedChar, openTalkPanel, closeTalkPanel, pulseMoodRing
-};
+window.lcCard = { openCard, closeCard, editSelectedChar, deleteSelectedChar, talkToSelectedChar, openTalkPanel, closeTalkPanel, pulseMoodRing };
+export { openCard, closeCard, editSelectedChar, deleteSelectedChar, talkToSelectedChar, openTalkPanel, closeTalkPanel, pulseMoodRing };

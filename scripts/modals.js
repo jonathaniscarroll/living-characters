@@ -2,17 +2,19 @@ function buildRoomChipPicker(selectedIds = []) {
   const container = document.getElementById('cf-room-chips');
   const hint = document.getElementById('cf-room-chips-hint');
   container.innerHTML = '';
-  if (!rooms.length) {
-    if (hint) hint.style.display = '';
-    return;
-  }
+  if (!rooms.length) { if (hint) hint.style.display = ''; return; }
   if (hint) hint.style.display = 'none';
   rooms.forEach(room => {
     const chip = document.createElement('button');
     chip.className = 'room-chip' + (selectedIds.includes(room.id) ? ' active' : '');
     chip.textContent = '\uD83C\uDFE0 ' + room.name;
     chip.dataset.roomId = room.id;
-    chip.onclick = () => chip.classList.toggle('active');
+    chip.onclick = () => {
+      chip.classList.toggle('active');
+      const ids = getSelectedRoomIds();
+      populateHomeWorkSelects(ids, document.getElementById('cf-home-room').value, document.getElementById('cf-work-room').value);
+      rebuildObjectUsagePrompts();
+    };
     container.appendChild(chip);
   });
 }
@@ -21,13 +23,70 @@ function getSelectedRoomIds() {
   return Array.from(document.querySelectorAll('#cf-room-chips .room-chip.active')).map(c => c.dataset.roomId);
 }
 
-// Camera presets — (X, Y, Z) positions that all lookAt(0,0,0)
+function populateHomeWorkSelects(selectedIds, homeRoomId, workRoomId) {
+  const homeEl = document.getElementById('cf-home-room');
+  const workEl = document.getElementById('cf-work-room');
+  if (!homeEl || !workEl) return;
+  [homeEl, workEl].forEach(el => {
+    el.innerHTML = '<option value="">— choose a room —</option>';
+    selectedIds.forEach(id => {
+      const room = rooms.find(r => r.id === id);
+      if (!room) return;
+      el.innerHTML += `<option value="${id}">${room.name}</option>`;
+    });
+  });
+  homeEl.value = homeRoomId || selectedIds[0] || '';
+  workEl.value = workRoomId || selectedIds[0] || '';
+}
+
+function readSchedule() {
+  const schedule = {};
+  document.querySelectorAll('.schedule-segment').forEach(seg => {
+    const active = seg.querySelector('.sch-pill.active');
+    schedule[seg.dataset.seg] = active ? active.dataset.val : 'home';
+  });
+  return schedule;
+}
+
+function rebuildObjectUsagePrompts() {
+  const container = document.getElementById('cf-object-usage');
+  if (!container) return;
+  container.innerHTML = '';
+  const homeId = document.getElementById('cf-home-room').value;
+  const workId = document.getElementById('cf-work-room').value;
+  const relevantRoomIds = [...new Set([homeId, workId].filter(Boolean))];
+  const ch = editingCharId ? characters.find(c => c.id === editingCharId) : null;
+  relevantRoomIds.forEach(roomId => {
+    const room = rooms.find(r => r.id === roomId);
+    if (!room) return;
+    const roomObjs = objects.filter(o => o.roomId === roomId);
+    if (!roomObjs.length) return;
+    const isHome = roomId === homeId;
+    const label = isHome ? '🏠' : '💼';
+    roomObjs.forEach(obj => {
+      const passageType = (isHome ? 'home' : 'work') + '-object-' + obj.name.toLowerCase().replace(/\s+/g, '-');
+      const existing = ch ? (ch.passages || []).find(p => p.type === passageType) : null;
+      const row = document.createElement('div');
+      row.className = 'prompt-row';
+      row.dataset.key = passageType;
+      row.innerHTML = `
+        <button class="prompt-pill ${existing?.text ? 'active' : ''}" onclick="togglePromptPill(this)">${label} ${obj.name}</button>
+        <div style="flex:1;display:flex;flex-direction:column;gap:3px">
+          <textarea class="prompt-input" placeholder="How does ${ch ? ch.name : 'this character'} use the ${obj.name}?" rows="2">${existing?.text || ''}</textarea>
+          <div class="prompt-hint">Shown when tapping ${obj.name} in the ${room.name} scene.</div>
+        </div>`;
+      container.appendChild(row);
+    });
+  });
+}
+
+// Camera presets
 const CAM_PRESETS = [
-  { label: '🎲 Isometric', x: 9,  y: 9,  z: 9  },
-  { label: '👁 Front',     x: 0,  y: 4,  z: 14 },
-  { label: '↔ Side',      x: 14, y: 4,  z: 0  },
-  { label: '⬆ Top',       x: 0,  y: 18, z: 0.01 },
-  { label: '🎬 Low',      x: 6,  y: 2,  z: 10 },
+  { label: '🎲 Isometric', x: 9, y: 9, z: 9 },
+  { label: '👁 Front',     x: 0, y: 4, z: 14 },
+  { label: '↔ Side',      x: 14, y: 4, z: 0 },
+  { label: '⬆ Top',       x: 0, y: 18, z: 0.01 },
+  { label: '🎬 Low',      x: 6, y: 2, z: 10 },
 ];
 
 function setCamPreset(x, y, z) {
@@ -46,20 +105,17 @@ function openRoomModal(roomId) {
   document.getElementById('rf-lat').value = room ? room.lat : '';
   document.getElementById('rf-lng').value = room ? room.lng : '';
   document.getElementById('rf-radius').value = room ? room.radius : '30';
-  // Camera position
   document.getElementById('rf-cam-x').value = room?.cameraX ?? 9;
   document.getElementById('rf-cam-y').value = room?.cameraY ?? 9;
   document.getElementById('rf-cam-z').value = room?.cameraZ ?? 9;
   const bp = document.getElementById('rf-backdrop-preview');
   const existingPreview = (room && room.backdropData) ? room.backdropData : ((room && room.backdropUrl) ? room.backdropUrl : null);
   if (existingPreview) {
-    bp.src = existingPreview;
-    bp.style.display = 'block';
+    bp.src = existingPreview; bp.style.display = 'block';
     if (room.backdropData) tempBackdropData = room.backdropData;
     document.getElementById('rf-backdrop-status').textContent = '\u2713 Your backdrop image is ready to save.';
   } else {
-    bp.src = '';
-    bp.style.display = 'none';
+    bp.src = ''; bp.style.display = 'none';
     document.getElementById('rf-backdrop-status').textContent = '';
   }
   document.getElementById('room-modal-overlay').classList.add('open');
@@ -68,8 +124,7 @@ function openRoomModal(roomId) {
 
 function closeRoomModal() {
   document.getElementById('room-modal-overlay').classList.remove('open');
-  editingRoomId = null;
-  tempBackdropData = null;
+  editingRoomId = null; tempBackdropData = null;
   document.getElementById('rf-backdrop-status').textContent = '';
 }
 
@@ -86,8 +141,7 @@ function saveRoom() {
   const cameraZ = parseFloat(document.getElementById('rf-cam-z').value);
   if (!name || Number.isNaN(lat) || Number.isNaN(lng)) return alert('Needs a name and coordinates.');
   const data = {
-    id: editingRoomId || ('room_' + Date.now()),
-    name, lede, lat, lng, radius,
+    id: editingRoomId || ('room_' + Date.now()), name, lede, lat, lng, radius,
     cameraX: Number.isNaN(cameraX) ? 9 : cameraX,
     cameraY: Number.isNaN(cameraY) ? 9 : cameraY,
     cameraZ: Number.isNaN(cameraZ) ? 9 : cameraZ,
@@ -97,24 +151,16 @@ function saveRoom() {
   if (editingRoomId) {
     const existing = rooms.find(r => r.id === editingRoomId);
     if (existing) Object.assign(existing, data);
-  } else {
-    rooms.push(data);
-  }
+  } else { rooms.push(data); }
   tempBackdropUrl = undefined;
-  closeRoomModal();
-  renderMapPins();
-  updateCompass();
-  save();
-  // If this room is currently open, rebuild the scene with new camera
+  closeRoomModal(); renderMapPins(); updateCompass(); save();
   if (activeRoomId === data.id) {
     const room = rooms.find(r => r.id === data.id);
     if (room) buildRoomScene(room);
   }
 }
 
-// ── Room picker map ────────────────────────────────────────────────────
-let roomPickerMap = null;
-let roomPickerMarker = null;
+let roomPickerMap = null, roomPickerMarker = null;
 function initRoomPickerMap() {
   const el = document.getElementById('room-latlng-map');
   if (!el || el._leaflet_id) return;
@@ -149,18 +195,14 @@ function uploadRoomBackdrop() {
   const reader = new FileReader();
   reader.onload = e => {
     tempBackdropData = e.target.result;
-    preview.src = e.target.result;
-    preview.style.display = 'block';
+    preview.src = e.target.result; preview.style.display = 'block';
     status.textContent = `\u2713 "${file.name}" is ready to use!`;
     status.style.color = 'var(--accent2)';
     tempBackdropUrl = e.target.result;
     const targetRoomId = editingRoomId || ('room_' + Date.now());
     if (window.lcStore && typeof window.lcStore.uploadRoomBackdropToGitHub === 'function') {
       window.lcStore.uploadRoomBackdropToGitHub(targetRoomId, file).then(url => {
-        if (url) {
-          tempBackdropUrl = url;
-          status.textContent = `\u2713 "${file.name}" uploaded to repo!`;
-        }
+        if (url) { tempBackdropUrl = url; status.textContent = `\u2713 "${file.name}" uploaded to repo!`; }
       }).catch(() => {});
     }
   };
@@ -174,9 +216,7 @@ function uploadRoomBackdrop() {
 
 function openCharModal(charId) {
   editingCharId = charId;
-  tempPhotoData = null;
-  tempAnimData = null;
-  tempGlbData = null;
+  tempPhotoData = null; tempAnimData = null; tempGlbData = null;
   const ch = charId ? characters.find(c => c.id === charId) : null;
   document.getElementById('char-modal-title').textContent = ch ? 'Edit Character' : 'Add a Character';
   document.getElementById('cf-name').value = ch ? ch.name : '';
@@ -184,6 +224,22 @@ function openCharModal(charId) {
   document.getElementById('cf-glb-url').value = ch ? (ch.glbUrl && !ch.glbUrl.startsWith('data:') ? ch.glbUrl : '') : '';
   const currentIds = ch ? (ch.roomIds || (ch.roomId ? [ch.roomId] : [])) : [];
   buildRoomChipPicker(currentIds);
+
+  // Home / work selects
+  populateHomeWorkSelects(currentIds, ch?.homeRoomId || null, ch?.workRoomId || null);
+
+  // Schedule editor
+  const segs = ['morning', 'midday', 'afternoon', 'evening', 'night'];
+  const schedule = ch?.schedule || { morning: 'home', midday: 'work', afternoon: 'work', evening: 'home', night: 'home' };
+  segs.forEach(seg => {
+    const segEl = document.querySelector(`.schedule-segment[data-seg="${seg}"]`);
+    if (!segEl) return;
+    segEl.querySelectorAll('.sch-pill').forEach(pill => {
+      pill.classList.toggle('active', pill.dataset.val === schedule[seg]);
+    });
+  });
+
+  // Photo / anim
   const pp = document.getElementById('cf-photo-preview');
   if (ch && ch.photoData) { pp.src = ch.photoData; pp.style.display = 'block'; tempPhotoData = ch.photoData; }
   else { pp.src = ''; pp.style.display = 'none'; }
@@ -191,18 +247,15 @@ function openCharModal(charId) {
   if (ch && ch.animData) { ap.src = ch.animData; ap.style.display = 'block'; tempAnimData = ch.animData; }
   else { ap.src = ''; ap.style.display = 'none'; }
   const glbStatus = document.getElementById('cf-glb-status');
-  if (ch && ch.glbUrl && ch.glbUrl.startsWith('data:')) {
-    tempGlbData = ch.glbUrl;
-    glbStatus.textContent = '\u2713 Your 3D model is ready to save.';
-  } else if (ch && ch.glbUrl) {
-    glbStatus.textContent = '\u2713 Using a web link for this character.';
-  } else {
-    glbStatus.textContent = '';
-  }
+  if (ch && ch.glbUrl && ch.glbUrl.startsWith('data:')) { tempGlbData = ch.glbUrl; glbStatus.textContent = '\u2713 Your 3D model is ready to save.'; }
+  else if (ch && ch.glbUrl) { glbStatus.textContent = '\u2713 Using a web link for this character.'; }
+  else { glbStatus.textContent = ''; }
   const wrap = document.getElementById('cf-fbx-progress');
   const bar  = document.getElementById('cf-fbx-progress-bar');
   if (wrap) wrap.style.display = 'none';
   if (bar)  bar.style.width = '0%';
+
+  // Mood picker
   const mp = document.getElementById('mood-picker');
   mp.innerHTML = '';
   MOODS.forEach(m => {
@@ -213,11 +266,12 @@ function openCharModal(charId) {
     btn.style.borderColor = isActive ? m.color : 'transparent';
     btn.onclick = () => {
       mp.querySelectorAll('.mood-opt').forEach(b => { b.classList.remove('active'); b.style.borderColor = 'transparent'; });
-      btn.classList.add('active');
-      btn.style.borderColor = m.color;
+      btn.classList.add('active'); btn.style.borderColor = m.color;
     };
     mp.appendChild(btn);
   });
+
+  // Standard dialogue builder
   const db = document.getElementById('dialogue-builder');
   db.innerHTML = '';
   PROMPT_TYPES.forEach(pt => {
@@ -233,25 +287,42 @@ function openCharModal(charId) {
       </div>`;
     db.appendChild(row);
   });
+
+  // Home / work context passages
+  const contextTypes = [
+    { key: 'home', label: '🏠 At home they say…', placeholder: 'What do they talk about at home?', hint: 'Shown when visiting this character at their home room.' },
+    { key: 'work', label: '💼 At work they say…', placeholder: 'What do they talk about at work?', hint: 'Shown when visiting this character at their work room.' },
+  ];
+  contextTypes.forEach(pt => {
+    const existing = ch && ch.passages ? ch.passages.find(p => p.type === pt.key) : null;
+    const row = document.createElement('div');
+    row.className = 'prompt-row';
+    row.dataset.key = pt.key;
+    row.innerHTML = `
+      <button class="prompt-pill ${existing?.text ? 'active' : ''}" onclick="togglePromptPill(this)">${pt.label}</button>
+      <div style="flex:1;display:flex;flex-direction:column;gap:3px">
+        <textarea class="prompt-input" placeholder="${pt.placeholder}" rows="2">${existing?.text || ''}</textarea>
+        <div class="prompt-hint">${pt.hint}</div>
+      </div>`;
+    db.appendChild(row);
+  });
+
+  // Object usage prompts (populated after home/work selects are set)
+  rebuildObjectUsagePrompts();
+
   const hint = document.getElementById('cf-room-chips-hint');
   if (hint && !rooms.length) {
-    hint.style.display = '';
-    hint.style.color = 'var(--accent)';
+    hint.style.display = ''; hint.style.color = 'var(--accent)';
     hint.textContent = '\u26A0\uFE0F Create a room first before adding a character.';
   }
   document.getElementById('char-modal-overlay').classList.add('open');
 }
 
-function togglePromptPill(btn) {
-  btn.classList.toggle('active');
-}
+function togglePromptPill(btn) { btn.classList.toggle('active'); }
 
 function closeCharModal() {
   document.getElementById('char-modal-overlay').classList.remove('open');
-  editingCharId = null;
-  tempPhotoData = null;
-  tempAnimData = null;
-  tempGlbData = null;
+  editingCharId = null; tempPhotoData = null; tempAnimData = null; tempGlbData = null;
   document.getElementById('cf-glb-status').textContent = '';
   const wrap = document.getElementById('cf-fbx-progress');
   const bar  = document.getElementById('cf-fbx-progress-bar');
@@ -265,8 +336,7 @@ function previewFile(inputId, previewId, dataKey) {
   if (!input.files || !input.files[0]) return;
   const reader = new FileReader();
   reader.onload = e => {
-    preview.src = e.target.result;
-    preview.style.display = 'block';
+    preview.src = e.target.result; preview.style.display = 'block';
     if (dataKey === 'photoData') tempPhotoData = e.target.result;
     if (dataKey === 'animData') tempAnimData = e.target.result;
   };
@@ -276,91 +346,51 @@ function previewFile(inputId, previewId, dataKey) {
 function saveCharacter() {
   const name = document.getElementById('cf-name').value.trim();
   if (!name) { alert('Please give the character a name.'); return; }
-
   const roomIds = getSelectedRoomIds();
   if (!editingCharId && !roomIds.length) {
     const chips = document.getElementById('cf-room-chips');
     const hint = document.getElementById('cf-room-chips-hint');
-    if (chips) {
-      chips.style.outline = '2px solid var(--accent)';
-      chips.style.borderRadius = '8px';
-      chips.style.padding = '6px';
-      setTimeout(() => { chips.style.outline = ''; chips.style.padding = ''; }, 2000);
-    }
-    if (hint) {
-      hint.style.display = '';
-      hint.style.color = 'var(--accent)';
-      hint.textContent = '\u26A0\uFE0F Please choose at least one room for this character.';
-      setTimeout(() => { hint.textContent = ''; hint.style.color = ''; }, 3000);
-    }
-    alert('Please choose at least one room before saving.');
-    return;
+    if (chips) { chips.style.outline = '2px solid var(--accent)'; chips.style.borderRadius = '8px'; chips.style.padding = '6px'; setTimeout(() => { chips.style.outline = ''; chips.style.padding = ''; }, 2000); }
+    if (hint) { hint.style.display = ''; hint.style.color = 'var(--accent)'; hint.textContent = '\u26A0\uFE0F Please choose at least one room for this character.'; setTimeout(() => { hint.textContent = ''; hint.style.color = ''; }, 3000); }
+    alert('Please choose at least one room before saving.'); return;
   }
-
   const primaryRoomId = roomIds[0] || '';
   const items = document.getElementById('cf-items').value.split(',').map(s => s.trim()).filter(Boolean);
   const glbUrl = tempGlbData || document.getElementById('cf-glb-url').value.trim();
   const activeMoodBtn = document.querySelector('#mood-picker .mood-opt.active');
   const moodLabel = MOODS.find(m => activeMoodBtn && activeMoodBtn.textContent.includes(m.emoji))?.label || 'Happy';
+  const homeRoomId = document.getElementById('cf-home-room').value || roomIds[0] || null;
+  const workRoomId = document.getElementById('cf-work-room').value || roomIds[0] || null;
+  const schedule = readSchedule();
   const passages = [];
-  document.querySelectorAll('#dialogue-builder .prompt-row').forEach(row => {
+  document.querySelectorAll('#dialogue-builder .prompt-row, #cf-object-usage .prompt-row').forEach(row => {
     const text = row.querySelector('.prompt-input').value.trim();
     if (text) passages.push({ type: row.dataset.key, text });
   });
-  const data = { name, roomId: primaryRoomId, roomIds, mood: moodLabel, items, passages, glbUrl, photoData: tempPhotoData, animData: tempAnimData };
+  const data = { name, roomId: primaryRoomId, roomIds, homeRoomId, workRoomId, schedule, mood: moodLabel, items, passages, glbUrl, photoData: tempPhotoData, animData: tempAnimData };
   const isNew = !editingCharId;
   if (editingCharId) {
     const ch = characters.find(c => c.id === editingCharId);
     if (ch) Object.assign(ch, data);
-  } else {
-    characters.push({ id: 'char_' + Date.now(), ...data });
-  }
-  closeCharModal();
-  renderMapPins();
-  save();
-
-  // Auto-commit to GitHub after every character save (new or edited)
+  } else { characters.push({ id: 'char_' + Date.now(), ...data }); }
+  closeCharModal(); renderMapPins(); save();
   const charLabel = isNew ? `Add character: ${name}` : `Update character: ${name}`;
   const commitInput = document.getElementById('gh-commit-input');
   const prevMsg = commitInput ? commitInput.value : '';
   if (commitInput) commitInput.value = charLabel;
   if (window.lcStore && typeof window.lcStore.ghSave === 'function') {
-    window.lcStore.ghSave().finally(() => {
-      if (commitInput) commitInput.value = prevMsg;
-    });
+    window.lcStore.ghSave().finally(() => { if (commitInput) commitInput.value = prevMsg; });
   }
 }
 
 window.lcModals = {
-  buildRoomChipPicker,
-  getSelectedRoomIds,
-  CAM_PRESETS,
-  setCamPreset,
-  openRoomModal,
-  closeRoomModal,
-  saveRoom,
-  uploadRoomBackdrop,
-  initRoomPickerMap,
-  openCharModal,
-  closeCharModal,
-  togglePromptPill,
-  previewFile,
-  saveCharacter
+  buildRoomChipPicker, getSelectedRoomIds, populateHomeWorkSelects, readSchedule,
+  CAM_PRESETS, setCamPreset, openRoomModal, closeRoomModal, saveRoom, uploadRoomBackdrop,
+  initRoomPickerMap, openCharModal, closeCharModal, togglePromptPill, previewFile, saveCharacter
 };
 
 export {
-  buildRoomChipPicker,
-  getSelectedRoomIds,
-  CAM_PRESETS,
-  setCamPreset,
-  openRoomModal,
-  closeRoomModal,
-  saveRoom,
-  uploadRoomBackdrop,
-  initRoomPickerMap,
-  openCharModal,
-  closeCharModal,
-  togglePromptPill,
-  previewFile,
-  saveCharacter
+  buildRoomChipPicker, getSelectedRoomIds, populateHomeWorkSelects, readSchedule,
+  CAM_PRESETS, setCamPreset, openRoomModal, closeRoomModal, saveRoom, uploadRoomBackdrop,
+  initRoomPickerMap, openCharModal, closeCharModal, togglePromptPill, previewFile, saveCharacter
 };

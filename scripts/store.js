@@ -44,10 +44,7 @@ function onTokenInput() {
 
 async function ghLoad() {
   const token = getToken();
-  if (!token) {
-    setGhStatus('Enter a GitHub token first', 'err');
-    return;
-  }
+  if (!token) { setGhStatus('Enter a GitHub token first', 'err'); return; }
   setGhStatus('Loading…');
   try {
     const res = await fetch(`https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/contents/${GH_PATH}?ref=${GH_BRANCH}`, {
@@ -66,10 +63,7 @@ async function ghLoad() {
 
 async function ghSave() {
   const token = getToken();
-  if (!token) {
-    setGhStatus('Enter a GitHub token first', 'err');
-    return;
-  }
+  if (!token) { setGhStatus('Enter a GitHub token first', 'err'); return; }
   const src = buildTweeSource(rooms, characters, objects);
   const encoded = btoa(unescape(encodeURIComponent(src)));
   const msg = document.getElementById('gh-commit-input').value.trim() || 'Update living-characters world via tool';
@@ -108,7 +102,6 @@ function buildTweeSource(roomsList, chars, objs) {
     if (room.cameraX != null) roomMeta.cameraX = room.cameraX;
     if (room.cameraY != null) roomMeta.cameraY = room.cameraY;
     if (room.cameraZ != null) roomMeta.cameraZ = room.cameraZ;
-    // Persist the GitHub-committed backdrop URL so it survives a round-trip
     if (room.backdropUrl) roomMeta.backdropUrl = room.backdropUrl;
     out += `:: ${room.name} ${JSON.stringify(roomMeta)}\n`;
     out += room.lede ? room.lede + '\n' : '';
@@ -119,12 +112,21 @@ function buildTweeSource(roomsList, chars, objs) {
       if (obj.position) { meta.x = obj.position.x; meta.y = obj.position.y || 0; meta.z = obj.position.z; }
       if (obj.rotation) meta.rotY = obj.rotation.y || 0;
       if (obj.interactable !== undefined) meta.interactable = obj.interactable;
+      if (obj.context) meta.context = obj.context;
+      if (obj.usageTags && obj.usageTags.length) meta.usageTags = obj.usageTags;
       out += `:: ${obj.name}-object ${JSON.stringify(meta)}\n`;
       out += obj.description ? obj.description + '\n' : '';
       out += '\n';
     });
     chars.filter(c => (c.roomIds || [c.roomId]).includes(room.id)).forEach(ch => {
-      const meta = { roomIds: ch.roomIds || [ch.roomId], mood: ch.mood, items: (ch.items || []) };
+      const meta = {
+        roomIds: ch.roomIds || [ch.roomId],
+        homeRoomId: ch.homeRoomId || null,
+        workRoomId: ch.workRoomId || null,
+        schedule: ch.schedule || null,
+        mood: ch.mood,
+        items: ch.items || []
+      };
       if (ch.glbUrl) meta.glbUrl = ch.glbUrl;
       out += `:: ${ch.name} ${JSON.stringify(meta)}\n\n`;
       (ch.passages || []).forEach(p => { out += `:: ${ch.name}-${p.type}\n${p.text}\n\n`; });
@@ -169,9 +171,7 @@ function handleImportFile(event) {
 
 function importTweeSource(src, silent) {
   const lines = src.split('\n');
-  const newRooms = [];
-  const newChars = [];
-  const newObjs = [];
+  const newRooms = [], newChars = [], newObjs = [];
   let i = 0;
   while (i < lines.length) {
     const line = lines[i];
@@ -187,48 +187,44 @@ function importTweeSource(src, silent) {
       if (meta.lat !== undefined) {
         const roomId = meta.id || ('room_' + passName.replace(/\s+/g, '_'));
         newRooms.push({
-          id: roomId,
-          name: passName,
-          lede: body,
-          lat: meta.lat,
-          lng: meta.lng,
-          radius: meta.radius || 30,
+          id: roomId, name: passName, lede: body,
+          lat: meta.lat, lng: meta.lng, radius: meta.radius || 30,
           backdropUrl: meta.backdropUrl || null,
-          cameraX: meta.cameraX,
-          cameraY: meta.cameraY,
-          cameraZ: meta.cameraZ
+          cameraX: meta.cameraX, cameraY: meta.cameraY, cameraZ: meta.cameraZ
         });
       } else if (passName.endsWith('-object')) {
         const objName = passName.slice(0, -7).trim();
         newObjs.push({
           id: 'obj_' + objName.replace(/\s+/g, '_') + '_' + Date.now(),
-          roomId: meta.roomId || '',
-          name: objName,
-          glbUrl: meta.glbUrl || '',
+          roomId: meta.roomId || '', name: objName, glbUrl: meta.glbUrl || '',
           position: { x: meta.x || 0, y: meta.y || 0, z: meta.z || 0 },
-          rotation: { y: meta.rotY || 0 },
-          scale: meta.scale || 1,
-          description: body,
-          interactable: meta.interactable !== false
+          rotation: { y: meta.rotY || 0 }, scale: meta.scale || 1,
+          description: body, interactable: meta.interactable !== false,
+          context: meta.context || null, usageTags: meta.usageTags || []
         });
       } else if ((meta.roomIds !== undefined || meta.roomId !== undefined) && !passName.includes('-')) {
         const roomIds = Array.isArray(meta.roomIds) ? meta.roomIds : (meta.roomId ? [meta.roomId] : []);
         const primaryRoomId = roomIds[0] || meta.roomId;
-        newChars.push({ id: 'char_' + passName.replace(/\s+/g, '_'), name: passName, roomId: primaryRoomId, roomIds, mood: meta.mood || 'Happy', items: meta.items || [], passages: [], photoData: null, animData: null, glbUrl: meta.glbUrl || null });
+        newChars.push({
+          id: 'char_' + passName.replace(/\s+/g, '_'), name: passName,
+          roomId: primaryRoomId, roomIds,
+          homeRoomId: meta.homeRoomId || null,
+          workRoomId: meta.workRoomId || null,
+          schedule: meta.schedule || null,
+          mood: meta.mood || 'Happy', items: meta.items || [],
+          passages: [], photoData: null, animData: null, glbUrl: meta.glbUrl || null
+        });
       } else if (passName.includes('-')) {
-        const [charName, ...tp] = passName.split('-');
-        const type = tp.join('-');
+        const dashIdx = passName.indexOf('-');
+        const charName = passName.slice(0, dashIdx);
+        const type = passName.slice(dashIdx + 1);
         const ch = newChars.find(c => c.name === charName);
         if (ch) ch.passages.push({ type, text: body });
       }
-    } else {
-      i++;
-    }
+    } else { i++; }
   }
   if (newRooms.length || newChars.length || newObjs.length) {
-    rooms = newRooms;
-    characters = newChars;
-    objects = newObjs;
+    rooms = newRooms; characters = newChars; objects = newObjs;
     if (typeof window.renderMapPins === 'function') window.renderMapPins();
     if (typeof window.updateCompass === 'function') window.updateCompass();
     save();
@@ -246,7 +242,6 @@ function save() {
   } catch (e) {}
 }
 
-// ── Phase 2: Upload backdrop image to GitHub ───────────────────────────────────
 async function uploadRoomBackdropToGitHub(roomId, file) {
   const token = getToken();
   if (!token) {
@@ -256,21 +251,13 @@ async function uploadRoomBackdropToGitHub(roomId, file) {
   }
   const base64 = await new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = e => {
-      const dataUrl = e.target.result;
-      const base64Content = String(dataUrl).replace(/^data:.*?;base64,/, '');
-      resolve(base64Content);
-    };
+    reader.onload = e => resolve(String(e.target.result).replace(/^data:.*?;base64,/, ''));
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
   const path = `media/room-backdrops/${roomId}.png`;
   const url = `https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/contents/${path}`;
-  const body = {
-    message: `Upload backdrop for room ${roomId}`,
-    content: base64,
-    branch: GH_BRANCH
-  };
+  const body = { message: `Upload backdrop for room ${roomId}`, content: base64, branch: GH_BRANCH };
   const res = await fetch(url, {
     method: 'PUT',
     headers: { Authorization: 'token ' + token, Accept: 'application/vnd.github.v3+json', 'Content-Type': 'application/json' },
@@ -282,7 +269,6 @@ async function uploadRoomBackdropToGitHub(roomId, file) {
     showToast('Backdrop upload failed', 'err');
     return null;
   }
-  const json = await res.json();
   setGhStatus('Backdrop saved ✓', 'ok');
   showToast('Backdrop saved to GitHub', 'ok');
   return `https://raw.githubusercontent.com/${GH_OWNER}/${GH_REPO}/${GH_BRANCH}/media/room-backdrops/${roomId}.png`;
@@ -308,6 +294,9 @@ function loadLocal() {
       characters = JSON.parse(c);
       characters.forEach(ch => {
         if (!ch.roomIds || !Array.isArray(ch.roomIds)) ch.roomIds = ch.roomId ? [ch.roomId] : [];
+        if (!ch.homeRoomId) ch.homeRoomId = ch.roomIds[0] || null;
+        if (!ch.workRoomId) ch.workRoomId = ch.roomIds[0] || null;
+        if (!ch.schedule) ch.schedule = { morning: 'home', midday: 'work', afternoon: 'work', evening: 'home', night: 'home' };
       });
     }
     if (o) objects = JSON.parse(o);
@@ -323,43 +312,15 @@ window.addEventListener('DOMContentLoaded', () => {
 });
 
 window.lcStore = {
-  save,
-  loadLocal,
-  ghLoad,
-  ghSave,
-  buildTweeSource,
-  buildTweeStandalone,
-  previewTwee,
-  closeTweePreview,
-  downloadTwee,
-  triggerImport,
-  handleImportFile,
-  importTweeSource,
-  onTokenInput,
-  setGhStatus,
-  getToken,
-  decodeBase64Unicode,
-  seedGhFileSha,
-  uploadRoomBackdropToGitHub
+  save, loadLocal, ghLoad, ghSave, buildTweeSource, buildTweeStandalone,
+  previewTwee, closeTweePreview, downloadTwee, triggerImport, handleImportFile,
+  importTweeSource, onTokenInput, setGhStatus, getToken, decodeBase64Unicode,
+  seedGhFileSha, uploadRoomBackdropToGitHub
 };
 
 export {
-  save,
-  loadLocal,
-  ghLoad,
-  ghSave,
-  buildTweeSource,
-  buildTweeStandalone,
-  previewTwee,
-  closeTweePreview,
-  downloadTwee,
-  triggerImport,
-  handleImportFile,
-  importTweeSource,
-  onTokenInput,
-  setGhStatus,
-  getToken,
-  decodeBase64Unicode,
-  seedGhFileSha,
-  uploadRoomBackdropToGitHub
+  save, loadLocal, ghLoad, ghSave, buildTweeSource, buildTweeStandalone,
+  previewTwee, closeTweePreview, downloadTwee, triggerImport, handleImportFile,
+  importTweeSource, onTokenInput, setGhStatus, getToken, decodeBase64Unicode,
+  seedGhFileSha, uploadRoomBackdropToGitHub
 };
