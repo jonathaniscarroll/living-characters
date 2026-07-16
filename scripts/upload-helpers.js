@@ -26,8 +26,12 @@ export async function handleModelUpload(file, statusElId, urlFieldId, dataKey, o
     }
   }
   function storeResult(dataUrl) {
+    // Write to both the named global key AND window.tempGlbData so
+    // saveCharacter() / saveObject() always find it regardless of which
+    // variable name they check.
     if (dataKey) window[dataKey] = dataUrl;
-    if (urlEl)   urlEl.value = '';
+    window.tempGlbData = dataUrl;       // character modal reads this
+    if (urlEl) urlEl.value = '';
     return dataUrl;
   }
 
@@ -94,6 +98,8 @@ export async function uploadCharacterGlb() {
   const barEl      = document.getElementById('cf-fbx-progress-bar');
   if (progressEl) progressEl.style.display = 'block';
 
+  // dataKey 'tempGlbData' writes to window.tempGlbData;
+  // storeResult() also explicitly sets window.tempGlbData as a belt-and-braces.
   const result = await handleModelUpload(
     file,
     'cf-glb-status',
@@ -126,7 +132,7 @@ export async function uploadObjectGlb() {
   if (!result && progressEl) progressEl.style.display = 'none';
 }
 
-// ── Expose on window so inline onclick handlers (index.html) resolve ─────────
+// ── Expose on window so inline onclick handlers (index.html) resolve ──────────
 window.lcUpload = { uploadCharacterGlb, uploadObjectGlb, handleModelUpload };
 window.handleModelUpload = handleModelUpload;
 

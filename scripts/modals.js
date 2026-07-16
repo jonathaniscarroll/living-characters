@@ -216,7 +216,11 @@ function uploadRoomBackdrop() {
 
 function openCharModal(charId) {
   editingCharId = charId;
-  tempPhotoData = null; tempAnimData = null; tempGlbData = null;
+  // Reset all temp upload state — both the module-local var AND window globals
+  tempPhotoData = null;
+  tempAnimData  = null;
+  tempGlbData   = null;
+  window.tempGlbData = null;   // ← clear the global so a stale upload can't bleed through
   const ch = charId ? characters.find(c => c.id === charId) : null;
   document.getElementById('char-modal-title').textContent = ch ? 'Edit Character' : 'Add a Character';
   document.getElementById('cf-name').value = ch ? ch.name : '';
@@ -239,17 +243,27 @@ function openCharModal(charId) {
     });
   });
 
-  // Photo / anim
+  // Photo / anim previews
   const pp = document.getElementById('cf-photo-preview');
   if (ch && ch.photoData) { pp.src = ch.photoData; pp.style.display = 'block'; tempPhotoData = ch.photoData; }
   else { pp.src = ''; pp.style.display = 'none'; }
   const ap = document.getElementById('cf-anim-preview');
   if (ch && ch.animData) { ap.src = ch.animData; ap.style.display = 'block'; tempAnimData = ch.animData; }
   else { ap.src = ''; ap.style.display = 'none'; }
+
+  // GLB status — if there's already a data URL on the character, seed it into
+  // BOTH the module-local var and window.tempGlbData so saveCharacter() finds it.
   const glbStatus = document.getElementById('cf-glb-status');
-  if (ch && ch.glbUrl && ch.glbUrl.startsWith('data:')) { tempGlbData = ch.glbUrl; glbStatus.textContent = '\u2713 Your 3D model is ready to save.'; }
-  else if (ch && ch.glbUrl) { glbStatus.textContent = '\u2713 Using a web link for this character.'; }
-  else { glbStatus.textContent = ''; }
+  if (ch && ch.glbUrl && ch.glbUrl.startsWith('data:')) {
+    tempGlbData = ch.glbUrl;
+    window.tempGlbData = ch.glbUrl;
+    glbStatus.textContent = '\u2713 Your 3D model is ready to save.';
+  } else if (ch && ch.glbUrl) {
+    glbStatus.textContent = '\u2713 Using a web link for this character.';
+  } else {
+    glbStatus.textContent = '';
+  }
+
   const wrap = document.getElementById('cf-fbx-progress');
   const bar  = document.getElementById('cf-fbx-progress-bar');
   if (wrap) wrap.style.display = 'none';
@@ -322,7 +336,11 @@ function togglePromptPill(btn) { btn.classList.toggle('active'); }
 
 function closeCharModal() {
   document.getElementById('char-modal-overlay').classList.remove('open');
-  editingCharId = null; tempPhotoData = null; tempAnimData = null; tempGlbData = null;
+  editingCharId = null;
+  tempPhotoData = null;
+  tempAnimData  = null;
+  tempGlbData   = null;
+  window.tempGlbData = null;   // ← also clear global on close
   document.getElementById('cf-glb-status').textContent = '';
   const wrap = document.getElementById('cf-fbx-progress');
   const bar  = document.getElementById('cf-fbx-progress-bar');
@@ -338,7 +356,7 @@ function previewFile(inputId, previewId, dataKey) {
   reader.onload = e => {
     preview.src = e.target.result; preview.style.display = 'block';
     if (dataKey === 'photoData') tempPhotoData = e.target.result;
-    if (dataKey === 'animData') tempAnimData = e.target.result;
+    if (dataKey === 'animData')  tempAnimData  = e.target.result;
   };
   reader.readAsDataURL(input.files[0]);
 }
@@ -349,34 +367,65 @@ function saveCharacter() {
   const roomIds = getSelectedRoomIds();
   if (!editingCharId && !roomIds.length) {
     const chips = document.getElementById('cf-room-chips');
-    const hint = document.getElementById('cf-room-chips-hint');
-    if (chips) { chips.style.outline = '2px solid var(--accent)'; chips.style.borderRadius = '8px'; chips.style.padding = '6px'; setTimeout(() => { chips.style.outline = ''; chips.style.padding = ''; }, 2000); }
-    if (hint) { hint.style.display = ''; hint.style.color = 'var(--accent)'; hint.textContent = '\u26A0\uFE0F Please choose at least one room for this character.'; setTimeout(() => { hint.textContent = ''; hint.style.color = ''; }, 3000); }
+    const hint  = document.getElementById('cf-room-chips-hint');
+    if (chips) {
+      chips.style.outline = '2px solid var(--accent)';
+      chips.style.borderRadius = '8px';
+      chips.style.padding = '6px';
+      setTimeout(() => { chips.style.outline = ''; chips.style.padding = ''; }, 2000);
+    }
+    if (hint) {
+      hint.style.display = ''; hint.style.color = 'var(--accent)';
+      hint.textContent = '\u26A0\uFE0F Please choose at least one room for this character.';
+      setTimeout(() => { hint.textContent = ''; hint.style.color = ''; }, 3000);
+    }
     alert('Please choose at least one room before saving.'); return;
   }
   const primaryRoomId = roomIds[0] || '';
   const items = document.getElementById('cf-items').value.split(',').map(s => s.trim()).filter(Boolean);
-  const glbUrl = tempGlbData || document.getElementById('cf-glb-url').value.trim();
+
+  // Resolve GLB: prefer the module-local var, then the window global (set by
+  // upload-helpers.js), then the URL text field.  This covers the case where
+  // the upload helper runs asynchronously in a different module scope.
+  const glbUrl = tempGlbData || window.tempGlbData || document.getElementById('cf-glb-url').value.trim() || null;
+
   const activeMoodBtn = document.querySelector('#mood-picker .mood-opt.active');
   const moodLabel = MOODS.find(m => activeMoodBtn && activeMoodBtn.textContent.includes(m.emoji))?.label || 'Happy';
   const homeRoomId = document.getElementById('cf-home-room').value || roomIds[0] || null;
   const workRoomId = document.getElementById('cf-work-room').value || roomIds[0] || null;
-  const schedule = readSchedule();
+  const schedule   = readSchedule();
+
   const passages = [];
   document.querySelectorAll('#dialogue-builder .prompt-row, #cf-object-usage .prompt-row').forEach(row => {
     const text = row.querySelector('.prompt-input').value.trim();
     if (text) passages.push({ type: row.dataset.key, text });
   });
-  const data = { name, roomId: primaryRoomId, roomIds, homeRoomId, workRoomId, schedule, mood: moodLabel, items, passages, glbUrl, photoData: tempPhotoData, animData: tempAnimData };
+
+  const data = {
+    name, roomId: primaryRoomId, roomIds,
+    homeRoomId, workRoomId, schedule,
+    mood: moodLabel, items, passages,
+    glbUrl,
+    photoData: tempPhotoData,
+    animData:  tempAnimData,
+  };
+
   const isNew = !editingCharId;
   if (editingCharId) {
     const ch = characters.find(c => c.id === editingCharId);
     if (ch) Object.assign(ch, data);
-  } else { characters.push({ id: 'char_' + Date.now(), ...data }); }
-  closeCharModal(); renderMapPins(); save();
-  const charLabel = isNew ? `Add character: ${name}` : `Update character: ${name}`;
+  } else {
+    characters.push({ id: 'char_' + Date.now(), ...data });
+  }
+
+  closeCharModal();
+  renderMapPins();
+  save();
+
+  // Auto-save to GitHub with a descriptive commit message
+  const charLabel   = isNew ? `Add character: ${name}` : `Update character: ${name}`;
   const commitInput = document.getElementById('gh-commit-input');
-  const prevMsg = commitInput ? commitInput.value : '';
+  const prevMsg     = commitInput ? commitInput.value : '';
   if (commitInput) commitInput.value = charLabel;
   if (window.lcStore && typeof window.lcStore.ghSave === 'function') {
     window.lcStore.ghSave().finally(() => { if (commitInput) commitInput.value = prevMsg; });
@@ -385,12 +434,14 @@ function saveCharacter() {
 
 window.lcModals = {
   buildRoomChipPicker, getSelectedRoomIds, populateHomeWorkSelects, readSchedule,
+  rebuildObjectUsagePrompts,
   CAM_PRESETS, setCamPreset, openRoomModal, closeRoomModal, saveRoom, uploadRoomBackdrop,
   initRoomPickerMap, openCharModal, closeCharModal, togglePromptPill, previewFile, saveCharacter
 };
 
 export {
   buildRoomChipPicker, getSelectedRoomIds, populateHomeWorkSelects, readSchedule,
+  rebuildObjectUsagePrompts,
   CAM_PRESETS, setCamPreset, openRoomModal, closeRoomModal, saveRoom, uploadRoomBackdrop,
   initRoomPickerMap, openCharModal, closeCharModal, togglePromptPill, previewFile, saveCharacter
 };
