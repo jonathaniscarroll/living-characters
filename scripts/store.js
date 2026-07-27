@@ -3,6 +3,11 @@ const GH_REPO = 'living-characters';
 const GH_PATH = 'story/main.twee';
 const GH_BRANCH = 'main';
 
+// Public raw URL — readable by anyone, no token needed
+const GH_RAW_URL = `https://raw.githubusercontent.com/${GH_OWNER}/${GH_REPO}/${GH_BRANCH}/${GH_PATH}`;
+// Cache-bust so browsers don't serve stale content
+function rawUrlFresh() { return GH_RAW_URL + '?v=' + Date.now(); }
+
 let ghFileSha = null;
 
 function decodeBase64Unicode(b64) {
@@ -39,6 +44,46 @@ function onTokenInput() {
     localStorage.setItem('lc_gh_token', t);
     setGhStatus('token saved ✓', 'ok');
     seedGhFileSha(t);
+  }
+}
+
+// ── Auto-load world from public GitHub on startup ────────────────────────────
+// No token needed — reads the raw public file.
+// Falls back to localStorage if offline or repo has no content yet.
+async function autoLoadFromGitHub() {
+  setGhStatus('Loading world…');
+  try {
+    const res = await fetch(rawUrlFresh());
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const src = await res.text();
+    if (src.trim().length < 10) throw new Error('empty');
+    importTweeSource(src, true /* silent */);
+    setGhStatus('World loaded ✓', 'ok');
+    showToast('World loaded ✓', 'ok');
+    // Seed sha so Save works immediately after auto-load
+    const token = getToken();
+    if (token) {
+      seedGhFileSha(token);
+    } else {
+      // Fetch sha without auth (public repo, counts against anon rate limit)
+      const metaRes = await fetch(
+        `https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/contents/${GH_PATH}?ref=${GH_BRANCH}`,
+        { headers: { Accept: 'application/vnd.github.v3+json' } }
+      );
+      if (metaRes.ok) { const d = await metaRes.json(); ghFileSha = d.sha; }
+    }
+  } catch (e) {
+    // Graceful fallback: use localStorage so the tool still works offline
+    loadLocal();
+    if (e.message === 'empty') {
+      setGhStatus('No world saved yet', '');
+      showToast('No world saved yet — start adding characters!', 'ok');
+    } else if (e.message.startsWith('HTTP 404')) {
+      setGhStatus('No world file yet', '');
+    } else {
+      setGhStatus('Offline — local data', '');
+      showToast('Offline — showing local data', '');
+    }
   }
 }
 
@@ -90,6 +135,8 @@ async function ghSave() {
     const data = await res.json();
     ghFileSha = data.content.sha;
     setGhStatus('Saved ✓  ' + data.commit.sha.slice(0, 7), 'ok');
+    // Mirror to localStorage as offline cache
+    save();
   } catch (e) {
     setGhStatus('Save failed: ' + e.message, 'err');
   }
@@ -234,6 +281,7 @@ function importTweeSource(src, silent) {
   }
 }
 
+// Mirror current state to localStorage as offline cache
 function save() {
   try {
     localStorage.setItem('lc_rooms', JSON.stringify(rooms));
@@ -307,19 +355,24 @@ window.addEventListener('DOMContentLoaded', () => {
   const saved = localStorage.getItem('lc_gh_token');
   if (saved) {
     document.getElementById('gh-token-input').value = saved;
-    seedGhFileSha(saved);
   }
+  // Auto-load the shared world from GitHub on every startup.
+  // No token needed — reads the public raw file.
+  // Falls back to localStorage if offline or file doesn't exist yet.
+  autoLoadFromGitHub();
 });
 
 window.lcStore = {
-  save, loadLocal, ghLoad, ghSave, buildTweeSource, buildTweeStandalone,
+  save, loadLocal, ghLoad, ghSave, autoLoadFromGitHub,
+  buildTweeSource, buildTweeStandalone,
   previewTwee, closeTweePreview, downloadTwee, triggerImport, handleImportFile,
   importTweeSource, onTokenInput, setGhStatus, getToken, decodeBase64Unicode,
   seedGhFileSha, uploadRoomBackdropToGitHub
 };
 
 export {
-  save, loadLocal, ghLoad, ghSave, buildTweeSource, buildTweeStandalone,
+  save, loadLocal, ghLoad, ghSave, autoLoadFromGitHub,
+  buildTweeSource, buildTweeStandalone,
   previewTwee, closeTweePreview, downloadTwee, triggerImport, handleImportFile,
   importTweeSource, onTokenInput, setGhStatus, getToken, decodeBase64Unicode,
   seedGhFileSha, uploadRoomBackdropToGitHub
