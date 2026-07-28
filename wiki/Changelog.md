@@ -27,6 +27,15 @@ Legacy rooms with named backdrop keys (grass / forest / wood / stone) continue t
 
 ---
 
+### 2026-07-28
+- **GPS user marker** — pulsing blue dot (`DivIcon` + CSS `@keyframes lc-pulse`) placed at user's real-world coordinates. "You are here" tooltip. `zIndexOffset: 9999` keeps it above character pins.
+- **Accuracy circle** — `L.circle` with radius = `coords.accuracy` metres; semi-transparent blue ring, non-interactive.
+- **Auto-center on load** — `initMap()` now calls `getCurrentPosition` before any user interaction. Map snaps to user position on the first successful fix.
+- **First-fix gate** — `_gpsFirstFix` boolean ensures the map re-centers exactly once; subsequent `watchPosition` updates do not override manual panning.
+- **Sim mode marker** — `startSim` now also moves the user marker and accuracy circle through each room waypoint.
+
+---
+
 ## Earlier
 
 - Initial implementation: map canvas, character pins, Three.js room scene, wander AI, mood rings, dialogue builder, Twee export, schedule editor, GitHub sync, drag-to-move.
