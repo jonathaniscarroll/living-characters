@@ -39,6 +39,12 @@ Characters replace locations as the primary unit of interaction. Instead of walk
 | `localStorage` persistence | ✅ |
 | GitHub-backed save / load (optional PAT) | ✅ |
 | Camera angle presets (isometric, front, side, top, low) | ✅ |
+| GPS user position marker — pulsing blue dot, "You are here" tooltip, `zIndexOffset` above character pins | ✅ |
+| GPS accuracy circle — semi-transparent blue `L.circle` scaled to `coords.accuracy` metres | ✅ |
+| Auto-center on load — `getCurrentPosition` fires on `initMap()`, snaps map to user before GPS button is pressed; falls back to Halifax default | ✅ |
+| First-fix gate — map re-centers exactly once (on first GPS fix); user can pan freely after | ✅ |
+| Simulation mode (`startSim`) — walks through all rooms every 4 s for indoor/offline testing | ✅ |
+| Mobile pinch-zoom fix (`mobile-zoom-fix.css` / `.js`) | ✅ |
 
 ---
 
@@ -53,7 +59,9 @@ scripts/
   fbx-to-glb.js     — FBX loader + GLTFExporter pipeline
   store.js          — localStorage + optional GitHub save/load
   twee.js           — Twee export builder
-  map.js            — Leaflet map, pins, compass
+  map.js            — Leaflet map, character + room pins, GPS user marker (pulsing dot + accuracy
+                       circle), first-fix re-center, compass panel, proximity checks, sim mode,
+                       day-segment scheduling, facilitator/visitor mode toggle
 media/              — default backdrop images (room2.png, garden.png)
 story/              — exported .twee files
 wiki/               — in-repo wiki pages (mirrored below)
