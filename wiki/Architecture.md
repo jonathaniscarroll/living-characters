@@ -107,3 +107,28 @@ window.tempBackdropData    // set by uploadRoomBackdrop, read by saveRoom()
 ## Module boundary problem (fixed Jul 2026)
 
 `upload-helpers.js` runs as a separate ES module. When it finished converting an FBX it wrote to `window.tempGlbData` but the old `modals.js` read a module-local `tempGlbData` variable that was never updated by the upload helper. Fix: `storeResult()` in upload-helpers now always writes `window.tempGlbData` explicitly; `saveCharacter()` resolves `tempGlbData || window.tempGlbData || url-field`.
+
+### GPS subsystem (`map.js`)
+
+**Startup flow:**
+1. `initMap()` calls `navigator.geolocation.getCurrentPosition()`.
+2. On success the map snaps to the user's coords via `map.setView()` and `_updateUserMarker()` places the blue dot + accuracy circle. `_gpsFirstFix` is set to `true`.
+3. On permission denial / unavailability the map stays on the `DEFAULT_CENTER` ([44.65, −63.59], zoom 16).
+
+**Live tracking (`startGPS`):**
+- Uses `watchPosition`. Each callback updates `userLat`/`userLng` (global proximity variables), calls `_updateUserMarker()`, and refreshes the compass.
+- The map only re-centers on the **very first** fix (`_gpsFirstFix` gate). After that the user pans freely.
+
+**User marker styling:**
+- `L.divIcon` with class `.lc-user-dot` — a 16 × 16 px blue circle, white border, `::after` pseudo-element with `@keyframes lc-pulse` (scale 1 → 2.4, opacity 1 → 0, 2 s ease-out loop).
+- `zIndexOffset: 9999` ensures it always renders above character pins.
+- Accuracy ring: `L.circle` with `fillOpacity: 0.08`, `weight: 1.5`, `interactive: false`.
+
+**Simulation mode (`startSim`):**
+- Cycles through all rooms at 4-second intervals, setting `userLat`/`userLng` to near each room's centre (±0.0002° jitter).
+- Also moves the user marker and accuracy circle so the blue dot tracks the sim position.
+- Toggling `startSim` again stops the interval and clears `_insideRoomIds`.
+
+**Facilitator / Visitor mode (`toggleMode`):**
+- In **Facilitator** mode `checkProximity()` is a no-op — proximity toasts and room auto-open are suppressed.
+- In **Visitor** mode normal proximity logic runs.
