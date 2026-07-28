@@ -2,6 +2,11 @@
 
 let _insideRoomIds = new Set();
 
+// ── User position state ──────────────────────────────────────────────────────
+let userMarker = null;       // L.marker / L.circleMarker for "You are here"
+let userAccuracyCircle = null; // L.circle showing accuracy radius
+let _gpsFirstFix = false;    // true after the very first fix snaps the map
+
 // ── Day segment ──────────────────────────────────────────────────────────────
 let currentSegment = 'morning';
 
@@ -24,12 +29,124 @@ function getActiveRoomId(character) {
   return segValue;
 }
 
+// ── User position marker helpers ─────────────────────────────────────────────
+
+// Inject the pulse keyframes once into the document <head>
+(function _injectPulseStyle() {
+  if (document.getElementById('lc-user-pulse-style')) return;
+  const style = document.createElement('style');
+  style.id = 'lc-user-pulse-style';
+  style.textContent = `
+    @keyframes lc-pulse {
+      0%   { transform: scale(1);   opacity: 1; }
+      70%  { transform: scale(2.4); opacity: 0; }
+      100% { transform: scale(1);   opacity: 0; }
+    }
+    .lc-user-dot {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #2979ff;
+      border: 2.5px solid #fff;
+      box-shadow: 0 0 0 2px rgba(41,121,255,0.4);
+      position: relative;
+    }
+    .lc-user-dot::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      background: rgba(41,121,255,0.55);
+      animation: lc-pulse 2s ease-out infinite;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .lc-user-dot::after { animation: none; }
+    }
+  `;
+  document.head.appendChild(style);
+}());
+
+function _makeUserIcon() {
+  return L.divIcon({
+    className: '',
+    html: '<div class="lc-user-dot"></div>',
+    iconSize:   [16, 16],
+    iconAnchor: [8, 8]
+  });
+}
+
+/**
+ * Place or move the "You are here" marker and accuracy circle.
+ * @param {number} lat
+ * @param {number} lng
+ * @param {number} accuracy  metres (from coords.accuracy)
+ */
+function _updateUserMarker(lat, lng, accuracy) {
+  if (!map) return;
+
+  if (!userMarker) {
+    userMarker = L.marker([lat, lng], {
+      icon: _makeUserIcon(),
+      zIndexOffset: 9999,  // always on top of character pins
+      interactive: true
+    }).addTo(map);
+    userMarker.bindTooltip('You are here', { permanent: false, direction: 'top', offset: [0, -10] });
+  } else {
+    userMarker.setLatLng([lat, lng]);
+  }
+
+  const acc = accuracy || 0;
+  if (!userAccuracyCircle) {
+    userAccuracyCircle = L.circle([lat, lng], {
+      radius: acc,
+      color:       '#2979ff',
+      fillColor:   '#2979ff',
+      fillOpacity: 0.08,
+      weight:      1.5,
+      opacity:     0.5,
+      interactive: false
+    }).addTo(map);
+  } else {
+    userAccuracyCircle.setLatLng([lat, lng]);
+    userAccuracyCircle.setRadius(acc);
+  }
+}
+
+// ── Map init ─────────────────────────────────────────────────────────────────
+
+const DEFAULT_CENTER = [44.65, -63.59];
+const DEFAULT_ZOOM   = 16;
+
 function initMap() {
-  map = L.map('map', { zoomControl: true }).setView([44.65, -63.59], 16);
+  map = L.map('map', { zoomControl: true }).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© OpenStreetMap contributors', maxZoom: 19
   }).addTo(map);
   renderMapPins();
+
+  // Try to center the map on the user's real position at startup.
+  // The map is already visible with the default center; we silently
+  // snap it once the browser returns a fix (or do nothing on error).
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        const { latitude: lat, longitude: lng, accuracy } = pos.coords;
+        // Update global proximity variables (declared in index.html)
+        userLat = lat;
+        userLng = lng;
+        // Snap map to user and place marker
+        if (!_gpsFirstFix) {
+          _gpsFirstFix = true;
+          map.setView([lat, lng], map.getZoom());
+        }
+        _updateUserMarker(lat, lng, accuracy);
+        // Refresh compass now that we have a position
+        updateCompass();
+      },
+      () => { /* Geolocation denied or unavailable — stay on default center */ },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
+    );
+  }
 }
 
 function renderMapPins() {
@@ -88,9 +205,22 @@ function startGPS() {
   if (!navigator.geolocation) { alert('Geolocation not supported.'); return; }
   document.getElementById('gps-status').textContent = 'GPS: acquiring…';
   gpsWatchId = navigator.geolocation.watchPosition(pos => {
-    userLat = pos.coords.latitude; userLng = pos.coords.longitude;
-    document.getElementById('gps-status').textContent = `GPS: ${userLat.toFixed(4)}, ${userLng.toFixed(4)}`;
-    checkProximity(); updateCompass();
+    const { latitude: lat, longitude: lng, accuracy } = pos.coords;
+    userLat = lat;
+    userLng = lng;
+    document.getElementById('gps-status').textContent = `GPS: ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+
+    // Snap to user on the very first fix (only once)
+    if (!_gpsFirstFix) {
+      _gpsFirstFix = true;
+      map.setView([lat, lng], map.getZoom());
+    }
+
+    // Update / create the "You are here" marker and accuracy circle
+    _updateUserMarker(lat, lng, accuracy);
+
+    checkProximity();
+    updateCompass();
   }, err => {
     const msgs = { 1: 'permission denied', 2: 'position unavailable', 3: 'timeout' };
     document.getElementById('gps-status').textContent = 'GPS: ' + (msgs[err.code] || err.message || 'error');
@@ -109,7 +239,10 @@ function startSim() {
     userLat = room.lat + (Math.random() - 0.5) * 0.0002;
     userLng = room.lng + (Math.random() - 0.5) * 0.0002;
     document.getElementById('gps-status').textContent = `Sim: near ${room.name}`;
-    map.panTo([userLat, userLng]); checkProximity(); updateCompass(); idx++;
+    map.panTo([userLat, userLng]);
+    // Update "You are here" marker during simulation too
+    _updateUserMarker(userLat, userLng, 10);
+    checkProximity(); updateCompass(); idx++;
   };
   step(); simInterval = setInterval(step, 4000);
 }
