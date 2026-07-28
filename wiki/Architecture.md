@@ -11,6 +11,7 @@ index.html
 │  All markup: map view, room view, modals, toolbars
 │  Loads Three.js, GLTFLoader, Leaflet from CDN/vendor
 │  Imports scripts as ES modules
+│  Declares DEFAULT_GLB_URL (fallback 3D model) and MOODS[]
 │
 scripts/
 ├── room.js           Three.js room scene
@@ -36,7 +37,33 @@ scripts/
 ├── store.js          localStorage + GitHub save/load
 ├── twee.js           Twee export builder
 └── map.js            Leaflet map, pins, compass
+
+author/
+└── index.html        Entry-point stub for the GitHub Pages / build deployment.
+                   In production the full editor UI is copied here by CI.
+                   In development it redirects to the repo-root index.html.
+
+mobile-zoom-fix.css  CSS rules that prevent unwanted browser zoom on mobile
+mobile-zoom-fix.js   JS counterpart: intercepts pinch-zoom events for fine-grained
+                     control on iOS/Android when Leaflet’s default handling is
+                     insufficient.
+
+story/               Destination folder for Twee export downloads.
+                     The “Export Twee” button writes .twee files here via
+                     the GitHub save path. Safe to delete between sessions.
+
+media/               Default backdrop images shipped with the repo
+                     (room2.png, garden.png). Used as fallbacks when a room
+                     has no uploaded backdrop.
 ```
+
+## Constants (index.html)
+
+```js
+const DEFAULT_GLB_URL = 'https://threejs.org/examples/models/gltf/Soldier.glb';
+```
+
+This URL is the **fallback 3D character model** used whenever a character has no uploaded GLB/FBX and no photo/GIF. The Three.js Soldier model ships Mixamo-compatible walk and idle animations, so wander AI works out-of-the-box for test characters. It is also used by `spawnTestRoom()` in `map.js`. To swap the default, change `DEFAULT_GLB_URL` in `index.html` before the ES module imports.
 
 ## Data shapes
 
