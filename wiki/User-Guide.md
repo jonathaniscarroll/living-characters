@@ -27,6 +27,22 @@ This guide covers everything a facilitator or camper needs to run a Living Chara
 
 ---
 
+## GPS & location features
+
+**On page load** the tool silently requests your browser location. If granted, the map centres on your position and a **pulsing blue dot** appears — this is the "You are here" marker. A semi-transparent blue circle around it shows GPS accuracy in metres.
+
+**📍 GPS button** — starts continuous tracking (`watchPosition`). The status bar shows your live coordinates. The map **will not keep re-centring** after the first fix; you can pan freely.
+
+**🎲 Sim button** — cycles through all rooms automatically every 4 seconds. Useful for demos and indoor authoring sessions where GPS is unavailable. Press again to stop.
+
+**Compass panel** — shows the five nearest rooms and their distance in metres. A "✓ here" label appears when you are inside a room's radius trigger.
+
+**Facilitator vs Visitor mode** — switch with the toolbar toggle.
+- *Visitor*: proximity triggers fire normally (entering a room opens it, leaving closes it).
+- *Facilitator / Projector*: proximity is suppressed. Use this when running the tool on a shared projector screen so room changes don't fire automatically.
+
+---
+
 ## Creating a room
 
 1. Click **+ Room**.
