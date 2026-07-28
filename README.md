@@ -51,20 +51,25 @@ Characters replace locations as the primary unit of interaction. Instead of walk
 ## Script architecture
 
 ```
-index.html          — single-page app shell, all modals, toolbar
+index.html            — single-page app shell, all modals, toolbar
+                         declares DEFAULT_GLB_URL (Three.js Soldier fallback model)
 scripts/
-  room.js           — Three.js room scene, backdrop, wander AI, drag-to-move
-  modals.js         — character + room modal open/save/close logic
-  upload-helpers.js — GLB passthrough + FBX→GLB conversion, writes window.tempGlbData
-  fbx-to-glb.js     — FBX loader + GLTFExporter pipeline
-  store.js          — localStorage + optional GitHub save/load
-  twee.js           — Twee export builder
-  map.js            — Leaflet map, character + room pins, GPS user marker (pulsing dot + accuracy
-                       circle), first-fix re-center, compass panel, proximity checks, sim mode,
-                       day-segment scheduling, facilitator/visitor mode toggle
-media/              — default backdrop images (room2.png, garden.png)
-story/              — exported .twee files
-wiki/               — in-repo wiki pages (mirrored below)
+  room.js             — Three.js room scene, backdrop, wander AI, drag-to-move
+  modals.js           — character + room modal open/save/close logic
+  upload-helpers.js   — GLB passthrough + FBX→GLB conversion, writes window.tempGlbData
+  fbx-to-glb.js       — FBX loader + GLTFExporter pipeline
+  store.js            — localStorage + optional GitHub save/load
+  twee.js             — Twee export builder
+  map.js              — Leaflet map, character + room pins, GPS user marker (pulsing dot +
+                         accuracy circle), first-fix re-center, compass panel, proximity
+                         checks, sim mode, day-segment scheduling, facilitator/visitor toggle
+author/               — deployment entry-point stub; in production CI copies the full
+                         editor here for GitHub Pages
+mobile-zoom-fix.css   — CSS rules preventing unwanted browser zoom on mobile
+mobile-zoom-fix.js    — JS pinch-zoom event handling for iOS/Android
+media/                — default backdrop images (room2.png, garden.png)
+story/                — exported .twee files (written by “Export Twee” via GitHub save)
+wiki/                 — in-repo wiki pages (mirrored below)
 ```
 
 ---
@@ -86,6 +91,8 @@ Characters support three visual modes, checked in this order:
 
 All Mixamo animations embedded in the GLB are supported. The wander AI blends between the `Idle` and `Walk` (or `Run`) clips automatically.
 
+When no model or photo is present, `DEFAULT_GLB_URL` (`https://threejs.org/examples/models/gltf/Soldier.glb`) is used as a stand-in. The Soldier model ships Mixamo-compatible animations so wander AI works immediately.
+
 ---
 
 ## Twee passage shape
@@ -102,7 +109,7 @@ Each character maps to a set of Twee nodes:
 :: CharacterName-work
 ```
 
-The export button at the top of the tool generates a single `.twee` file for the whole cast.
+The export button at the top of the tool generates a single `.twee` file for the whole cast, saved to the `story/` directory via the GitHub save path.
 
 ---
 
