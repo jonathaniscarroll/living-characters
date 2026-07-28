@@ -392,7 +392,7 @@ function buildRoomScene(room) {
   scene.background = null;
   const aspect   = W / H;
   const viewSize = 10;
-  const camera   = new THREE.OrthographicCamera(
+  const camera   = new THREE.PerspectiveCamera(
     -viewSize * aspect / 2, viewSize * aspect / 2,
      viewSize / 2, -viewSize / 2, 1, 1000
   );
