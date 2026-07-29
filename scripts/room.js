@@ -133,9 +133,10 @@ function spawnTalkCloseUp(ch) {
 
   const scene = new THREE.Scene();
   scene.background = null;
-  const cam = new THREE.PerspectiveCamera(45, 200 / 300, 0.1, 100);
+  const cam = new THREE.OrthographicCamera(45, 200 / 300, 0.1, 100);
   cam.position.set(0, 1.2, 3.5);
-  cam.lookAt(0, 1, 0);
+  cam.lookAt(0, 0, 0);
+  cam.zoom = 2;
   scene.add(new THREE.AmbientLight(0xffffff, 1.6));
   const dl = new THREE.DirectionalLight(0xffffff, 0.8);
   dl.position.set(2, 5, 3);
@@ -392,7 +393,7 @@ function buildRoomScene(room) {
   scene.background = null;
   const aspect   = W / H;
   const viewSize = 10;
-  const camera   = new THREE.PerspectiveCamera(
+  const camera   = new THREE.OrthographicCamera(
     -viewSize * aspect / 2, viewSize * aspect / 2,
      viewSize / 2, -viewSize / 2, 1, 1000
   );
@@ -402,6 +403,7 @@ function buildRoomScene(room) {
   const camZ = room.cameraZ ?? 9;
   camera.position.set(camX, camY, camZ);
   camera.lookAt(0, 0, 0);
+  camera.zoom =  2;
 
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.setClearColor(0x000000, 0);
