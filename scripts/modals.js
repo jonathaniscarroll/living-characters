@@ -108,6 +108,12 @@ function openRoomModal(roomId) {
   document.getElementById('rf-cam-x').value = room?.cameraX ?? 9;
   document.getElementById('rf-cam-y').value = room?.cameraY ?? 9;
   document.getElementById('rf-cam-z').value = room?.cameraZ ?? 9;
+  // Camera focus (look-at target) — new fields, default to 0/0/0
+  document.getElementById('rf-cam-tx').value = room?.cameraTargetX ?? 0;
+  document.getElementById('rf-cam-ty').value = room?.cameraTargetY ?? 0;
+  document.getElementById('rf-cam-tz').value = room?.cameraTargetZ ?? 0;
+  // Camera zoom — new field, default 2
+  document.getElementById('rf-cam-zoom').value = room?.cameraZoom ?? 2;
   const bp = document.getElementById('rf-backdrop-preview');
   const existingPreview = (room && room.backdropData) ? room.backdropData : ((room && room.backdropUrl) ? room.backdropUrl : null);
   if (existingPreview) {
@@ -139,12 +145,23 @@ function saveRoom() {
   const cameraX = parseFloat(document.getElementById('rf-cam-x').value);
   const cameraY = parseFloat(document.getElementById('rf-cam-y').value);
   const cameraZ = parseFloat(document.getElementById('rf-cam-z').value);
+  // New camera look-at target fields
+  const cameraTargetX = parseFloat(document.getElementById('rf-cam-tx').value);
+  const cameraTargetY = parseFloat(document.getElementById('rf-cam-ty').value);
+  const cameraTargetZ = parseFloat(document.getElementById('rf-cam-tz').value);
+  // New zoom field — clamp to 0.5–5
+  const rawZoom = parseFloat(document.getElementById('rf-cam-zoom').value);
+  const cameraZoom = Number.isNaN(rawZoom) ? 2 : Math.min(5, Math.max(0.5, rawZoom));
   if (!name || Number.isNaN(lat) || Number.isNaN(lng)) return alert('Needs a name and coordinates.');
   const data = {
     id: editingRoomId || ('room_' + Date.now()), name, lede, lat, lng, radius,
     cameraX: Number.isNaN(cameraX) ? 9 : cameraX,
     cameraY: Number.isNaN(cameraY) ? 9 : cameraY,
     cameraZ: Number.isNaN(cameraZ) ? 9 : cameraZ,
+    cameraTargetX: Number.isNaN(cameraTargetX) ? 0 : cameraTargetX,
+    cameraTargetY: Number.isNaN(cameraTargetY) ? 0 : cameraTargetY,
+    cameraTargetZ: Number.isNaN(cameraTargetZ) ? 0 : cameraTargetZ,
+    cameraZoom,
   };
   if (backdropData) data.backdropData = backdropData;
   if (backdropUrl) data.backdropUrl = backdropUrl;
