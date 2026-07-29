@@ -117,6 +117,15 @@ function spawnTalkCloseUp(ch) {
   const glbUrl = ch.glbUrl || ch.animData || ch.photoData || null;
   if (!glbUrl) return;
 
+  // Inherit zoom from the active room so the close-up feels consistent.
+  // The close-up camera is fixed at a portrait aspect (200×300), so we
+  // derive a slightly-boosted version of the room zoom rather than using
+  // it verbatim (keeps the character nicely framed in the small canvas).
+  const activeRoom = rooms.find(r => r.id === activeRoomId);
+  const roomZoom   = activeRoom?.cameraZoom ?? 2;
+  // Scale so the close-up sits between 1.5× and 3.5× — centred on roomZoom
+  const closeUpZoom = Math.min(3.5, Math.max(1.5, roomZoom));
+
   const overlay = document.createElement('div');
   overlay.id = 'talk-closeup-overlay';
   overlay.style.cssText = [
@@ -135,8 +144,8 @@ function spawnTalkCloseUp(ch) {
   scene.background = null;
   const cam = new THREE.OrthographicCamera(45, 200 / 300, 0.1, 100);
   cam.position.set(0, 1.2, 3.5);
-  // cam.lookAt(0, 0, 0);
-  cam.zoom = 2;
+  cam.lookAt(0, 0.8, 0);
+  cam.zoom = closeUpZoom;
   scene.add(new THREE.AmbientLight(0xffffff, 1.6));
   const dl = new THREE.DirectionalLight(0xffffff, 0.8);
   dl.position.set(2, 5, 3);
@@ -402,8 +411,19 @@ function buildRoomScene(room) {
   const camY = room.cameraY ?? 9;
   const camZ = room.cameraZ ?? 9;
   camera.position.set(camX, camY, camZ);
-  // camera.lookAt(0, 0, 0);
-  camera.zoom =  2;
+
+  // Per-room zoom (clamped 0.5–5; default 2 matches old hard-coded value)
+  camera.zoom = Math.min(5, Math.max(0.5, room.cameraZoom ?? 2));
+
+  // Per-room look-at target (default 0,0,0)
+  camera.lookAt(
+    room.cameraTargetX ?? 0,
+    room.cameraTargetY ?? 0,
+    room.cameraTargetZ ?? 0
+  );
+
+  // After setting zoom we must update the projection matrix
+  camera.updateProjectionMatrix();
 
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.setClearColor(0x000000, 0);
