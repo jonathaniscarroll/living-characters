@@ -135,7 +135,7 @@ function spawnTalkCloseUp(ch) {
   scene.background = null;
   const cam = new THREE.OrthographicCamera(45, 200 / 300, 0.1, 100);
   cam.position.set(0, 1.2, 3.5);
-  cam.lookAt(0, 0, 0);
+  // cam.lookAt(0, 0, 0);
   cam.zoom = 2;
   scene.add(new THREE.AmbientLight(0xffffff, 1.6));
   const dl = new THREE.DirectionalLight(0xffffff, 0.8);
@@ -402,7 +402,7 @@ function buildRoomScene(room) {
   const camY = room.cameraY ?? 9;
   const camZ = room.cameraZ ?? 9;
   camera.position.set(camX, camY, camZ);
-  camera.lookAt(0, 0, 0);
+  // camera.lookAt(0, 0, 0);
   camera.zoom =  2;
 
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
