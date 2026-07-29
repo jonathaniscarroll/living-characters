@@ -357,6 +357,21 @@
       <button type="button" class="file-btn" onclick="setCamPreset(0,18,0.01)" style="flex:1;min-width:90px;font-size:10px;padding:3px 6px">⬆ Top</button>
       <button type="button" class="file-btn" onclick="setCamPreset(6,2,10)"   style="flex:1;min-width:90px;font-size:10px;padding:3px 6px">🎬 Low</button>
     </div>
+    <div class="modal-section-title">🎯 Camera Focus &amp; Zoom</div>
+    <div class="field">
+      <label>Camera focus X / Y / Z (where the camera looks)</label>
+      <div style="display:flex;gap:6px">
+        <input id="rf-cam-tx" type="number" step="0.5" placeholder="Focus X" style="flex:1" value="0" />
+        <input id="rf-cam-ty" type="number" step="0.5" placeholder="Focus Y" style="flex:1" value="0" />
+        <input id="rf-cam-tz" type="number" step="0.5" placeholder="Focus Z" style="flex:1" value="0" />
+      </div>
+      <p style="font-size:10px;color:var(--text-muted);margin-top:3px">Default 0 / 0 / 0 centres the view on the floor. Raise Focus Y to tilt the camera up toward taller characters.</p>
+    </div>
+    <div class="field">
+      <label>Camera zoom (0.5 = wide · 2 = normal · 5 = close-up)</label>
+      <input id="rf-cam-zoom" type="number" step="0.1" min="0.5" max="5" placeholder="2" value="2" style="max-width:120px" />
+      <p style="font-size:10px;color:var(--text-muted);margin-top:3px">Clamped between 0.5 and 5. The talk close-up inherits a scaled version of this value automatically.</p>
+    </div>
     <div class="modal-actions">
       <button class="mbtn cancel" onclick="closeRoomModal()">Cancel</button>
       <button class="mbtn save"   onclick="saveRoom()">Save Room</button>
