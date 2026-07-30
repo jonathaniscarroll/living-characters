@@ -1,105 +1,121 @@
-# Living Characters
+# living-characters
 
-**A browser-based tool for creating, placing, and talking to characters in shared virtual rooms — built for the NSCADU Art Camp program.**
-
-Characters replace locations as the primary unit of interaction. Instead of walking to a place to unlock a passage, participants tap a character on a shared map to open their card, read their dialogue, and explore their world. Rooms are the stages — authored with an uploaded backdrop image and a Three.js 3D scene — and characters are placed inside them with drag-to-move positioning, wander AI, and a mood ring that pulses in their emotional colour.
-
-> **Live tool:** [`index.html`](./index.html) — runs in any modern browser, no install, no backend.
+> **Branch `living-characters-ar`** — AR camera edition.  
+> Characters live at spots on a shared map. Tap a pin → open their card → **Visit in AR** → they appear standing in the real world through your camera.
 
 ---
 
-## The through-line: `spatial-narrative` → `living-characters`
+## What it is
 
-`jonathaniscarroll/spatial-narrative` is a GPS + compass proximity viewer. It shows one Twee passage at a time based on where you are physically, with a live compass pointing toward other unvisited nodes.
+`living-characters` is a browser-based world-building tool for NSCAD Art Camp. Participants sculpt characters from felt and clay, photogrammetrically scan them, and give them a presence on a shared map. Facilitators author dialogue, moods, items, and Twee passages for each character. Participants then encounter those characters in an **augmented reality** view — overlaid on the live camera feed, standing on the actual floor in front of them.
 
-`jonathaniscarroll/living-characters` is the same idea but **characters replace locations as the primary unit.** The spatial logic is still there — characters live at spots on a map, they have presence and context — but the authoring and interaction model is organised around **who** rather than **where**. The Twee passage structure follows the same convention, just keyed to character names and states instead of place names.
+The spatial through-line mirrors [`spatial-narrative`](https://github.com/jonathaniscarroll/spatial-narrative): one active thing at a time, a compass (or map pin) pointing toward others.
 
 ---
 
-## What's working right now
+## AR Interaction Model
 
-| Feature | Status |
+### What happens when you tap "Visit in AR"
+
+1. The device camera opens.
+2. **On Android Chrome / WebXR-enabled browsers:** WebXR immersive-ar launches with hit-test. A white ring appears on detected surfaces. Tap the floor to anchor the character there.
+3. **On iOS Safari / fallback browsers:** A simulated AR mode opens — the live camera feed plays behind a transparent Three.js canvas. The character is auto-placed at arm's length in front of you. Tap anywhere on the ground to reposition.
+4. The character's GLB model loads and plays its Idle animation. Their mood-ring colour pulses at the top of the screen.
+5. Tap **💬 Talk** to open the dialogue tree. Tap **🎒 Items** to inspect carried items.
+6. Tap **✕ Exit AR** to return to the character card.
+
+### Desktop fallback
+
+On desktop browsers without camera access, the simulated AR path renders the character on a neutral dark background using the same Three.js scene, so the workshop can still be demonstrated.
+
+---
+
+## Library choices
+
+| Library | Why |
 |---|---|
-| Pannable / zoomable map canvas (2400 × 1600 px), six named zones | ✅ |
-| Character pins with photo, mood ring (pulsing colour), animated GIF slot, dialogue | ✅ |
-| Add / Edit character modal with mini-map location picker | ✅ |
-| GLB / GLTF upload → Three.js scene render | ✅ |
-| FBX upload → in-browser conversion → GLB → Three.js render | ✅ (fixed Jul 2026) |
-| Mixamo GIF animations in character cards | ✅ |
-| Room modal — backdrop via **uploaded image only** (no preset options) | ✅ |
-| Three.js room scene — floor, walls, ambient + directional light | ✅ |
-| Character wander AI — idle / walk state machine, Mixamo animation blending | ✅ |
-| Talk close-up panel — zoomed 3D view of character while dialogue plays | ✅ |
-| Drag-to-move objects and characters in the room scene | ✅ |
-| Objects with GLB models, labels, inspect panel | ✅ |
-| Twee-style dialogue builder per character (hello / question / secret / item) | ✅ |
-| Twee export button — downloadable `.twee` file for the whole cast | ✅ |
-| Schedule editor — morning / midday / afternoon / evening / night | ✅ |
-| Home room / work room assignment per character | ✅ |
-| `localStorage` persistence | ✅ |
-| GitHub-backed save / load (optional PAT) | ✅ |
-| Camera angle presets (isometric, front, side, top, low) | ✅ |
-| GPS user position marker — pulsing blue dot, "You are here" tooltip, `zIndexOffset` above character pins | ✅ |
-| GPS accuracy circle — semi-transparent blue `L.circle` scaled to `coords.accuracy` metres | ✅ |
-| Auto-center on load — `getCurrentPosition` fires on `initMap()`, snaps map to user before GPS button is pressed; falls back to Halifax default | ✅ |
-| First-fix gate — map re-centers exactly once (on first GPS fix); user can pan freely after | ✅ |
-| Simulation mode (`startSim`) — walks through all rooms every 4 s for indoor/offline testing | ✅ |
-| Mobile pinch-zoom fix (`mobile-zoom-fix.css` / `.js`) | ✅ |
+| **Three.js r152** (CDN) | 3D rendering — already present in the repo for room.js |
+| **`GLTFLoader`** (Three.js add-on) | GLB/GLTF model loading — already present |
+| **WebXR Hit Test API** | Ground-plane detection on Android Chrome — built into the browser, zero bundle cost |
+| **`getUserMedia`** | Camera feed for the simulated AR fallback — built-in, no library needed |
+| **Leaflet** | 2D map — already present |
+
+No new CDN dependencies are introduced. The AR feature is entirely contained in `scripts/ar.js` and `scripts/ar-patch.js`.
 
 ---
 
-## Script architecture
+## File structure
 
 ```
-index.html            — single-page app shell, all modals, toolbar
-                         declares DEFAULT_GLB_URL (Three.js Soldier fallback model)
-scripts/
-  room.js             — Three.js room scene, backdrop, wander AI, drag-to-move
-  modals.js           — character + room modal open/save/close logic
-  upload-helpers.js   — GLB passthrough + FBX→GLB conversion, writes window.tempGlbData
-  fbx-to-glb.js       — FBX loader + GLTFExporter pipeline
-  store.js            — localStorage + optional GitHub save/load
-  twee.js             — Twee export builder
-  map.js              — Leaflet map, character + room pins, GPS user marker (pulsing dot +
-                         accuracy circle), first-fix re-center, compass panel, proximity
-                         checks, sim mode, day-segment scheduling, facilitator/visitor toggle
-author/               — deployment entry-point stub; in production CI copies the full
-                         editor here for GitHub Pages
-mobile-zoom-fix.css   — CSS rules preventing unwanted browser zoom on mobile
-mobile-zoom-fix.js    — JS pinch-zoom event handling for iOS/Android
-media/                — default backdrop images (room2.png, garden.png)
-story/                — exported .twee files (written by “Export Twee” via GitHub save)
-wiki/                 — in-repo wiki pages (mirrored below)
+living-characters/
+├── index.html               ← main app shell (AR scripts injected here)
+├── scripts/
+│   ├── ar.js                ← NEW: WebXR + simulated AR view module
+│   ├── ar-patch.js          ← NEW: runtime wiring — injects AR buttons into existing UI
+│   ├── map.js               ← existing: Leaflet map, character pins, GPS marker
+│   ├── modals.js            ← existing: add/edit character modal
+│   ├── card.js              ← existing: character card display
+│   ├── room.js              ← existing: Three.js room scene (legacy, preserved)
+│   ├── twee.js              ← existing: Twee export builder (unchanged)
+│   └── store.js             ← existing: localStorage + GitHub save/load (unchanged)
+└── story/                   ← exported .twee files land here
 ```
 
 ---
 
-## Room backdrops
+## Character data model — new AR fields
 
-Backdrops come exclusively from images you upload in the **Add a Room** modal. There are no preset style options (forest / cave / stone etc). If you don't upload an image the room shows a solid floor colour + simple walls.
+The following fields are added to each character object and automatically persisted by `store.js` (JSON round-trip):
 
----
+```js
+{
+  // … existing fields …
+  name:      'Mira',
+  mood:      'curious',
+  glbUrl:    'https://…/mira.glb',
+  photoData: 'data:image/…',
+  dialogue:  { hello: '…', question: '…', secret: '…' },
+  items:     [ { name: 'Blue Stone', description: 'Found near the tide pool' } ],
+  lat: 44.6, lng: -63.6,
 
-## 3D character models
-
-Characters support three visual modes, checked in this order:
-
-1. **GLB / GLTF** — uploaded file or external URL stored on `ch.glbUrl`
-2. **FBX** — uploaded, converted in-browser to GLB via `fbx-to-glb.js`, result stored on `ch.glbUrl`
-3. **Photo / GIF sprite** — flat sprite plane from `ch.photoData` / `ch.animData`
-4. **Fallback box** — coloured box in the character's mood colour
-
-All Mixamo animations embedded in the GLB are supported. The wander AI blends between the `Idle` and `Walk` (or `Run`) clips automatically.
-
-When no model or photo is present, `DEFAULT_GLB_URL` (`https://threejs.org/examples/models/gltf/Soldier.glb`) is used as a stand-in. The Soldier model ships Mixamo-compatible animations so wander AI works immediately.
-
----
-
-## Twee passage shape
-
-Each character maps to a set of Twee nodes:
-
+  // ── New AR fields ──
+  arEnabled: true,   // show AR button and allow placement
+  arScale:   1.0,    // scale multiplier for GLB in AR (default 1.0)
+  arYOffset: 0,      // vertical offset on the ground plane (metres)
+}
 ```
+
+---
+
+## Facilitator workflow
+
+### Creating a character
+
+1. Open the app on the facilitator machine.
+2. Tap an empty spot on the map to open **Add Character**.
+3. Fill in name, mood, upload a photo or GLB model, add dialogue lines and items.
+4. Scroll down to **AR Settings** — confirm AR is enabled and adjust scale if needed.
+5. Save. The character pin appears on the map with a 📷 badge.
+
+### Giving participants access
+
+- Share the URL (GitHub Pages) — all characters live in `localStorage` on the facilitator machine unless you use the **GitHub save** button to push to the repo.
+- For multi-device use, use **GitHub save/load** (existing feature in `store.js`) to sync the character JSON to the repository, then participants load the same URL.
+
+### Visiting a character in AR
+
+1. Tap the character pin → tap **View Card**.
+2. Tap **📷 Visit in AR**.
+3. Point the camera at the floor. Tap to place the character.
+4. Talk, inspect items, then tap **✕ Exit AR**.
+
+---
+
+## Twee export
+
+The **Export Twee** button in the toolbar generates a `.twee` file for the whole cast using the existing `scripts/twee.js` pipeline — completely unchanged. Passage structure per character:
+
+```twee
 :: CharacterName
 :: CharacterName-hello
 :: CharacterName-question
@@ -109,40 +125,28 @@ Each character maps to a set of Twee nodes:
 :: CharacterName-work
 ```
 
-The export button at the top of the tool generates a single `.twee` file for the whole cast, saved to the `story/` directory via the GitHub save path.
+The GitHub save flow writes this to the `story/` directory.
 
 ---
 
-## Key constraints (Art Camp context)
+## Technical constraints
 
-- No individual computers for participants — facilitator input only on one machine
-- Felt and clay as physical medium; photogrammetric scanning produces the GLB files
-- Mixamo GIF animations in character cards
-- Structured workshops ~1 hour to keep pacing gentle
-- Thursday is always beach day
-- Tool runs in any modern browser, no install, no backend
+- **No backend** — all data in `localStorage` plus optional GitHub save/load.
+- **No install** — runs in any modern browser from a URL.
+- **No new bundle dependencies** — AR uses WebXR (built-in) + Three.js (already loaded).
+- **Room scenes preserved** — `room.js` is not removed. "Visit Room" remains accessible; "Visit in AR" is the new default action on every card.
 
 ---
 
-## Related repos
+## Browser support for AR
 
-| Repo | Purpose |
+| Browser | AR mode |
 |---|---|
-| [`jonathaniscarroll/living-characters`](https://github.com/jonathaniscarroll/living-characters) | This repo — the interactive tool |
-| [`jonathaniscarroll/spatial-narrative`](https://github.com/jonathaniscarroll/spatial-narrative) | Source template — GPS Twee viewer |
-| [`jonathaniscarroll/nscadu.ca`](https://github.com/jonathaniscarroll/nscadu.ca) | Presentation page at `jonathan-carroll/presentations/art-camp-living-characters/` |
+| Android Chrome 81+ | ✅ WebXR hit-test (true ground detection) |
+| iOS Safari 16+ | ⚠️ Simulated AR (camera + Three.js overlay) |
+| Desktop Chrome/Firefox | ⚠️ Simulated AR (no camera, dark background) |
+| Any modern browser | ✅ Map, cards, dialogue, Twee export |
 
 ---
 
-## Wiki
-
-Detailed documentation lives in [`wiki/`](./wiki/):
-
-- [Architecture](./wiki/Architecture.md)
-- [Authoring Guide](./wiki/Authoring-Guide.md)
-- [3D Models & FBX](./wiki/3D-Models-and-FBX.md)
-- [Rooms & Backdrops](./wiki/Rooms-and-Backdrops.md)
-- [Dialogue & Twee](./wiki/Dialogue-and-Twee.md)
-- [Saving & GitHub Sync](./wiki/Saving-and-GitHub-Sync.md)
-- [Workshop Runsheet](./wiki/Workshop-Runsheet.md)
-- [Changelog](./wiki/Changelog.md)
+*living-characters is part of NSCAD's Mobile Media Lab. Thursday is always beach day.*

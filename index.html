@@ -211,8 +211,18 @@
     ::-webkit-scrollbar{width:6px;} ::-webkit-scrollbar-track{background:transparent;} ::-webkit-scrollbar-thumb{background:#ffffff20;border-radius:3px;}
   </style>
   <link rel="stylesheet" href="mobile-zoom-fix.css" />
+  <!-- Polyfill for browsers with no navigator.xr -->
+<script>
+  if (!navigator.xr) {
+    navigator.xr = { isSessionSupported: () => Promise.resolve(false) };
+  }
+</script>
+
 </head>
 <script src="mobile-zoom-fix.js"></script>
+<!-- Just before </body> -->
+<script src="scripts/ar.js"></script>
+<script src="scripts/ar-patch.js"></script>
 
 <body>
 
