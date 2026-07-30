@@ -20,6 +20,24 @@
 (function () {
   'use strict';
 
+let _depsReadyPromise = null;
+
+function waitForDeps(timeoutMs = 8000) {
+  if (window.THREE && window.GLTFLoader) return Promise.resolve();
+  if (_depsReadyPromise) return _depsReadyPromise;
+  _depsReadyPromise = new Promise((resolve, reject) => {
+    const start = Date.now();
+    const tick = () => {
+      if (window.THREE && window.GLTFLoader) return resolve();
+      if (Date.now() - start > timeoutMs)
+        return reject(new Error('AR dependencies not ready'));
+      requestAnimationFrame(tick);
+    };
+    tick();
+  });
+  return _depsReadyPromise;
+}
+
   // ── State ────────────────────────────────────────────────────────────────────
   let _ch          = null;
   let _renderer    = null;
@@ -472,7 +490,8 @@
 
   // ── Open / Close ────────────────────────────────────────────────────────────────
   async function open(character) {
-    if (!window.THREE) { alert('Three.js not loaded — cannot open AR.'); return; }
+    try { await waitForDeps(); }
+    catch (err) { alert('Three.js is still loading — try again in a moment.'); return; }
     _ch = character;
     _placed = false;
 
