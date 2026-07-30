@@ -138,6 +138,7 @@
     .card-btn{flex:1;padding:8px;border-radius:8px;border:none;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;}
     .card-btn.edit{background:rgba(255,255,255,.1);color:var(--text);} .card-btn.delete{background:rgba(233,69,96,.15);color:var(--accent);}
     .card-btn.talk{background:rgba(245,166,35,.2);color:var(--accent2);border:1px solid var(--accent2);}
+    .card-btn.ar{background:rgba(56,189,248,.15);color:#38bdf8;border:1px solid #38bdf880;}
     .modal-overlay{position:fixed;inset:0;z-index:1400;background:rgba(0,0,0,.65);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s;}
     .modal-overlay.open{opacity:1;pointer-events:all;}
     .modal-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px;width:480px;max-width:calc(100vw - 32px);max-height:calc(100vh - 64px);overflow-y:auto;display:flex;flex-direction:column;gap:14px;}
@@ -308,6 +309,7 @@
   </div>
   <div class="card-actions">
     <button class="card-btn talk"   onclick="talkToSelectedChar()">💬 Talk</button>
+    <button class="card-btn ar"     id="card-ar-btn">📱 AR</button>
     <button class="card-btn edit"   onclick="editSelectedChar()">Edit</button>
     <button class="card-btn delete" onclick="deleteSelectedChar()">Remove</button>
   </div>
