@@ -140,37 +140,17 @@ function initMap() {
 // ── Editor: open Add-Character modal pre-filled with map coords ───────────────
 
 function _openAddCharacterAt(lat, lng) {
-  // Prefer the existing addCharacter / openAddModal helpers if present
-  if (typeof window.openAddCharacterModal === 'function') {
-    window.openAddCharacterModal({ lat, lng });
-    return;
-  }
-  // Fallback: find the Add Character button and click it, then inject coords
-  const addBtn = document.querySelector(
-    '#add-char-btn, [data-action="add-character"], .add-character-btn, button[onclick*="addChar"]'
-  );
-  if (addBtn) {
-    addBtn.click();
-    // After the modal renders, fill the lat/lng fields if they exist
-    requestAnimationFrame(() => _injectCoordsIntoModal(lat, lng));
-  } else {
-    // Last resort: store pending coords and let the modal's own init pick them up
-    window._pendingCharLat = lat;
-    window._pendingCharLng = lng;
-    // Try triggering a custom event modals.js can listen to
-    document.dispatchEvent(new CustomEvent('lc:add-character-at', { detail: { lat, lng } }));
-  }
-}
-
-function _injectCoordsIntoModal(lat, lng) {
-  // Try explicit lat/lng inputs first
-  const latInput = document.querySelector('#char-lat, input[name="lat"], input[placeholder*="lat"]');
-  const lngInput = document.querySelector('#char-lng, input[name="lng"], input[placeholder*="lng"], input[placeholder*="lon"]');
-  if (latInput) { latInput.value = lat.toFixed(6); latInput.dispatchEvent(new Event('input')); }
-  if (lngInput) { lngInput.value = lng.toFixed(6); lngInput.dispatchEvent(new Event('input')); }
-  // Store on window as fallback so form-save handlers can read them
+  // Store coords globally so saveCharacter() can pick them up
   window._pendingCharLat = lat;
   window._pendingCharLng = lng;
+
+  // Use the global wrapper that index.html wires up — always available
+  if (typeof window.openCharModal === 'function') {
+    window.openCharModal(null);
+    return;
+  }
+  // Fallback: dispatch a custom event for modals.js to catch
+  document.dispatchEvent(new CustomEvent('lc:add-character-at', { detail: { lat, lng } }));
 }
 
 // ── Pin rendering ─────────────────────────────────────────────────────────────
