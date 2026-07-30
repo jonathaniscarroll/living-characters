@@ -1,12 +1,18 @@
 /**
- * scripts/ar.js  v3
- * AR camera view for living-characters.
+ * scripts/ar.js  v4
+ * AR camera view — living-characters
  *
- * Two paths:
- *   WebXR  — real camera pass-through + hit-test (Android Chrome)
- *   SimAR  — getUserMedia rear camera + DeviceOrientation tracking (iOS / desktop)
- *             The Three.js camera rotates with the phone so the model stays
- *             anchored to the floor as you move the device.
+ * SimAR orientation tracking uses the same quaternion math as
+ * THREE.DeviceOrientationControls (the proven reference implementation):
+ *
+ *   q_camera = Q_⊥  ×  q_device  ×  Q_screen
+ *
+ * where:
+ *   Q_⊥      = −90° around world X  (flips sensor frame: Z-up → Y-up)
+ *   q_device  = quaternion built from alpha/beta/gamma
+ *   Q_screen  = rotation to account for screen orientation lock
+ *
+ * The model stays fixed in world space; only the camera rotates.
  *
  * API:  window.ARView.open(character)  /  window.ARView.close()
  */
@@ -14,7 +20,7 @@
 (function () {
   'use strict';
 
-  // ─── State ───────────────────────────────────────────────────────────────
+  // ── State ────────────────────────────────────────────────────────────────────
   let _ch          = null;
   let _renderer    = null;
   let _scene       = null;
@@ -34,32 +40,28 @@
   let _container   = null;
   let _overlay     = null;
 
-  // DeviceOrientation tracking
-  let _orientHandler  = null;   // bound event listener (so we can remove it)
-  let _targetQuat     = null;   // THREE.Quaternion updated from sensor
-  let _orientReady    = false;  // true once we have a first reading
+  // Orientation state
+  let _orientHandler = null;
+  let _lastEvt       = null;   // most recent DeviceOrientationEvent
 
-  // ─── Mood colours ─────────────────────────────────────────────────────
-  const MOOD_COLOURS = {
+  // ── Mood colours ──────────────────────────────────────────────────────────────
+  const MOODS = {
     happy:'#ffe44d', sad:'#6699cc', angry:'#ff4444',
     scared:'#cc88ff', curious:'#44dd88', neutral:'#aaaaaa',
   };
-  const moodColour = m => MOOD_COLOURS[(m||'').toLowerCase()] || '#aaaaaa';
+  const moodColour = m => MOODS[(m||'').toLowerCase()] || '#aaaaaa';
 
-  // ─── Hint helpers ────────────────────────────────────────────────────
+  // ── Hint ─────────────────────────────────────────────────────────────────────
   function showHint(msg) {
     const el = document.getElementById('ar-hint');
-    if (!el) return;
-    el.textContent = msg;
-    el.style.opacity = '1';
+    if (el) { el.textContent = msg; el.style.opacity = '1'; }
   }
-  function hideHint() {
+  function hideHint(delay = 1800) {
     const el = document.getElementById('ar-hint');
-    if (!el) return;
-    setTimeout(() => { el.style.opacity = '0'; }, 2000);
+    if (el) setTimeout(() => { el.style.opacity = '0'; }, delay);
   }
 
-  // ─── Three.js init ─────────────────────────────────────────────────────
+  // ── Three.js init ─────────────────────────────────────────────────────────────
   function initThree(canvas, w, h) {
     const T   = window.THREE;
     _scene    = new T.Scene();
@@ -73,7 +75,6 @@
     const d = new T.DirectionalLight(0xffffff, 1.2);
     d.position.set(2, 5, 3);
     _scene.add(d);
-    _targetQuat = new T.Quaternion();
   }
 
   function makeReticle() {
@@ -81,140 +82,149 @@
     const geo = new T.RingGeometry(0.07, 0.1, 32);
     geo.applyMatrix4(new T.Matrix4().makeRotationX(-Math.PI / 2));
     _reticle = new T.Mesh(geo, new T.MeshBasicMaterial({
-      color: 0xffffff, side: T.DoubleSide, depthTest: false
+      color: 0xffffff, side: T.DoubleSide, depthTest: false,
     }));
     _reticle.visible = false;
     _scene.add(_reticle);
   }
 
-  // ─── DeviceOrientation → camera quaternion ───────────────────────────────────
+  // ── Proven DeviceOrientation → camera quaternion ───────────────────────────────
   //
-  // DeviceOrientationEvent gives us:
-  //   alpha — compass heading (Z-axis rotation, 0–360)
-  //   beta  — front-back tilt  (X-axis, −180–180)
-  //   gamma — left-right tilt  (Y-axis, −90–90)
+  // Exactly mirrors THREE.DeviceOrientationControls source:
+  //   https://github.com/nicktindall/cyclon.p2p/blob/master/
+  //   (and the canonical r3f / three.js examples version)
   //
-  // THREE.js camera looks down −Z by default. We want the camera to look in the
-  // direction the phone is pointing. The correct Euler order for a portrait phone
-  // held up and panning is 'YXZ': yaw (alpha), pitch (beta), roll (gamma).
+  // q_camera = Q_⊥ × q_device × Q_screen
   //
-  // iOS reports alpha relative to an arbitrary starting heading, so we capture
-  // the first alpha as an offset and subtract it so the model starts in front.
+  // Q_⊥      : quaternion( -sqrt(0.5), 0, 0, sqrt(0.5) )  = −90° around X
+  // q_device  : built from Euler( beta, alpha, -gamma, 'YXZ' )
+  // Q_screen  : accounts for screen orientation angle (usually 0 on portrait-locked apps)
 
-  let _alphaOffset = null;
+  // Pre-built constant quaternions (allocated once)
+  let _Q_minus90X = null;  // set in _initOrientQuats
+  let _Q_screen   = null;
+  let _q_device   = null;
+  let _q_scratch  = null;
 
-  function _startOrientationTracking() {
+  function _initOrientQuats() {
     const T = window.THREE;
+    const s = Math.sqrt(0.5);
+    _Q_minus90X = new T.Quaternion(-s, 0, 0, s);  // −90° around world X
+    _q_device   = new T.Quaternion();
+    _q_scratch  = new T.Quaternion();
+    // Screen orientation: 0 for portrait lock, −90° for landscape-left, etc.
+    _Q_screen   = new T.Quaternion();
+    _setScreenQuat();
+  }
+
+  function _setScreenQuat() {
+    const angle = ((screen.orientation && screen.orientation.angle) ||
+                   window.orientation || 0) * Math.PI / 180;
+    _Q_screen.setFromAxisAngle(new window.THREE.Vector3(0, 0, 1), -angle);
+  }
+
+  function _applyOrientation(evt, camera) {
+    if (!evt || evt.alpha === null || evt.alpha === undefined) return;
+    const T = window.THREE;
+    const deg = T.MathUtils.degToRad;
+
+    // q_device from alpha/beta/gamma in 'YXZ' order
+    // This is the canonical form used by THREE.DeviceOrientationControls
+    _q_device.setFromEuler(
+      new T.Euler(deg(evt.beta), deg(evt.alpha), -deg(evt.gamma), 'YXZ')
+    );
+
+    // q_camera = Q_⊥ × q_device × Q_screen
+    camera.quaternion
+      .copy(_Q_minus90X)
+      .multiply(_q_device)
+      .multiply(_Q_screen);
+  }
+
+  async function _startOrientationTracking() {
+    _initOrientQuats();
 
     const attach = () => {
-      _alphaOffset = null;
-      _orientHandler = (e) => {
-        if (e.alpha === null) return;  // sensor not available
-
-        // Capture starting heading so model begins in front of user
-        if (_alphaOffset === null) _alphaOffset = e.alpha;
-
-        const alpha = (e.alpha - _alphaOffset + 360) % 360;
-        const beta  = e.beta  ?? 0;
-        const gamma = e.gamma ?? 0;
-
-        // Convert degrees → radians
-        const a = THREE.MathUtils.degToRad(alpha);
-        const b = THREE.MathUtils.degToRad(beta);
-        const g = THREE.MathUtils.degToRad(gamma);
-
-        // Build euler in screen-space: phone in portrait, camera axis is -Z
-        // Order YXZ: heading first, then pitch, then roll
-        const euler = new T.Euler(
-          b - Math.PI / 2,   // beta: subtract 90° so 0° = looking forward not up
-          -a,                 // alpha: negate so turning right rotates right
-          -g,                 // gamma: negate for natural roll
-          'YXZ'
-        );
-        _targetQuat.setFromEuler(euler);
-        _orientReady = true;
-      };
+      _orientHandler = (e) => { _lastEvt = e; };
       window.addEventListener('deviceorientation', _orientHandler, { passive: true });
+      window.addEventListener('orientationchange', _setScreenQuat);
     };
 
-    // iOS 13+ requires explicit permission
     if (typeof DeviceOrientationEvent !== 'undefined' &&
         typeof DeviceOrientationEvent.requestPermission === 'function') {
-      DeviceOrientationEvent.requestPermission()
-        .then(state => { if (state === 'granted') attach(); })
-        .catch(() => {/* silently skip — fall back to static camera */});
+      // iOS 13+ — must be called from a user-gesture context
+      try {
+        const state = await DeviceOrientationEvent.requestPermission();
+        if (state === 'granted') attach();
+        else showHint('Allow motion access for AR tracking');
+      } catch (e) {
+        // Permission dialog failed (e.g. called outside gesture) — try anyway
+        attach();
+      }
     } else {
-      // Android / desktop — no permission needed
-      attach();
+      attach();  // Android / desktop — no permission needed
     }
   }
 
   function _stopOrientationTracking() {
     if (_orientHandler) {
       window.removeEventListener('deviceorientation', _orientHandler);
+      window.removeEventListener('orientationchange', _setScreenQuat);
       _orientHandler = null;
     }
-    _targetQuat = null;
-    _alphaOffset = null;
-    _orientReady = false;
+    _lastEvt = null;
   }
 
-  // ─── Model loading ──────────────────────────────────────────────────────
+  // ── Model loading ──────────────────────────────────────────────────────────────
   function loadModel(x, y, z) {
     const T     = window.THREE;
     const ch    = _ch;
-    const scale = typeof ch.arScale === 'number'   ? ch.arScale   : 1.0;
+    const scale = typeof ch.arScale   === 'number' ? ch.arScale   : 1.0;
     const yOff  = typeof ch.arYOffset === 'number' ? ch.arYOffset : 0;
     const url   = ch.glbUrl || '';
 
     if (_model) { _scene.remove(_model); _model = null; }
 
-    const place = (mesh) => {
+    const commit = (mesh) => {
       _model = mesh;
       _model.position.set(x, y + yOff, z);
       _scene.add(_model);
       _placed = true;
-      _reticle.visible = false;
+      if (_reticle) _reticle.visible = false;
       hideHint();
-      // After placement, nudge the user to move the phone
-      setTimeout(() => showHint('Move your phone to look around'), 2400);
-      setTimeout(() => hideHint(), 4000);
+      setTimeout(() => { showHint('Move your phone to look around'); hideHint(2500); }, 2200);
     };
 
-    if (url && window.GLTFLoader) {
-      // Instant placeholder
-      const ph = makeFallbackBox(ch, scale, yOff);
-      ph.position.set(x, y + yOff, z);
-      _model = ph;
-      _scene.add(_model);
-      _placed = true;
-      _reticle.visible = false;
-      hideHint();
-      setTimeout(() => showHint('Move your phone to look around'), 2400);
-      setTimeout(() => hideHint(), 4000);
+    // Always show placeholder immediately so tap feels instant
+    const ph = _makeFallback(ch, scale);
+    ph.position.set(x, y + yOff, z);
+    _model = ph;
+    _scene.add(_model);
+    _placed = true;
+    if (_reticle) _reticle.visible = false;
+    hideHint();
 
-      const loader = new window.GLTFLoader();
-      loader.load(url,
+    if (url && window.GLTFLoader) {
+      new window.GLTFLoader().load(
+        url,
         (gltf) => {
           _scene.remove(ph);
           const m = gltf.scene;
           m.scale.setScalar(scale);
-          place(m);
+          commit(m);
           if (gltf.animations && gltf.animations.length) {
             _mixer = new T.AnimationMixer(m);
-            const idle = gltf.animations.find(a => /idle/i.test(a.name)) || gltf.animations[0];
-            _mixer.clipAction(idle).play();
+            const clip = gltf.animations.find(a => /idle/i.test(a.name)) || gltf.animations[0];
+            _mixer.clipAction(clip).play();
           }
         },
         undefined,
-        err => console.warn('AR: GLB failed, keeping placeholder', err)
+        err => console.warn('AR GLB failed, keeping placeholder', err)
       );
-    } else {
-      place(makeFallbackBox(ch, scale, yOff));
     }
   }
 
-  function makeFallbackBox(ch, scale) {
+  function _makeFallback(ch, scale) {
     const T   = window.THREE;
     const geo = new T.BoxGeometry(0.3 * scale, 0.6 * scale, 0.3 * scale);
     const mat = ch.photoData
@@ -229,9 +239,9 @@
     _model.position.set(x, y + yOff, z);
   }
 
-  // ─── WebXR path ───────────────────────────────────────────────────────────
+  // ── WebXR path ───────────────────────────────────────────────────────────────
   async function startWebXR() {
-    const T      = window.THREE;
+    const T = window.THREE;
     const canvas = document.createElement('canvas');
     canvas.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;z-index:9998;touch-action:none;';
     _container.appendChild(canvas);
@@ -253,16 +263,16 @@
 
     _xrSession.addEventListener('select', () => {
       if (!_reticle.visible) return;
-      const pos = new T.Vector3(), quat = new T.Quaternion(), sc = new T.Vector3();
-      _reticle.matrix.decompose(pos, quat, sc);
-      _placed ? repositionModel(pos.x, pos.y, pos.z) : loadModel(pos.x, pos.y, pos.z);
+      const p = new T.Vector3(), q = new T.Quaternion(), s = new T.Vector3();
+      _reticle.matrix.decompose(p, q, s);
+      _placed ? repositionModel(p.x, p.y, p.z) : loadModel(p.x, p.y, p.z);
     });
 
     _renderer.setAnimationLoop((_, frame) => {
       if (frame && _hitTestSrc) {
-        const results = frame.getHitTestResults(_hitTestSrc);
-        if (results.length) {
-          const pose = results[0].getPose(refSpace);
+        const hits = frame.getHitTestResults(_hitTestSrc);
+        if (hits.length) {
+          const pose = hits[0].getPose(refSpace);
           _reticle.visible = true;
           _reticle.matrix.fromArray(pose.transform.matrix);
           _reticle.matrixAutoUpdate = false;
@@ -277,17 +287,18 @@
     _xrSession.addEventListener('end', () => close(false));
   }
 
-  // ─── Simulated AR path (iOS / desktop) ────────────────────────────────────
+  // ── Simulated AR path ─────────────────────────────────────────────────────────
   async function startSimAR() {
     const T = window.THREE;
     _simMode = true;
 
-    // Camera feed
+    // ─ Camera feed ────────────────────────────────────────────────────
     _videoEl = document.createElement('video');
     _videoEl.setAttribute('autoplay', '');
     _videoEl.setAttribute('playsinline', '');
     _videoEl.setAttribute('muted', '');
-    _videoEl.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;object-fit:cover;z-index:9997;';
+    _videoEl.style.cssText =
+      'position:fixed;inset:0;width:100%;height:100%;object-fit:cover;z-index:9997;';
     try {
       _videoStream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 } },
@@ -300,48 +311,45 @@
     }
     _container.appendChild(_videoEl);
 
-    // Three.js canvas
+    // ─ Three.js canvas ───────────────────────────────────────────────
     const canvas = document.createElement('canvas');
-    canvas.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;z-index:9998;pointer-events:none;touch-action:none;';
+    canvas.style.cssText =
+      'position:fixed;inset:0;width:100%;height:100%;z-index:9998;pointer-events:none;touch-action:none;';
     _container.appendChild(canvas);
-
     initThree(canvas, innerWidth, innerHeight);
     makeReticle();
 
     // Invisible ground plane at y = 0
     const geoG = new T.PlaneGeometry(20, 20);
     geoG.rotateX(-Math.PI / 2);
-    _ground = new T.Mesh(geoG, new T.MeshBasicMaterial({ visible: false, side: T.DoubleSide }));
+    _ground = new T.Mesh(geoG,
+      new T.MeshBasicMaterial({ visible: false, side: T.DoubleSide }));
     _ground.position.y = 0;
     _scene.add(_ground);
 
-    // Camera starts at eye height, looking forward
-    // Position stays fixed (we have no translation data from sensors)
-    // Only rotation is updated from DeviceOrientation
+    // Camera at eye height, no initial lookAt — orientation controls it fully
     _camera.position.set(0, 1.6, 0);
-    _camera.lookAt(0, 0, -3);
 
-    // Start orientation tracking (asks iOS permission if needed)
-    _startOrientationTracking();
+    // ─ Start orientation tracking ────────────────────────────────────
+    // Note: requestPermission() must be called from a user gesture.
+    // openAR() is triggered by a button tap, so we're safe here.
+    await _startOrientationTracking();
 
     showHint('Tap the floor to place ' + _ch.name);
 
-    // ── Render loop ───────────────────────────────────────────────
-    const LERP = 0.15;  // smoothing factor (0 = instant, 1 = frozen)
+    // ─ Render loop ─────────────────────────────────────────────────
     const loop = () => {
       _rafId = requestAnimationFrame(loop);
-
-      // Smoothly interpolate camera rotation toward sensor target
-      if (_orientReady && _targetQuat) {
-        _camera.quaternion.slerp(_targetQuat, LERP);
-      }
-
+      // Apply latest orientation reading directly (no slerp smoothing —
+      // slerp was causing drift because we were interpolating toward a
+      // wrongly-framed target. Direct assignment with correct math is smoother.)
+      if (_lastEvt) _applyOrientation(_lastEvt, _camera);
       if (_mixer) _mixer.update(_clock.getDelta());
       _renderer.render(_scene, _camera);
     };
     loop();
 
-    // ── Raycasting helpers ────────────────────────────────────────
+    // ─ Raycasting ─────────────────────────────────────────────────
     const getRayHit = (cx, cy) => {
       const rc = new T.Raycaster();
       rc.setFromCamera(
@@ -355,7 +363,7 @@
     _overlay.addEventListener('pointermove', (e) => {
       if (e.target.closest('button, #ar-dialogue, #ar-items-panel')) return;
       const p = getRayHit(e.clientX, e.clientY);
-      if (p) { _reticle.position.set(p.x, p.y + 0.001, p.z); _reticle.visible = true; }
+      if (p) { _reticle.position.set(p.x, p.y + 0.002, p.z); _reticle.visible = true; }
     });
 
     _overlay.addEventListener('pointerup', (e) => {
@@ -367,61 +375,57 @@
     });
   }
 
-  // ─── Overlay HTML & UI wiring ──────────────────────────────────────────────
+  // ── Overlay HTML ───────────────────────────────────────────────────────────────
   function buildOverlayHTML(ch) {
-    const colour = moodColour(ch.mood);
+    const c = moodColour(ch.mood);
     return `
-      <div id="ar-overlay" style="position:fixed;inset:0;pointer-events:none;z-index:9999;font-family:system-ui,sans-serif;">
-        <!-- top bar -->
-        <div style="position:absolute;top:0;left:0;right:0;padding:16px 20px;
-          display:flex;align-items:center;gap:12px;
-          background:linear-gradient(to bottom,rgba(0,0,0,.55),transparent);pointer-events:auto;">
-          <div style="width:18px;height:18px;border-radius:50%;background:${colour};
-            box-shadow:0 0 10px 4px ${colour}88;
-            animation:ar-pulse 1.8s ease-in-out infinite;flex-shrink:0;"></div>
-          <span style="color:#fff;font-size:20px;font-weight:700;
-            text-shadow:0 1px 4px rgba(0,0,0,.7);">${ch.name||'Character'}</span>
-          <button id="ar-exit" style="margin-left:auto;background:rgba(255,255,255,.15);
-            border:none;border-radius:8px;padding:8px 16px;color:#fff;
-            font-size:15px;font-weight:600;cursor:pointer;
-            backdrop-filter:blur(6px);">✕ Exit AR</button>
-        </div>
-        <!-- hint -->
-        <div id="ar-hint" style="position:absolute;top:80px;left:50%;
-          transform:translateX(-50%);background:rgba(0,0,0,.55);color:#fff;
-          border-radius:20px;padding:8px 20px;font-size:14px;text-align:center;
-          backdrop-filter:blur(6px);transition:opacity .6s;
-          pointer-events:none;white-space:nowrap;">
-          Tap the floor to place ${ch.name||'character'}
-        </div>
-        <!-- bottom actions -->
-        <div style="position:absolute;bottom:0;left:0;right:0;padding:20px;
-          display:flex;gap:12px;justify-content:center;
-          background:linear-gradient(to top,rgba(0,0,0,.55),transparent);
-          pointer-events:auto;">
-          <button id="ar-talk" style="background:rgba(255,255,255,.18);
-            border:2px solid rgba(255,255,255,.4);border-radius:16px;
-            padding:14px 28px;color:#fff;font-size:17px;font-weight:700;
-            cursor:pointer;backdrop-filter:blur(8px);min-width:120px;">💬 Talk</button>
-          <button id="ar-items" style="background:rgba(255,255,255,.18);
-            border:2px solid rgba(255,255,255,.4);border-radius:16px;
-            padding:14px 28px;color:#fff;font-size:17px;font-weight:700;
-            cursor:pointer;backdrop-filter:blur(8px);min-width:120px;">🎒 Items</button>
-        </div>
-        <!-- panels -->
-        <div id="ar-dialogue" style="position:absolute;bottom:100px;left:16px;right:16px;
-          background:rgba(10,10,10,.85);border-radius:20px;padding:20px;color:#fff;
-          font-size:16px;line-height:1.5;backdrop-filter:blur(12px);display:none;
-          max-height:40vh;overflow-y:auto;pointer-events:auto;"></div>
-        <div id="ar-items-panel" style="position:absolute;bottom:100px;left:16px;right:16px;
-          background:rgba(10,10,10,.85);border-radius:20px;padding:20px;color:#fff;
-          font-size:16px;line-height:1.5;backdrop-filter:blur(12px);display:none;
-          pointer-events:auto;"></div>
-        <style>
-          @keyframes ar-pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.3);opacity:.7}}
-          #ar-exit:active,#ar-talk:active,#ar-items:active{transform:scale(.95);background:rgba(255,255,255,.28);}
-        </style>
-      </div>`;
+<div id="ar-overlay" style="position:fixed;inset:0;pointer-events:none;z-index:9999;font-family:system-ui,sans-serif;">
+  <div style="position:absolute;top:0;left:0;right:0;padding:16px 20px;
+    display:flex;align-items:center;gap:12px;
+    background:linear-gradient(to bottom,rgba(0,0,0,.55),transparent);
+    pointer-events:auto;">
+    <div style="width:18px;height:18px;border-radius:50%;background:${c};
+      box-shadow:0 0 10px 4px ${c}88;
+      animation:ar-pulse 1.8s ease-in-out infinite;flex-shrink:0;"></div>
+    <span style="color:#fff;font-size:20px;font-weight:700;
+      text-shadow:0 1px 4px rgba(0,0,0,.7);">${ch.name||'Character'}</span>
+    <button id="ar-exit" style="margin-left:auto;background:rgba(255,255,255,.15);
+      border:none;border-radius:8px;padding:8px 16px;color:#fff;
+      font-size:15px;font-weight:600;cursor:pointer;
+      backdrop-filter:blur(6px);">✕ Exit AR</button>
+  </div>
+  <div id="ar-hint" style="position:absolute;top:80px;left:50%;
+    transform:translateX(-50%);background:rgba(0,0,0,.55);color:#fff;
+    border-radius:20px;padding:8px 20px;font-size:14px;text-align:center;
+    backdrop-filter:blur(6px);transition:opacity .6s;
+    pointer-events:none;white-space:nowrap;
+    ">Tap the floor to place ${ch.name||'character'}</div>
+  <div style="position:absolute;bottom:0;left:0;right:0;padding:20px;
+    display:flex;gap:12px;justify-content:center;
+    background:linear-gradient(to top,rgba(0,0,0,.55),transparent);
+    pointer-events:auto;">
+    <button id="ar-talk" style="background:rgba(255,255,255,.18);
+      border:2px solid rgba(255,255,255,.4);border-radius:16px;
+      padding:14px 28px;color:#fff;font-size:17px;font-weight:700;
+      cursor:pointer;backdrop-filter:blur(8px);min-width:120px;">💬 Talk</button>
+    <button id="ar-items" style="background:rgba(255,255,255,.18);
+      border:2px solid rgba(255,255,255,.4);border-radius:16px;
+      padding:14px 28px;color:#fff;font-size:17px;font-weight:700;
+      cursor:pointer;backdrop-filter:blur(8px);min-width:120px;">🎒 Items</button>
+  </div>
+  <div id="ar-dialogue" style="position:absolute;bottom:100px;left:16px;right:16px;
+    background:rgba(10,10,10,.85);border-radius:20px;padding:20px;color:#fff;
+    font-size:16px;line-height:1.5;backdrop-filter:blur(12px);display:none;
+    max-height:40vh;overflow-y:auto;pointer-events:auto;"></div>
+  <div id="ar-items-panel" style="position:absolute;bottom:100px;left:16px;right:16px;
+    background:rgba(10,10,10,.85);border-radius:20px;padding:20px;color:#fff;
+    font-size:16px;line-height:1.5;backdrop-filter:blur(12px);display:none;
+    pointer-events:auto;"></div>
+  <style>
+    @keyframes ar-pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.3);opacity:.7}}
+    #ar-exit:active,#ar-talk:active,#ar-items:active{transform:scale(.95);background:rgba(255,255,255,.28);}
+  </style>
+</div>`;
   }
 
   function wireUI(ch) {
@@ -451,7 +455,7 @@
     if (hello)    h += `<p style="margin-top:10px">${hello}</p>`;
     if (question) h += `<p style="margin-top:8px;color:#adf">❓ ${question}</p>`;
     if (secret)   h += `<p style="margin-top:8px;color:#fad">🤫 ${secret}</p>`;
-    if (!hello && !question && !secret) h += '<p style="color:#aaa">…says nothing yet.</p>';
+    if (!hello&&!question&&!secret) h += '<p style="color:#aaa">…says nothing yet.</p>';
     return h;
   }
 
@@ -461,12 +465,12 @@
     return list.map(i =>
       `<div style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,.1)">
         <strong>${i.name||i}</strong>
-        ${i.description ? '<br><span style="color:#ccc;font-size:14px">'+i.description+'</span>' : ''}
+        ${i.description?'<br><span style="color:#ccc;font-size:14px">'+i.description+'</span>':''}
       </div>`
     ).join('');
   }
 
-  // ─── Open / Close ────────────────────────────────────────────────────────
+  // ── Open / Close ────────────────────────────────────────────────────────────────
   async function open(character) {
     if (!window.THREE) { alert('Three.js not loaded — cannot open AR.'); return; }
     _ch = character;
@@ -485,29 +489,28 @@
 
     wireUI(character);
 
-    const supportsWebXR = !!(navigator.xr &&
+    const webXR = !!(navigator.xr &&
       await navigator.xr.isSessionSupported('immersive-ar').catch(() => false));
-
-    if (supportsWebXR) {
+    if (webXR) {
       try { await startWebXR(); }
-      catch (e) { console.warn('WebXR failed, using sim AR:', e); await startSimAR(); }
+      catch (e) { console.warn('WebXR failed, sim AR:', e); await startSimAR(); }
     } else {
       await startSimAR();
     }
   }
 
   function close(returnToCard) {
-    if (_rafId)       { cancelAnimationFrame(_rafId);              _rafId = null; }
-    if (_xrSession)   { _xrSession.end().catch(()=>{});            _xrSession = null; }
+    if (_rafId)       { cancelAnimationFrame(_rafId);                  _rafId = null; }
+    if (_xrSession)   { _xrSession.end().catch(()=>{});                _xrSession = null; }
     if (_videoStream) { _videoStream.getTracks().forEach(t=>t.stop()); _videoStream = null; }
-    if (_renderer)    { _renderer.dispose();                       _renderer = null; }
-    if (_mixer)       { _mixer.stopAllAction();                    _mixer = null; }
+    if (_renderer)    { _renderer.dispose();                           _renderer = null; }
+    if (_mixer)       { _mixer.stopAllAction();                        _mixer = null; }
     _stopOrientationTracking();
     _scene=_camera=_model=_reticle=_ground=_clock=null;
     _placed=false; _simMode=false;
-    if (_container) { _container.remove(); _container = null; }
-    if (_overlay)   { _overlay.remove();   _overlay   = null; }
-    if (_videoEl)   { _videoEl.remove();   _videoEl   = null; }
+    if (_container) { _container.remove(); _container=null; }
+    if (_overlay)   { _overlay.remove();   _overlay=null; }
+    if (_videoEl)   { _videoEl.remove();   _videoEl=null; }
     if (returnToCard && _ch && typeof window.openCharacterCard === 'function') {
       window.openCharacterCard(_ch);
     }
@@ -515,5 +518,4 @@
   }
 
   window.ARView = { open, close };
-
 })();
