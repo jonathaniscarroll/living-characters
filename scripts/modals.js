@@ -446,8 +446,14 @@ function saveCharacter() {
     animData:  tempAnimData,
   };
 
-  // Carry over existing lat/lng on edit so map position is preserved
-  if (editingCharId) {
+  // Bake pending map-tap coords directly into data before any push/assign
+  if (window._pendingCharLat !== undefined) {
+    data.lat = window._pendingCharLat;
+    data.lng = window._pendingCharLng;
+    delete window._pendingCharLat;
+    delete window._pendingCharLng;
+  } else if (editingCharId) {
+    // Carry over existing lat/lng on edit so map position is preserved
     const existing = characters.find(c => c.id === editingCharId);
     if (existing && typeof existing.lat === 'number') {
       data.lat = existing.lat;
