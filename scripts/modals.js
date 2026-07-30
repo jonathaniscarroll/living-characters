@@ -341,11 +341,21 @@ function openCharModal(charId) {
   // Object usage prompts (populated after home/work selects are set)
   rebuildObjectUsagePrompts();
 
+  // If opened via map tap, show a hint that location is pre-set
   const hint = document.getElementById('cf-room-chips-hint');
-  if (hint && !rooms.length) {
-    hint.style.display = ''; hint.style.color = 'var(--accent)';
-    hint.textContent = '\u26A0\uFE0F Create a room first before adding a character.';
+  if (hint) {
+    if (window._pendingCharLat !== undefined) {
+      hint.style.display = '';
+      hint.style.color = 'var(--accent2)';
+      hint.textContent = `📍 Placing at ${window._pendingCharLat.toFixed(4)}, ${window._pendingCharLng.toFixed(4)} — rooms are optional.`;
+    } else if (!rooms.length) {
+      hint.style.display = ''; hint.style.color = 'var(--accent)';
+      hint.textContent = '⚠️ Create a room first before adding a character.';
+    } else {
+      hint.style.display = 'none';
+    }
   }
+
   document.getElementById('char-modal-overlay').classList.add('open');
 }
 
@@ -363,6 +373,9 @@ function closeCharModal() {
   const bar  = document.getElementById('cf-fbx-progress-bar');
   if (wrap) wrap.style.display = 'none';
   if (bar)  bar.style.width = '0%';
+  // Clear pending coords if user cancels
+  delete window._pendingCharLat;
+  delete window._pendingCharLng;
 }
 
 function previewFile(inputId, previewId, dataKey) {
@@ -382,7 +395,13 @@ function saveCharacter() {
   const name = document.getElementById('cf-name').value.trim();
   if (!name) { alert('Please give the character a name.'); return; }
   const roomIds = getSelectedRoomIds();
-  if (!editingCharId && !roomIds.length) {
+
+  // A room is only required if the character is NOT being placed directly on
+  // the map via a tap (i.e. no pending lat/lng coords from map.js).
+  const hasMapCoords = (window._pendingCharLat !== undefined) ||
+    (editingCharId && (() => { const ch = characters.find(c => c.id === editingCharId); return ch && typeof ch.lat === 'number'; })());
+
+  if (!editingCharId && !roomIds.length && !hasMapCoords) {
     const chips = document.getElementById('cf-room-chips');
     const hint  = document.getElementById('cf-room-chips-hint');
     if (chips) {
@@ -393,17 +412,17 @@ function saveCharacter() {
     }
     if (hint) {
       hint.style.display = ''; hint.style.color = 'var(--accent)';
-      hint.textContent = '\u26A0\uFE0F Please choose at least one room for this character.';
+      hint.textContent = '⚠️ Please choose at least one room for this character.';
       setTimeout(() => { hint.textContent = ''; hint.style.color = ''; }, 3000);
     }
     alert('Please choose at least one room before saving.'); return;
   }
+
   const primaryRoomId = roomIds[0] || '';
   const items = document.getElementById('cf-items').value.split(',').map(s => s.trim()).filter(Boolean);
 
   // Resolve GLB: prefer the module-local var, then the window global (set by
-  // upload-helpers.js), then the URL text field.  This covers the case where
-  // the upload helper runs asynchronously in a different module scope.
+  // upload-helpers.js), then the URL text field.
   const glbUrl = tempGlbData || window.tempGlbData || document.getElementById('cf-glb-url').value.trim() || null;
 
   const activeMoodBtn = document.querySelector('#mood-picker .mood-opt.active');
@@ -427,17 +446,33 @@ function saveCharacter() {
     animData:  tempAnimData,
   };
 
+  // Carry over existing lat/lng on edit so map position is preserved
+  if (editingCharId) {
+    const existing = characters.find(c => c.id === editingCharId);
+    if (existing && typeof existing.lat === 'number') {
+      data.lat = existing.lat;
+      data.lng = existing.lng;
+    }
+  }
+
   const isNew = !editingCharId;
+  let savedId;
   if (editingCharId) {
     const ch = characters.find(c => c.id === editingCharId);
-    if (ch) Object.assign(ch, data);
+    if (ch) { Object.assign(ch, data); savedId = ch.id; }
   } else {
-    characters.push({ id: 'char_' + Date.now(), ...data });
+    savedId = 'char_' + Date.now();
+    characters.push({ id: savedId, ...data });
   }
 
   closeCharModal();
   renderMapPins();
   save();
+
+  // Notify map.js so it can apply pending lat/lng to the newly saved character
+  if (savedId) {
+    document.dispatchEvent(new CustomEvent('lc:character-saved', { detail: { id: savedId } }));
+  }
 
   // Auto-save to GitHub with a descriptive commit message
   const charLabel   = isNew ? `Add character: ${name}` : `Update character: ${name}`;
