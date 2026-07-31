@@ -88,13 +88,77 @@ async function ghLoad() {
   }
 }
 
+// ── Asset upload helper ────────────────────────────────────────────────────────
+// Uploads a single base64 dataUrl to story/assets/{charId}-{field}.{ext}
+// Returns the raw GitHub URL, or null on failure.
+async function uploadCharacterAsset(charId, field, dataUrl) {
+  const token = getToken();
+  if (!token || !dataUrl || !dataUrl.startsWith('data:')) return null;
+
+  const mime = dataUrl.match(/^data:([^;]+);base64,/)?.[1] || 'image/jpeg';
+  const ext  = mime.split('/')[1] || 'bin';
+  const b64  = dataUrl.replace(/^data:[^;]+;base64,/, '');
+  const path = `story/assets/${charId}-${field}.${ext}`;
+
+  // Check if file already exists (to get SHA for update)
+  let existingSha = null;
+  try {
+    const check = await fetch(
+      `https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/contents/${path}?ref=${GH_BRANCH}`,
+      { headers: { Authorization: 'token ' + token, Accept: 'application/vnd.github.v3+json' } }
+    );
+    if (check.ok) { const d = await check.json(); existingSha = d.sha; }
+  } catch (_) {}
+
+  const body = {
+    message: `Asset: ${charId} ${field}`,
+    content: b64,
+    branch: GH_BRANCH,
+  };
+  if (existingSha) body.sha = existingSha;
+
+  const res = await fetch(
+    `https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/contents/${path}`,
+    {
+      method: 'PUT',
+      headers: {
+        Authorization: 'token ' + token,
+        Accept: 'application/vnd.github.v3+json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    }
+  );
+  if (!res.ok) return null;
+  return `https://raw.githubusercontent.com/${GH_OWNER}/${GH_REPO}/${GH_BRANCH}/${path}`;
+}
+
+// ── Upload all pending assets before a Twee save ──────────────────────────────
+// For each character that has a local base64 blob but no hosted URL yet,
+// upload the blob and store the resulting raw URL on the character record.
+async function uploadAllPendingAssets() {
+  for (const ch of characters) {
+    if (ch.photoData && ch.photoData.startsWith('data:') && !ch.photoUrl) {
+      const url = await uploadCharacterAsset(ch.id, 'photo', ch.photoData);
+      if (url) ch.photoUrl = url;
+    }
+    if (ch.animData && ch.animData.startsWith('data:') && !ch.animUrl) {
+      const url = await uploadCharacterAsset(ch.id, 'anim', ch.animData);
+      if (url) ch.animUrl = url;
+    }
+  }
+  save(); // persist the new photoUrl/animUrl fields to localStorage
+}
+
 async function ghSave() {
   const token = getToken();
   if (!token) { setGhStatus('Enter a GitHub token first', 'err'); return; }
+  setGhStatus('Uploading assets\u2026');
+  await uploadAllPendingAssets();          // upload blobs first; store URLs on chars
+  setGhStatus('Saving world\u2026');
   const src = buildTweeSource(rooms, characters, objects);
   const encoded = btoa(unescape(encodeURIComponent(src)));
   const msg = document.getElementById('gh-commit-input').value.trim() || 'Update living-characters world via tool';
-  setGhStatus('Saving\u2026');
   try {
     const body = { message: msg, content: encoded, branch: GH_BRANCH };
     if (ghFileSha) body.sha = ghFileSha;
@@ -127,6 +191,8 @@ async function ghSave() {
  * Each character written EXACTLY ONCE (no per-room duplication).
  * ch.lat / ch.lng (map-placed characters outside any room) are now
  * included in the character's JSON metadata so they survive reload.
+ *
+ * Asset policy: write hosted URLs only — never base64 blobs.
  */
 function buildTweeSource(roomsList, chars, objs) {
   let out = '';
@@ -171,15 +237,17 @@ function buildTweeSource(roomsList, chars, objs) {
       mood:       ch.mood,
       items:      ch.items || []
     };
-    // ── FIX: persist map-placed coordinates ──────────────────────────────────
     if (typeof ch.lat === 'number') meta.lat = ch.lat;
     if (typeof ch.lng === 'number') meta.lng = ch.lng;
-    // ─────────────────────────────────────────────────────────────────────────
     if (ch.glbUrl && !ch.glbUrl.startsWith('data:')) meta.glbUrl = ch.glbUrl;
-    // ── Phase 3: persist sprite frames and chroma key settings ───────────────
+
+    // Write hosted URLs only — never base64 blobs
+    if (ch.photoUrl) meta.photoUrl = ch.photoUrl;
+    if (ch.animUrl)  meta.animUrl  = ch.animUrl;
+    // sprites and chromaKey are small metadata strings, keep those
     if (ch.sprites)   meta.sprites   = ch.sprites;
     if (ch.chromaKey) meta.chromaKey = ch.chromaKey;
-    // ─────────────────────────────────────────────────────────────────────────
+    // Do NOT write ch.photoData or ch.animData here
 
     out += `:: ${ch.name} ${JSON.stringify(meta)}\n\n`;
     (ch.passages || []).forEach(p => { out += `:: ${ch.name}-${p.type}\n${p.text}\n\n`; });
@@ -260,16 +328,18 @@ function importTweeSource(src, silent) {
           workRoomId: meta.workRoomId || null,
           schedule: meta.schedule || null,
           mood: meta.mood || 'Happy', items: meta.items || [],
-          passages: [], photoData: null, animData: null, glbUrl: meta.glbUrl || null
+          passages: [],
+          // Hosted URLs survive Twee round-trip; blobs are never in Twee
+          photoUrl:  meta.photoUrl  || null,
+          animUrl:   meta.animUrl   || null,
+          photoData: null,   // blobs are never in Twee; set from URL lazily if needed
+          animData:  null,
+          glbUrl: meta.glbUrl || null
         };
-        // ── FIX: restore map-placed coordinates ──────────────────────────────
         if (typeof meta.lat === 'number') ch.lat = meta.lat;
         if (typeof meta.lng === 'number') ch.lng = meta.lng;
-        // ─────────────────────────────────────────────────────────────────────
-        // ── Phase 3: restore sprite frames and chroma key settings ───────────
         if (meta.sprites)   ch.sprites   = meta.sprites;
         if (meta.chromaKey) ch.chromaKey = meta.chromaKey;
-        // ─────────────────────────────────────────────────────────────────────
         newChars.push(ch);
       } else if (passName.includes('-')) {
         const dashIdx = passName.indexOf('-');
@@ -373,7 +443,7 @@ window.lcStore = {
   buildTweeSource, buildTweeStandalone,
   previewTwee, closeTweePreview, downloadTwee, triggerImport, handleImportFile,
   importTweeSource, onTokenInput, setGhStatus, getToken, decodeBase64Unicode,
-  seedGhFileSha, uploadRoomBackdropToGitHub
+  seedGhFileSha, uploadRoomBackdropToGitHub, uploadCharacterAsset, uploadAllPendingAssets
 };
 
 export {
@@ -381,5 +451,5 @@ export {
   buildTweeSource, buildTweeStandalone,
   previewTwee, closeTweePreview, downloadTwee, triggerImport, handleImportFile,
   importTweeSource, onTokenInput, setGhStatus, getToken, decodeBase64Unicode,
-  seedGhFileSha, uploadRoomBackdropToGitHub
+  seedGhFileSha, uploadRoomBackdropToGitHub, uploadCharacterAsset, uploadAllPendingAssets
 };
