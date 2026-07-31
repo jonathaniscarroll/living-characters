@@ -176,6 +176,10 @@ function buildTweeSource(roomsList, chars, objs) {
     if (typeof ch.lng === 'number') meta.lng = ch.lng;
     // ─────────────────────────────────────────────────────────────────────────
     if (ch.glbUrl && !ch.glbUrl.startsWith('data:')) meta.glbUrl = ch.glbUrl;
+    // ── Phase 3: persist sprite frames and chroma key settings ───────────────
+    if (ch.sprites)   meta.sprites   = ch.sprites;
+    if (ch.chromaKey) meta.chromaKey = ch.chromaKey;
+    // ─────────────────────────────────────────────────────────────────────────
 
     out += `:: ${ch.name} ${JSON.stringify(meta)}\n\n`;
     (ch.passages || []).forEach(p => { out += `:: ${ch.name}-${p.type}\n${p.text}\n\n`; });
@@ -261,6 +265,10 @@ function importTweeSource(src, silent) {
         // ── FIX: restore map-placed coordinates ──────────────────────────────
         if (typeof meta.lat === 'number') ch.lat = meta.lat;
         if (typeof meta.lng === 'number') ch.lng = meta.lng;
+        // ─────────────────────────────────────────────────────────────────────
+        // ── Phase 3: restore sprite frames and chroma key settings ───────────
+        if (meta.sprites)   ch.sprites   = meta.sprites;
+        if (meta.chromaKey) ch.chromaKey = meta.chromaKey;
         // ─────────────────────────────────────────────────────────────────────
         newChars.push(ch);
       } else if (passName.includes('-')) {
