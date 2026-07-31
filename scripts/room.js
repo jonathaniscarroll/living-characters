@@ -76,13 +76,12 @@ function openRoom(roomId) {
   applyRoomBackdrop(room);
   document.getElementById('room-view').classList.add('open');
 
-  // Wait for THREE + GLTFLoader to be ready, then build
   let attempts = 0;
   function tryBuild() {
     if (window.THREE && window.GLTFLoader) {
       setTimeout(() => buildRoomScene(room), 360);
     } else if (attempts++ < 20) {
-      setTimeout(tryBuild, 250); // retry every 250ms, up to ~5 seconds
+      setTimeout(tryBuild, 250);
     } else {
       console.warn('3D viewer failed to load after timeout.');
     }
@@ -383,9 +382,8 @@ function _tickWander(agent, dt) {
 // SPRITE BILLBOARD STATE
 // Map<charId, { animator, texture, mesh }>
 // ─────────────────────────────────────────────────────────────
-const _spriteMap = new Map(); // chId → { animator, texture, mesh }
+const _spriteMap = new Map();
 
-/** Build a sprite billboard for one character and add it to the scene. */
 function _buildCharSprite(ch, cx, cz, scene) {
   const THREE = window.THREE;
   const fallbackSrc = ch.animData || ch.photoData || null;
@@ -417,7 +415,6 @@ function _buildCharSprite(ch, cx, cz, scene) {
 
     _spriteMap.set(ch.id, { animator, texture, mesh });
   } else {
-    // Colour-block fallback — no image
     const mood = MOODS.find(m => m.label === ch.mood) || MOODS[0];
     const geo  = new THREE.PlaneGeometry(1.0, 1.6);
     const mat  = new THREE.MeshBasicMaterial({ color: mood.color, side: THREE.DoubleSide });
@@ -425,34 +422,29 @@ function _buildCharSprite(ch, cx, cz, scene) {
     mesh.position.set(cx, 0.8, cz);
     mesh._charId = ch.id;
     scene.add(mesh);
-    // No animator entry — mesh still participates in billboard facing
     _spriteMap.set(ch.id, { animator: null, texture: null, mesh });
   }
 
   return mesh;
 }
 
-/** Tick all sprite animators and keep billboards facing the camera. */
 function _tickAllSprites(deltaMs, camera) {
   _spriteMap.forEach(({ animator, texture, mesh }) => {
     if (animator && texture) {
       const frame = animator.tick(deltaMs);
       if (frame !== null) {
         texture.image.src = frame;
-        // needsUpdate set by image.onload
       }
     }
     if (mesh && camera) mesh.lookAt(camera.position);
   });
 }
 
-/** Set the animation state for a specific character. */
 function setRoomCharacterState(chId, state) {
   const entry = _spriteMap.get(chId);
   if (entry && entry.animator) entry.animator.setState(state);
 }
 
-/** Clean up all sprite animators and textures. */
 function _destroyAllSprites() {
   _spriteMap.forEach(({ texture }) => {
     if (texture) { try { texture.dispose(); } catch (_) {} }
@@ -591,7 +583,6 @@ function buildRoomScene(room) {
     }
   });
 
-  // Object list panel
   const panel = document.getElementById('obj-list-panel');
   const listC = document.getElementById('obj-list-container');
   listC.innerHTML = '';
@@ -607,6 +598,7 @@ function buildRoomScene(room) {
   }
 
   // ── Characters (sprite billboard) ──
+  // Keep charsInRoom in scope here and pass it into handleRoomTap
   const charsInRoom = characters.filter(c => (c.roomIds || [c.roomId]).includes(room.id));
   charsInRoom.forEach((ch) => {
     const hasStoredPos = ch.sceneX != null && ch.sceneZ != null;
@@ -614,7 +606,6 @@ function buildRoomScene(room) {
     const cz = hasStoredPos ? ch.sceneZ : 0;
     const mood = MOODS.find(m => m.label === ch.mood) || MOODS[0];
 
-    // Mood ring on the ground
     const ring = new THREE.Mesh(
       new THREE.RingGeometry(0.5, 0.7, 32),
       new THREE.MeshBasicMaterial({ color: mood.color, side: THREE.DoubleSide })
@@ -624,15 +615,10 @@ function buildRoomScene(room) {
     ring._moodRingCharId = ch.id;
     scene.add(ring);
 
-    // Build sprite billboard (handles fallback internally)
     const mesh = _buildCharSprite(ch, cx, cz, scene);
-
     charObjects.push({ obj: mesh, chId: ch.id, cx, cz });
-
-    // Wander AI — no GLB mixer for sprites; pass null
     _initWanderAgent(ch.id, mesh, ring, cx, cz, null, null);
 
-    // Name label
     const lbl = document.createElement('div');
     lbl.className = 'char-label';
     lbl.textContent = ch.name;
@@ -659,7 +645,6 @@ function buildRoomScene(room) {
     const dt = clock.getDelta();
     glbMixers.forEach(m => m.update(dt));
     _wanderAgents.forEach(agent => _tickWander(agent, dt));
-    // Tick sprite animators and face billboards toward camera
     _tickAllSprites(dt * 1000, camera);
     if (_roomEditMode && _dragTarget && _lastRoomPointer) {
       const point = _screenToFloor(_lastRoomPointer, renderer, camera);
@@ -676,9 +661,10 @@ function buildRoomScene(room) {
   const dom = renderer.domElement;
   dom.addEventListener('mousemove', e => { _lastRoomPointer = e; }, { passive: true });
   dom.addEventListener('touchmove', e => { _lastRoomPointer = e; e.preventDefault(); }, { passive: false });
+  // Pass charsInRoom into handleRoomTap so it is in scope
   dom.addEventListener('click', e => {
     if (_roomEditMode) { onRoomObjectClick(e); return; }
-    handleRoomTap(e, renderer, camera, charObjects);
+    handleRoomTap(e, renderer, camera, charObjects, charsInRoom);
   });
   dom.addEventListener('touchend', e => {
     if (_roomEditMode && e.changedTouches?.length) {
@@ -687,7 +673,10 @@ function buildRoomScene(room) {
   }, { passive: true });
 }
 
-function handleRoomTap(e, renderer, camera, charObjects) {
+// charsInRoom is now received as a parameter instead of being
+// captured from the outer buildRoomScene closure (which caused
+// "charsInRoom is not defined" when called as a standalone fn).
+function handleRoomTap(e, renderer, camera, charObjects, charsInRoom) {
   const rect = renderer.domElement.getBoundingClientRect();
   const clientX = e.touches ? e.touches[0].clientX : e.clientX;
   const clientY = e.touches ? e.touches[0].clientY : e.clientY;
@@ -725,8 +714,7 @@ function handleRoomTap(e, renderer, camera, charObjects) {
     if (closest && minD < 3) {
       const ch = characters.find(c => c.id === closest);
       if (ch) {
-        // Set talk state on the tapped character; idle on others
-        charsInRoom.forEach(c => setRoomCharacterState(c.id, 'idle'));
+        (charsInRoom || []).forEach(c => setRoomCharacterState(c.id, 'idle'));
         setRoomCharacterState(closest, 'talk');
         openTalkPanel(ch);
         spawnTalkCloseUp(ch);
@@ -750,7 +738,6 @@ function destroyRoomScene() {
   _roomEditMode = false;
   threeScene = null;
   threeCamera = null;
-  // Clean up sprite animators and textures
   _destroyAllSprites();
 }
 

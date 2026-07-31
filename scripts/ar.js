@@ -1,23 +1,15 @@
 /* ============================================================
    scripts/ar.js  —  Living Characters pseudo-AR
-   ──────────────────────────────────────────────────────────
+   ——————————————————————————————————————————————————————————
    No WebXR. No Quick Look. Works on every modern iPhone/Android.
 
-   How it works:
-   1. getUserMedia (rear camera) → <video> fills the screen
-   2. Three.js <canvas> sits on top with alpha:true so the video
-      shows through
-   3. DeviceOrientation drives a gentle parallax/drift so the
-      sprite feels "anchored" in the room
-   4. Tap the sprite → opens the same card + talk panel used in
-      room mode (openCard / openTalkPanel from card.js)
-   5. Exit button dismisses everything and stops the camera
+   Tap the sprite → opens openTalkPanel directly (no card panel).
+   Exit button dismisses everything and stops the camera.
    ============================================================ */
 
 (function () {
   'use strict';
 
-  // ── state ────────────────────────────────────────────────────────────────
   let _active      = false;
   let _stream      = null;
   let _animId      = null;
@@ -38,15 +30,10 @@
   let _raycaster   = null;
   let _mouse       = new (window.THREE ? window.THREE.Vector2 : function(){this.x=0;this.y=0;})();
 
-  // ── sprite billboard state ───────────────────────────────────────────────
   let _animator    = null;
   let _texture     = null;
 
-  // ── saved z-indexes so we can restore on close ───────────────────────────
-  let _savedCardZ      = null;
-  let _savedTalkZ      = null;
-
-  // ── helpers ────────────────────────────────────────────────────────────────
+  // ── helpers ───────────────────────────────────────────────
   function toast(msg) {
     if (typeof showToast === 'function') showToast(msg);
     else console.warn('[AR]', msg);
@@ -54,39 +41,31 @@
 
   function getEl(id) { return document.getElementById(id); }
 
-  // ── Lift card + talk-panel above the AR canvas layer ──────────────────────
-  function _liftCardAboveAR() {
-    const card = getEl('card');
+  // ── Raise #talk-panel above the AR canvas (z 2001) ────────
+  // #card is NOT used in AR — we go straight to the talk panel.
+  let _savedTalkZ = null;
+  function _liftTalkPanelAboveAR() {
     const talk = getEl('talk-panel');
-    // ar-canvas is z-index 2001; ar-hud is 2002 — put card at 2003
-    if (card) {
-      _savedCardZ = card.style.zIndex;
-      card.style.zIndex = '2003';
-    }
     if (talk) {
       _savedTalkZ = talk.style.zIndex;
       talk.style.zIndex = '2003';
     }
   }
-
-  function _restoreCardZIndex() {
-    const card = getEl('card');
+  function _restoreTalkPanelZIndex() {
     const talk = getEl('talk-panel');
-    if (card && _savedCardZ !== null) { card.style.zIndex = _savedCardZ; _savedCardZ = null; }
-    if (talk && _savedTalkZ !== null) { talk.style.zIndex = _savedTalkZ; _savedTalkZ = null; }
+    if (talk && _savedTalkZ !== null) {
+      talk.style.zIndex = _savedTalkZ;
+      _savedTalkZ = null;
+    }
   }
 
-  // ── safe texture disposal ───────────────────────────────────────────────
+  // ── safe texture disposal ─────────────────────────────────
   function _disposeTexture(tex) {
     if (!tex) return;
-    if (tex.image) {
-      tex.image.onload  = null;
-      tex.image.onerror = null;
-    }
+    if (tex.image) { tex.image.onload = null; tex.image.onerror = null; }
     try { tex.dispose(); } catch (_) {}
   }
 
-  // ── load a src into a texture, guarding against stale closures ───────────
   function _loadTextureFrame(texture, material, src) {
     if (!texture || !src) return;
     const img = new Image();
@@ -97,13 +76,11 @@
       texture.needsUpdate = true;
       if (material) material.needsUpdate = true;
     };
-    img.onerror = () => {
-      console.warn('[AR] texture load failed:', src);
-    };
+    img.onerror = () => { console.warn('[AR] texture load failed:', src); };
     img.src = src;
   }
 
-  // ── orientation listener ───────────────────────────────────────────────
+  // ── orientation ───────────────────────────────────────────
   function _onOrient(e) {
     _orientAlpha = e.alpha || 0;
     _orientBeta  = e.beta  || 0;
@@ -115,7 +92,7 @@
     }
   }
 
-  // ── build / tear down DOM ─────────────────────────────────────────────
+  // ── DOM ───────────────────────────────────────────────────
   function _buildDOM() {
     let vid = getEl('ar-video');
     if (!vid) {
@@ -126,24 +103,20 @@
       vid.setAttribute('muted', '');
       Object.assign(vid.style, {
         position: 'fixed', inset: '0', width: '100%', height: '100%',
-        objectFit: 'cover', zIndex: '2000', display: 'none',
-        background: '#000',
+        objectFit: 'cover', zIndex: '2000', display: 'none', background: '#000',
       });
       document.body.appendChild(vid);
     }
-
     let cv = getEl('ar-canvas');
     if (!cv) {
       cv = document.createElement('canvas');
       cv.id = 'ar-canvas';
       Object.assign(cv.style, {
         position: 'fixed', inset: '0', width: '100%', height: '100%',
-        zIndex: '2001', display: 'none', touchAction: 'none',
-        pointerEvents: 'all',
+        zIndex: '2001', display: 'none', touchAction: 'none', pointerEvents: 'all',
       });
       document.body.appendChild(cv);
     }
-
     let hud = getEl('ar-hud');
     if (!hud) {
       hud = document.createElement('div');
@@ -152,8 +125,7 @@
         position: 'fixed', inset: '0', zIndex: '2002',
         display: 'none', flexDirection: 'column',
         alignItems: 'center', justifyContent: 'flex-end',
-        paddingBottom: '36px', gap: '10px',
-        pointerEvents: 'none',
+        paddingBottom: '36px', gap: '10px', pointerEvents: 'none',
       });
       document.body.appendChild(hud);
     }
@@ -174,54 +146,25 @@
     });
   }
 
-  // ── HUD build ──────────────────────────────────────────────────────────────
+  // ── HUD ───────────────────────────────────────────────────
   function _buildHUD(ch) {
     const hud = getEl('ar-hud');
     hud.innerHTML = '';
-
     const mood = (window.MOODS || []).find(m => m.label === ch.mood);
     const moodEmoji = mood ? mood.emoji : '\u2728';
 
     const hint = document.createElement('div');
     hint.id = 'ar-hint';
-    hint.style.cssText = [
-      'background:rgba(10,15,30,.78)',
-      'color:#eaeaea',
-      'font-family:inherit',
-      'font-size:13px',
-      'padding:6px 16px',
-      'border-radius:20px',
-      'pointer-events:none',
-    ].join(';');
+    hint.style.cssText = 'background:rgba(10,15,30,.78);color:#eaeaea;font-family:inherit;font-size:13px;padding:6px 16px;border-radius:20px;pointer-events:none;';
     hint.textContent = `Tap ${ch.name} to talk`;
 
     const badge = document.createElement('div');
-    badge.style.cssText = [
-      'background:rgba(10,15,30,.82)',
-      'color:#eaeaea',
-      'font-family:inherit',
-      'font-size:15px',
-      'font-weight:700',
-      'padding:7px 18px',
-      'border-radius:20px',
-      'pointer-events:none',
-    ].join(';');
+    badge.style.cssText = 'background:rgba(10,15,30,.82);color:#eaeaea;font-family:inherit;font-size:15px;font-weight:700;padding:7px 18px;border-radius:20px;pointer-events:none;';
     badge.textContent = `${moodEmoji}  ${ch.name}`;
 
     const exitBtn = document.createElement('button');
     exitBtn.textContent = '\u2715 Exit AR';
-    exitBtn.style.cssText = [
-      'pointer-events:all',
-      'padding:10px 28px',
-      'border-radius:24px',
-      'background:#e94560',
-      'color:#fff',
-      'border:none',
-      'font-size:14px',
-      'font-weight:700',
-      'font-family:inherit',
-      'cursor:pointer',
-    ].join(';');
+    exitBtn.style.cssText = 'pointer-events:all;padding:10px 28px;border-radius:24px;background:#e94560;color:#fff;border:none;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer;';
     exitBtn.addEventListener('click', close);
 
     hud.appendChild(hint);
@@ -229,7 +172,7 @@
     hud.appendChild(exitBtn);
   }
 
-  // ── Three.js setup ───────────────────────────────────────────────────────────
+  // ── Three.js ──────────────────────────────────────────────
   function _initThree(canvas) {
     const THREE = window.THREE;
     const w = window.innerWidth;
@@ -255,8 +198,7 @@
 
     const haloGeo = new THREE.RingGeometry(0.28, 0.38, 48);
     const haloMat = new THREE.MeshBasicMaterial({
-      color: 0x4f98a3, side: THREE.DoubleSide,
-      transparent: true, opacity: 0.55,
+      color: 0x4f98a3, side: THREE.DoubleSide, transparent: true, opacity: 0.55,
     });
     _haloMesh = new THREE.Mesh(haloGeo, haloMat);
     _haloMesh.rotation.x = -Math.PI / 2;
@@ -267,7 +209,7 @@
     _raycaster = new THREE.Raycaster();
   }
 
-  // ── Sprite billboard ─────────────────────────────────────────────────────────
+  // ── Sprite billboard ──────────────────────────────────────
   function _buildSpriteBillboard(ch) {
     const THREE = window.THREE;
     const fallbackSrc = ch.animData || ch.photoData || null;
@@ -283,28 +225,18 @@
       const label = document.createElement('div');
       label.id = 'ar-sprite-label';
       label.textContent = ch.name || '?';
-      label.style.cssText = [
-        'position:fixed', 'top:50%', 'left:50%',
-        'transform:translate(-50%,-50%)',
-        'color:#fff', 'font-size:18px', 'font-weight:700',
-        'font-family:inherit', 'pointer-events:none', 'z-index:2005',
-        'text-shadow:0 1px 4px rgba(0,0,0,.8)',
-      ].join(';');
+      label.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);color:#fff;font-size:18px;font-weight:700;font-family:inherit;pointer-events:none;z-index:2005;text-shadow:0 1px 4px rgba(0,0,0,.8);';
       document.body.appendChild(label);
       return;
     }
 
     _animator = new window.SpriteAnimator(ch.sprites || null, fallbackSrc);
-
     const texture = new THREE.Texture();
     _texture = texture;
 
     const geo = new THREE.PlaneGeometry(1.0, 1.6);
     const mat = new THREE.MeshBasicMaterial({
-      map: texture,
-      transparent: true,
-      alphaTest: 0.05,
-      side: THREE.DoubleSide,
+      map: texture, transparent: true, alphaTest: 0.05, side: THREE.DoubleSide,
     });
     _model = new THREE.Mesh(geo, mat);
     _model.position.set(0, 0.8, 0);
@@ -314,44 +246,37 @@
     if (firstFrame) _loadTextureFrame(texture, mat, firstFrame);
   }
 
-  // ── Sprite tick ───────────────────────────────────────────────────────────────
+  // ── Sprite tick ───────────────────────────────────────────
   function _tickSprite(deltaMs) {
     if (!_animator || !_model) return;
     const frame = _animator.tick(deltaMs);
     if (frame !== null && _texture) {
-      const mat = _model.material;
-      _loadTextureFrame(_texture, mat, frame);
+      _loadTextureFrame(_texture, _model.material, frame);
     }
     _model.lookAt(_camera.position);
   }
 
-  // ── Hit-test ──────────────────────────────────────────────────────────────────
+  // ── Hit-test ──────────────────────────────────────────────
   function _hitModel(clientX, clientY) {
     if (!_model || !_camera || !_raycaster) return false;
     _mouse.x =  (clientX / window.innerWidth)  * 2 - 1;
     _mouse.y = -(clientY / window.innerHeight) * 2 + 1;
     _raycaster.setFromCamera(_mouse, _camera);
-    const hits = _raycaster.intersectObject(_model, true);
-    return hits.length > 0;
+    return _raycaster.intersectObject(_model, true).length > 0;
   }
 
-  // ── Render loop ──────────────────────────────────────────────────────────────
+  // ── Render loop ───────────────────────────────────────────
   function _tick() {
     _animId = requestAnimationFrame(_tick);
     const delta = _clock ? _clock.getDelta() : 0.016;
     if (_mixer) _mixer.update(delta);
-
     _tickSprite(delta * 1000);
 
     if (_baseAlpha !== null && _model) {
-      let dg = _orientGamma - _baseGamma;
-      let db = _orientBeta  - _baseBeta;
-      dg = Math.max(-30, Math.min(30, dg));
-      db = Math.max(-30, Math.min(30, db));
-      const targetX = (dg / 30) * -1.2;
-      const targetZ = (db / 30) *  0.6;
-      _model.position.x += (targetX - _model.position.x) * 0.06;
-      _model.position.z += (targetZ - _model.position.z) * 0.06;
+      let dg = Math.max(-30, Math.min(30, _orientGamma - _baseGamma));
+      let db = Math.max(-30, Math.min(30, _orientBeta  - _baseBeta));
+      _model.position.x += ((dg / 30) * -1.2 - _model.position.x) * 0.06;
+      _model.position.z += ((db / 30) *  0.6  - _model.position.z) * 0.06;
       if (_haloMesh) {
         _haloMesh.position.x = _model.position.x;
         _haloMesh.position.z = _model.position.z;
@@ -367,12 +292,11 @@
     if (_renderer && _scene && _camera) _renderer.render(_scene, _camera);
   }
 
-  // ── Open ───────────────────────────────────────────────────────────────────────
+  // ── Open ──────────────────────────────────────────────────
   async function open(character) {
     if (_active) close();
     if (!character) { toast('No character selected'); return; }
     _character = character;
-
     if (!window.THREE) { toast('3D engine not ready — please wait a moment'); return; }
 
     _showDOM();
@@ -397,14 +321,13 @@
     window.addEventListener('deviceorientation', _onOrient, true);
     if (typeof DeviceOrientationEvent !== 'undefined' &&
         typeof DeviceOrientationEvent.requestPermission === 'function') {
-      DeviceOrientationEvent.requestPermission().then(s => {
-        if (s === 'granted') window.addEventListener('deviceorientation', _onOrient, true);
-      }).catch(() => {});
+      DeviceOrientationEvent.requestPermission()
+        .then(s => { if (s === 'granted') window.addEventListener('deviceorientation', _onOrient, true); })
+        .catch(() => {});
     }
 
-    // Raise card and talk-panel above the AR canvas NOW so they are ready
-    // the moment the user taps the sprite.
-    _liftCardAboveAR();
+    // Raise #talk-panel above the canvas so it is always tappable
+    _liftTalkPanelAboveAR();
 
     cv.addEventListener('pointerup', _onCanvasTap);
 
@@ -413,70 +336,54 @@
     _tick();
   }
 
-  // ── Canvas tap ─────────────────────────────────────────────────────────────
+  // ── Canvas tap ────────────────────────────────────────────
+  // Always go straight to openTalkPanel — no card in AR mode.
   function _onCanvasTap(e) {
     if (!_character) return;
-    const hit = _hitModel(e.clientX, e.clientY);
-    if (!hit) return;
+    if (!_hitModel(e.clientX, e.clientY)) return;
 
     const hint = getEl('ar-hint');
     if (hint) hint.style.opacity = '0';
 
     if (_animator) _animator.setState('talk');
 
-    // Try openCard first (looks up character in global `characters` array).
-    // If the character exists in the array, openCard handles both the card
-    // panel and the dialogue list. If not (e.g. loaded from Twee without
-    // being in the live array), fall back to openTalkPanel with the full
-    // character object so dialogue still appears.
-    const inArray = Array.isArray(window.characters) &&
-      window.characters.some(c => c.id === _character.id);
-
-    if (inArray && typeof openCard === 'function') {
-      openCard(_character.id);
-    } else if (typeof openTalkPanel === 'function') {
+    if (typeof openTalkPanel === 'function') {
       openTalkPanel(_character);
     }
   }
 
-  // ── Set character animation state (called by card.js on open/close) ─────
+  // ── Set character animation state ─────────────────────────
   function setCharacterState(state) {
     if (_animator) _animator.setState(state);
   }
 
-  // ── Close ───────────────────────────────────────────────────────────────────
+  // ── Close ─────────────────────────────────────────────────
   function close() {
     _active = false;
-
     if (_animId) { cancelAnimationFrame(_animId); _animId = null; }
     if (_stream) { _stream.getTracks().forEach(t => t.stop()); _stream = null; }
     window.removeEventListener('deviceorientation', _onOrient, true);
-
     try { if (_renderer) _renderer.dispose(); } catch (_) {}
     _renderer = _scene = _camera = _model = _haloMesh = _mixer = _clock = _raycaster = null;
 
     const texToDispose = _texture;
     _texture = null;
     _disposeTexture(texToDispose);
-
     _animator = null;
 
     const label = getEl('ar-sprite-label');
     if (label) label.remove();
 
     _hideDOM();
+    _restoreTalkPanelZIndex();
 
-    // Restore card / talk-panel z-indexes before (or after) closeCard so
-    // the card can still animate out at its normal layer.
-    _restoreCardZIndex();
-
-    if (typeof closeCard === 'function') closeCard();
+    if (typeof closeTalkPanel === 'function') closeTalkPanel();
 
     _baseAlpha = _baseBeta = _baseGamma = null;
     _character = null;
   }
 
-  // ── Public API ──────────────────────────────────────────────────────────────
+  // ── Public API ────────────────────────────────────────────
   window.ARView = { open, close, setCharacterState };
   window.lcAR  = { open, close, launchAR: open, setCharacterState };
   window.launchAR = open;
