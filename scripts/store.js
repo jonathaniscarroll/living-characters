@@ -48,8 +48,6 @@ function onTokenInput() {
 }
 
 // ── Auto-load world from public GitHub on startup ────────────────────────────
-// No token needed — reads the raw public file.
-// Falls back to localStorage if offline or repo has no content yet.
 async function autoLoadFromGitHub() {
   setGhStatus('Loading world…');
   try {
@@ -60,12 +58,10 @@ async function autoLoadFromGitHub() {
     importTweeSource(src, true /* silent */);
     setGhStatus('World loaded ✓', 'ok');
     showToast('World loaded ✓', 'ok');
-    // Seed sha so Save works immediately after auto-load
     const token = getToken();
     if (token) {
       seedGhFileSha(token);
     } else {
-      // Fetch sha without auth (public repo, counts against anon rate limit)
       const metaRes = await fetch(
         `https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/contents/${GH_PATH}?ref=${GH_BRANCH}`,
         { headers: { Accept: 'application/vnd.github.v3+json' } }
@@ -73,7 +69,6 @@ async function autoLoadFromGitHub() {
       if (metaRes.ok) { const d = await metaRes.json(); ghFileSha = d.sha; }
     }
   } catch (e) {
-    // Graceful fallback: use localStorage so the tool still works offline
     loadLocal();
     if (e.message === 'empty') {
       setGhStatus('No world saved yet', '');
@@ -135,15 +130,30 @@ async function ghSave() {
     const data = await res.json();
     ghFileSha = data.content.sha;
     setGhStatus('Saved ✓  ' + data.commit.sha.slice(0, 7), 'ok');
-    // Mirror to localStorage as offline cache
     save();
   } catch (e) {
     setGhStatus('Save failed: ' + e.message, 'err');
   }
 }
 
+/**
+ * buildTweeSource
+ * ---------------
+ * IMPORTANT: Each character is written exactly ONCE, regardless of how many
+ * rooms they belong to. The root character passage stores the full roomIds
+ * array in its JSON metadata. Previously characters were emitted once per
+ * room they appeared in, which caused duplication on re-import.
+ *
+ * Serialisation order:
+ *   1. Room passages (with lede body)
+ *   2. Object passages belonging to that room
+ *   3. Characters are written in a SEPARATE pass AFTER all rooms,
+ *      keyed by character id so each character appears exactly once.
+ */
 function buildTweeSource(roomsList, chars, objs) {
   let out = '';
+
+  // ── 1. Rooms + their objects ─────────────────────────────────────────────
   roomsList.forEach(room => {
     const roomMeta = { id: room.id, lat: room.lat, lng: room.lng, radius: room.radius };
     if (room.cameraX != null) roomMeta.cameraX = room.cameraX;
@@ -153,6 +163,7 @@ function buildTweeSource(roomsList, chars, objs) {
     out += `:: ${room.name} ${JSON.stringify(roomMeta)}\n`;
     out += room.lede ? room.lede + '\n' : '';
     out += '\n';
+
     (objs || []).filter(o => o.roomId === room.id).forEach(obj => {
       const meta = { roomId: obj.roomId, scale: obj.scale || 1 };
       if (obj.glbUrl) meta.glbUrl = obj.glbUrl;
@@ -165,20 +176,29 @@ function buildTweeSource(roomsList, chars, objs) {
       out += obj.description ? obj.description + '\n' : '';
       out += '\n';
     });
-    chars.filter(c => (c.roomIds || [c.roomId]).includes(room.id)).forEach(ch => {
-      const meta = {
-        roomIds: ch.roomIds || [ch.roomId],
-        homeRoomId: ch.homeRoomId || null,
-        workRoomId: ch.workRoomId || null,
-        schedule: ch.schedule || null,
-        mood: ch.mood,
-        items: ch.items || []
-      };
-      if (ch.glbUrl) meta.glbUrl = ch.glbUrl;
-      out += `:: ${ch.name} ${JSON.stringify(meta)}\n\n`;
-      (ch.passages || []).forEach(p => { out += `:: ${ch.name}-${p.type}\n${p.text}\n\n`; });
-    });
   });
+
+  // ── 2. Characters — each written EXACTLY ONCE ───────────────────────────
+  // Deduplicate by character id in case the in-memory array somehow has dupes.
+  const seen = new Set();
+  chars.forEach(ch => {
+    const uid = ch.id || ch.name;
+    if (seen.has(uid)) return; // skip duplicates already in memory
+    seen.add(uid);
+
+    const meta = {
+      roomIds: ch.roomIds || (ch.roomId ? [ch.roomId] : []),
+      homeRoomId: ch.homeRoomId || null,
+      workRoomId: ch.workRoomId || null,
+      schedule: ch.schedule || null,
+      mood: ch.mood,
+      items: ch.items || []
+    };
+    if (ch.glbUrl && !ch.glbUrl.startsWith('data:')) meta.glbUrl = ch.glbUrl;
+    out += `:: ${ch.name} ${JSON.stringify(meta)}\n\n`;
+    (ch.passages || []).forEach(p => { out += `:: ${ch.name}-${p.type}\n${p.text}\n\n`; });
+  });
+
   return out;
 }
 
@@ -250,6 +270,9 @@ function importTweeSource(src, silent) {
           context: meta.context || null, usageTags: meta.usageTags || []
         });
       } else if ((meta.roomIds !== undefined || meta.roomId !== undefined) && !passName.includes('-')) {
+        // Guard: skip if we already imported a character with this name
+        // (handles any residual duplication in an existing twee file).
+        if (newChars.find(c => c.name === passName)) { continue; }
         const roomIds = Array.isArray(meta.roomIds) ? meta.roomIds : (meta.roomId ? [meta.roomId] : []);
         const primaryRoomId = roomIds[0] || meta.roomId;
         newChars.push({
@@ -340,6 +363,14 @@ function loadLocal() {
     if (r) rooms = JSON.parse(r);
     if (c) {
       characters = JSON.parse(c);
+      // Deduplicate by id on load, just in case
+      const seen = new Set();
+      characters = characters.filter(ch => {
+        const uid = ch.id || ch.name;
+        if (seen.has(uid)) return false;
+        seen.add(uid);
+        return true;
+      });
       characters.forEach(ch => {
         if (!ch.roomIds || !Array.isArray(ch.roomIds)) ch.roomIds = ch.roomId ? [ch.roomId] : [];
         if (!ch.homeRoomId) ch.homeRoomId = ch.roomIds[0] || null;
@@ -356,9 +387,6 @@ window.addEventListener('DOMContentLoaded', () => {
   if (saved) {
     document.getElementById('gh-token-input').value = saved;
   }
-  // Auto-load the shared world from GitHub on every startup.
-  // No token needed — reads the public raw file.
-  // Falls back to localStorage if offline or file doesn't exist yet.
   autoLoadFromGitHub();
 });
 
