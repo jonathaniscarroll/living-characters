@@ -17,7 +17,9 @@
   </script>
   <script type="module">
     import * as THREE from 'three';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
     window.THREE = THREE;
+    window.GLTFLoader = GLTFLoader;
   </script>
   <script type="module" src="./scripts/store.js"></script>
   <script type="module" src="./scripts/map.js"></script>
