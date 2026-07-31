@@ -7,15 +7,21 @@
 :: mop-hello
 hellow
 
-:: belinda {"roomIds":[],"homeRoomId":null,"workRoomId":null,"schedule":{"morning":"home","midday":"work","afternoon":"work","evening":"home","night":"home"},"mood":"Happy","items":[],"lat":44.65227619588055,"lng":-63.58122825622559}
-
-:: guy {"roomIds":[],"homeRoomId":null,"workRoomId":null,"schedule":{"morning":"home","midday":"work","afternoon":"work","evening":"home","night":"home"},"mood":"Happy","items":[],"lat":44.65223040185709,"lng":-63.58047723770142}
-
-:: mop {"roomIds":["room_1785511396164"],"homeRoomId":"room_1785511396164","workRoomId":"room_1785511396164","schedule":{"morning":"home","midday":"work","afternoon":"work","evening":"home","night":"home"},"mood":"Happy","items":["hat"],"photoUrl":"https://raw.githubusercontent.com/jonathaniscarroll/living-characters/main/story/assets/char_1785511501415-photo.png","spriteUrls":{"idle":["https://raw.githubusercontent.com/jonathaniscarroll/living-characters/main/story/assets/char_1785511501415-sprite-idle-0.png",null],"walk":["https://raw.githubusercontent.com/jonathaniscarroll/living-characters/main/story/assets/char_1785511501415-sprite-walk-0.png",null],"talk":["https://raw.githubusercontent.com/jonathaniscarroll/living-characters/main/story/assets/char_1785511501415-sprite-talk-0.png",null],"listen":["https://raw.githubusercontent.com/jonathaniscarroll/living-characters/main/story/assets/char_1785511501415-sprite-listen-0.png",null]},"chromaKey":{"h":120,"tolerance":0.35,"spill":0.15}}
-
 :: mop-hello
 hello
 
 :: mop-question
 peep
+
+:: belinda {"roomIds":[],"homeRoomId":null,"workRoomId":null,"schedule":{"morning":"home","midday":"work","afternoon":"work","evening":"home","night":"home"},"mood":"Happy","items":[],"lat":44.65227619588055,"lng":-63.58122825622559}
+
+:: guy {"roomIds":[],"homeRoomId":null,"workRoomId":null,"schedule":{"morning":"home","midday":"work","afternoon":"work","evening":"home","night":"home"},"mood":"Happy","items":[],"lat":44.65223040185709,"lng":-63.58047723770142}
+
+:: Me {"roomIds":[],"homeRoomId":null,"workRoomId":null,"schedule":{"morning":"home","midday":"work","afternoon":"work","evening":"home","night":"home"},"mood":"Happy","items":[],"lat":44.653092849893504,"lng":-63.58311653137208,"photoUrl":"https://raw.githubusercontent.com/jonathaniscarroll/living-characters/main/story/assets/char_1785511924254-photo.jpeg","spriteUrls":{"idle":["https://raw.githubusercontent.com/jonathaniscarroll/living-characters/main/story/assets/char_1785511924254-sprite-idle-0.png",null],"walk":["https://raw.githubusercontent.com/jonathaniscarroll/living-characters/main/story/assets/char_1785511924254-sprite-walk-0.png",null],"talk":["https://raw.githubusercontent.com/jonathaniscarroll/living-characters/main/story/assets/char_1785511924254-sprite-talk-0.png",null],"listen":["https://raw.githubusercontent.com/jonathaniscarroll/living-characters/main/story/assets/char_1785511924254-sprite-listen-0.png",null]},"chromaKey":{"h":120,"tolerance":0.35,"spill":0.15}}
+
+:: Me-hello
+Hiio
+
+:: Me-question
+Ghh
 
