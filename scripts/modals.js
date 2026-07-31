@@ -232,7 +232,7 @@ function uploadRoomBackdrop() {
 // Sprite / Chroma Key state (module-level, reset on each openCharModal call)
 // ---------------------------------------------------------------------------
 
-let pendingSprites = { idle: [null, null], walk: [null, null], talk: [null, null], listen: [null, null] };
+let pendingSprites = { idle: [], walk: [], talk: [], listen: [] };
 let chromaSettings = { h: 120, tolerance: 0.35, spill: 0.15 };
 let eyedropperActive = false;
 
@@ -249,6 +249,15 @@ const CHECKERBOARD_STYLE = [
   'background-position:0 0,0 6px,6px -6px,-6px 0px;',
   'background-color:#fff;'
 ].join('');
+
+// --- Sprite helpers ---
+
+function ensureSpriteStateSeededFromCharacter(ch, state) {
+  if (!ch || !ch.sprites || !ch.sprites[state]) return;
+  if (!pendingSprites[state] || !pendingSprites[state].length) {
+    pendingSprites[state] = (ch.sprites[state] || []).slice();
+  }
+}
 
 /** Hue (0-360) to CSS hex colour for the swatch */
 function hueToHex(h) {
@@ -267,19 +276,10 @@ function buildSpriteSection(ch) {
   const existing = document.getElementById('sprite-frames-section');
   if (existing) existing.remove();
 
-  // Reset state
-  pendingSprites = { idle: [null, null], walk: [null, null], talk: [null, null], listen: [null, null] };
+  // Reset state to empty arrays; existing sprites will be seeded lazily per state
+  pendingSprites = { idle: [], walk: [], talk: [], listen: [] };
   chromaSettings = (ch && ch.chromaKey) ? { ...ch.chromaKey } : { h: 120, tolerance: 0.35, spill: 0.15 };
   eyedropperActive = false;
-
-  // Seed existing sprites if editing a character
-  if (ch && ch.sprites) {
-    SPRITE_STATES.forEach(state => {
-      if (ch.sprites[state]) {
-        pendingSprites[state] = [ch.sprites[state][0] || null, ch.sprites[state][1] || null];
-      }
-    });
-  }
 
   const section = document.createElement('div');
   section.id = 'sprite-frames-section';
@@ -350,82 +350,249 @@ function buildSpriteSection(ch) {
   }
 
   // Build grid rows
-  buildSpriteGrid();
+  buildSpriteGrid(ch);
 }
 
-function buildSpriteGrid() {
+function buildSpriteGrid(ch) {
   const grid = document.getElementById('sprite-grid');
   if (!grid) return;
   grid.innerHTML = '';
 
   SPRITE_STATES.forEach(state => {
+    ensureSpriteStateSeededFromCharacter(ch, state);
+
     const row = document.createElement('div');
-    row.style.cssText = 'display:flex;align-items:center;gap:8px;';
+    row.style.cssText = 'display:flex;align-items:flex-start;gap:8px;';
 
     const stateLabel = document.createElement('span');
     stateLabel.textContent = SPRITE_STATE_LABELS[state];
     stateLabel.style.cssText = 'font-size:11px;color:var(--text-muted,#999);width:36px;flex-shrink:0;text-transform:uppercase;letter-spacing:.5px;';
     row.appendChild(stateLabel);
 
-    [0, 1].forEach(frameIdx => {
-      const slot = buildSpriteSlot(state, frameIdx);
-      row.appendChild(slot);
+    const strip = document.createElement('div');
+    strip.className = 'sprite-strip';
+    strip.dataset.state = state;
+    strip.style.cssText = 'display:flex;flex-wrap:nowrap;gap:6px;align-items:flex-start;overflow-x:auto;padding-bottom:4px;';
+    row.appendChild(strip);
+
+    const controls = document.createElement('div');
+    controls.style.cssText = 'display:flex;flex-direction:column;gap:4px;';
+
+    const addBtn = document.createElement('button');
+    addBtn.textContent = '\uff0b Add frames';
+    addBtn.type = 'button';
+    addBtn.style.cssText = 'font-size:11px;padding:4px 8px;border-radius:999px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.05);color:var(--text,#e0e0e0);cursor:pointer;white-space:nowrap;';
+
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = 'image/*';
+    fileInput.multiple = true;
+    fileInput.style.display = 'none';
+    fileInput.addEventListener('change', () => onSpriteMultiFileChange(fileInput, state));
+
+    addBtn.addEventListener('click', () => {
+      if (!eyedropperActive) fileInput.click();
     });
 
+    controls.appendChild(addBtn);
+    controls.appendChild(fileInput);
+
+    row.appendChild(controls);
+
     grid.appendChild(row);
+
+    // Render existing frames for this state
+    renderSpriteStrip(state);
   });
 }
 
-function buildSpriteSlot(state, frameIdx) {
-  const dataUrl = pendingSprites[state][frameIdx];
-  const slot = document.createElement('div');
-  slot.id = `sprite-slot-${state}-${frameIdx}`;
-  slot.style.cssText = `position:relative;width:64px;height:72px;border-radius:6px;border:1.5px dashed rgba(255,255,255,0.2);overflow:hidden;flex-shrink:0;cursor:pointer;${CHECKERBOARD_STYLE}`;
+function renderSpriteStrip(state) {
+  const strip = document.querySelector(`.sprite-strip[data-state="${state}"]`);
+  if (!strip) return;
+  strip.innerHTML = '';
 
-  if (dataUrl) {
+  const frames = pendingSprites[state] || [];
+
+  frames.forEach((dataUrl, index) => {
+    const card = document.createElement('div');
+    card.className = 'sprite-card';
+    card.dataset.state = state;
+    card.dataset.index = String(index);
+    card.draggable = true;
+    card.style.cssText = `position:relative;width:64px;height:80px;border-radius:var(--radius-sm,6px);border:1px solid rgba(255,255,255,0.18);overflow:hidden;flex-shrink:0;cursor:grab;${CHECKERBOARD_STYLE}`;
+
+    const thumbWrap = document.createElement('div');
+    thumbWrap.style.cssText = 'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:2px;';
+
     const img = document.createElement('img');
     img.src = dataUrl;
-    img.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:contain;';
+    img.style.cssText = 'max-width:100%;max-height:100%;object-fit:contain;';
     img.dataset.state = state;
-    img.dataset.frame = frameIdx;
+    img.dataset.frame = String(index);
     img.addEventListener('click', onSpriteImgClick);
-    slot.appendChild(img);
+
+    thumbWrap.appendChild(img);
+    card.appendChild(thumbWrap);
 
     const clearBtn = document.createElement('button');
     clearBtn.textContent = '\u00D7';
     clearBtn.title = 'Remove frame';
     clearBtn.style.cssText = 'position:absolute;top:2px;right:2px;width:16px;height:16px;border-radius:50%;background:rgba(0,0,0,.6);border:none;color:#fff;font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;line-height:1;';
-    clearBtn.onclick = (e) => { e.stopPropagation(); clearSpriteSlot(state, frameIdx); };
-    slot.appendChild(clearBtn);
-  } else {
-    const plus = document.createElement('span');
-    plus.textContent = '+';
-    plus.style.cssText = 'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:20px;color:rgba(255,255,255,0.3);pointer-events:none;';
-    slot.appendChild(plus);
+    clearBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      removeSpriteFrame(state, index);
+    });
+    card.appendChild(clearBtn);
 
-    const frameLabel = document.createElement('span');
-    frameLabel.textContent = frameIdx === 0 ? 'A' : 'B';
-    frameLabel.style.cssText = 'position:absolute;bottom:3px;left:0;right:0;text-align:center;font-size:9px;color:rgba(255,255,255,0.3);pointer-events:none;';
-    slot.appendChild(frameLabel);
-  }
+    const indexLabel = document.createElement('div');
+    indexLabel.textContent = String(index + 1);
+    indexLabel.style.cssText = 'position:absolute;bottom:0;left:0;right:0;text-align:center;font-size:9px;color:rgba(255,255,255,0.65);text-shadow:0 0 4px rgba(0,0,0,.7);padding-bottom:2px;';
+    card.appendChild(indexLabel);
 
-  // Hidden file input
-  const fileInput = document.createElement('input');
-  fileInput.type = 'file';
-  fileInput.accept = 'image/*';
-  fileInput.style.display = 'none';
-  fileInput.id = `sprite-input-${state}-${frameIdx}`;
-  fileInput.addEventListener('change', () => onSpriteFileChange(fileInput, state, frameIdx));
-  slot.appendChild(fileInput);
+    attachSpriteDragHandlers(card);
 
-  slot.addEventListener('click', (e) => {
-    if (eyedropperActive) return;
-    if (e.target === slot || e.target.tagName === 'SPAN') {
-      fileInput.click();
+    strip.appendChild(card);
+  });
+}
+
+function removeSpriteFrame(state, index) {
+  const list = pendingSprites[state] || [];
+  list.splice(index, 1);
+  pendingSprites[state] = list;
+  renderSpriteStrip(state);
+}
+
+function onSpriteMultiFileChange(input, state) {
+  const files = Array.from(input.files || []);
+  if (!files.length) return;
+
+  const readerPromises = files.map(file => new Promise(resolve => {
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      const raw = e.target.result;
+      let keyed = raw;
+      if (window.lcChroma && typeof window.lcChroma.chromaKey === 'function') {
+        try { keyed = await window.lcChroma.chromaKey(raw, chromaSettings); } catch (_) {}
+      }
+      resolve(keyed);
+    };
+    reader.onerror = () => resolve(null);
+    reader.readAsDataURL(file);
+  }));
+
+  Promise.all(readerPromises).then(results => {
+    const list = pendingSprites[state] || [];
+    results.forEach(r => { if (r) list.push(r); });
+    pendingSprites[state] = list;
+    renderSpriteStrip(state);
+    input.value = '';
+  });
+}
+
+// Single-file slot behaviour for backwards compatibility: when a frame is chosen via
+// legacy APIs, treat it as setting frame 0 or 1 in the strip (expanding list as needed).
+function onSpriteFileChange(input, state, frameIdx) {
+  const file = input.files && input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    const raw = e.target.result;
+    let keyed = raw;
+    if (window.lcChroma && typeof window.lcChroma.chromaKey === 'function') {
+      try { keyed = await window.lcChroma.chromaKey(raw, chromaSettings); } catch (_) {}
     }
+
+    const list = pendingSprites[state] || [];
+    while (list.length <= frameIdx) list.push(null);
+    list[frameIdx] = keyed;
+    pendingSprites[state] = list;
+    renderSpriteStrip(state);
+  };
+  reader.readAsDataURL(file);
+  input.value = '';
+}
+
+// --- Drag and drop reordering ---
+
+let spriteDragState = { state: null, fromIndex: null };
+
+function attachSpriteDragHandlers(card) {
+  card.addEventListener('dragstart', (e) => {
+    spriteDragState.state = card.dataset.state;
+    spriteDragState.fromIndex = parseInt(card.dataset.index, 10);
+    e.dataTransfer.effectAllowed = 'move';
   });
 
-  return slot;
+  card.addEventListener('dragover', (e) => {
+    if (spriteDragState.state !== card.dataset.state) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  });
+
+  card.addEventListener('drop', (e) => {
+    e.preventDefault();
+    const state = card.dataset.state;
+    if (spriteDragState.state !== state) return;
+    const toIndex = parseInt(card.dataset.index, 10);
+    if (Number.isNaN(toIndex) || toIndex === spriteDragState.fromIndex) return;
+    reorderSpriteFrames(state, spriteDragState.fromIndex, toIndex);
+    spriteDragState.state = null;
+    spriteDragState.fromIndex = null;
+  });
+
+  card.addEventListener('dragend', () => {
+    spriteDragState.state = null;
+    spriteDragState.fromIndex = null;
+  });
+
+  // Touch support for tablets: simple tap-to-pick, tap-to-swap within same state
+  card.addEventListener('touchstart', (e) => {
+    if (eyedropperActive) return;
+    const state = card.dataset.state;
+    const index = parseInt(card.dataset.index, 10);
+    if (!spriteDragState.state) {
+      spriteDragState.state = state;
+      spriteDragState.fromIndex = index;
+      card.style.outline = '2px solid var(--accent2, #ffd54f)';
+      card.style.outlineOffset = '2px';
+    } else if (spriteDragState.state === state) {
+      const from = spriteDragState.fromIndex;
+      const to = index;
+      if (from !== to) {
+        reorderSpriteFrames(state, from, to);
+      }
+      const strip = document.querySelector(`.sprite-strip[data-state="${state}"]`);
+      if (strip) {
+        strip.querySelectorAll('.sprite-card').forEach(c => {
+          c.style.outline = '';
+          c.style.outlineOffset = '';
+        });
+      }
+      spriteDragState.state = null;
+      spriteDragState.fromIndex = null;
+    } else {
+      // Different state; reset
+      const prevStrip = document.querySelector(`.sprite-strip[data-state="${spriteDragState.state}"]`);
+      if (prevStrip) {
+        prevStrip.querySelectorAll('.sprite-card').forEach(c => {
+          c.style.outline = '';
+          c.style.outlineOffset = '';
+        });
+      }
+      spriteDragState.state = null;
+      spriteDragState.fromIndex = null;
+    }
+    e.preventDefault();
+  });
+}
+
+function reorderSpriteFrames(state, fromIndex, toIndex) {
+  const list = pendingSprites[state] || [];
+  if (fromIndex < 0 || fromIndex >= list.length || toIndex < 0 || toIndex >= list.length) return;
+  const [moved] = list.splice(fromIndex, 1);
+  list.splice(toIndex, 0, moved);
+  pendingSprites[state] = list;
+  renderSpriteStrip(state);
 }
 
 function onSpriteImgClick(e) {
@@ -443,7 +610,7 @@ function onSpriteImgClick(e) {
       deactivateEyedropper();
       const state = img.dataset.state;
       const frame = parseInt(img.dataset.frame, 10);
-      rerunChromaOnSlot(state, frame);
+      rerunChromaOnFrame(state, frame);
     }).catch(() => deactivateEyedropper());
   } else {
     deactivateEyedropper();
@@ -451,42 +618,15 @@ function onSpriteImgClick(e) {
   e.stopPropagation();
 }
 
-function onSpriteFileChange(input, state, frameIdx) {
-  const file = input.files && input.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = async (e) => {
-    const raw = e.target.result;
-    let keyed = raw;
-    if (window.lcChroma && typeof window.lcChroma.chromaKey === 'function') {
-      try { keyed = await window.lcChroma.chromaKey(raw, chromaSettings); } catch (_) {}
-    }
-    pendingSprites[state][frameIdx] = keyed;
-    refreshSpriteSlot(state, frameIdx);
-  };
-  reader.readAsDataURL(file);
-  input.value = '';
-}
-
-function refreshSpriteSlot(state, frameIdx) {
-  const slot = document.getElementById(`sprite-slot-${state}-${frameIdx}`);
-  if (!slot) return;
-  const newSlot = buildSpriteSlot(state, frameIdx);
-  slot.parentNode.replaceChild(newSlot, slot);
-}
-
-function clearSpriteSlot(state, frameIdx) {
-  pendingSprites[state][frameIdx] = null;
-  refreshSpriteSlot(state, frameIdx);
-}
-
-async function rerunChromaOnSlot(state, frameIdx) {
-  const current = pendingSprites[state][frameIdx];
+async function rerunChromaOnFrame(state, frameIdx) {
+  const list = pendingSprites[state] || [];
+  const current = list[frameIdx];
   if (!current || !window.lcChroma) return;
   try {
     const keyed = await window.lcChroma.chromaKey(current, chromaSettings);
-    pendingSprites[state][frameIdx] = keyed;
-    refreshSpriteSlot(state, frameIdx);
+    list[frameIdx] = keyed;
+    pendingSprites[state] = list;
+    renderSpriteStrip(state);
   } catch (_) {}
 }
 
@@ -509,8 +649,9 @@ async function applyChromaToAll() {
   const btn = document.querySelector('#sprite-frames-section button[onclick*="applyChromaToAll"]');
   if (btn) { btn.disabled = true; btn.textContent = 'Applying\u2026'; }
   for (const state of SPRITE_STATES) {
-    for (let i = 0; i < 2; i++) {
-      await rerunChromaOnSlot(state, i);
+    const frames = pendingSprites[state] || [];
+    for (let i = 0; i < frames.length; i++) {
+      await rerunChromaOnFrame(state, i);
     }
   }
   if (btn) { btn.disabled = false; btn.textContent = 'Apply to all frames'; }
@@ -659,7 +800,7 @@ function closeCharModal() {
   tempPhotoData = null;
   tempAnimData  = null;
   // Reset sprite state
-  pendingSprites = { idle: [null, null], walk: [null, null], talk: [null, null], listen: [null, null] };
+  pendingSprites = { idle: [], walk: [], talk: [], listen: [] };
   eyedropperActive = false;
   delete window._pendingCharLat;
   delete window._pendingCharLng;
