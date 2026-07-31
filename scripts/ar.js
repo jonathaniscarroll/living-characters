@@ -1,6 +1,6 @@
 /* ============================================================
    scripts/ar.js  —  Living Characters pseudo-AR
-   ────────────────────────────────────────────────────────────
+   ──────────────────────────────────────────────────────────
    No WebXR. No Quick Look. Works on every modern iPhone/Android.
 
    How it works:
@@ -8,7 +8,7 @@
    2. Three.js <canvas> sits on top with alpha:true so the video
       shows through
    3. DeviceOrientation drives a gentle parallax/drift so the
-      sprite feels "anchored" in the room
+      sprite feels “anchored” in the room
    4. Tap the sprite → opens the same card + talk panel used in
       room mode (openCard / openTalkPanel from card.js)
    5. Exit button dismisses everything and stops the camera
@@ -17,18 +17,18 @@
 (function () {
   'use strict';
 
-  // ── state ──────────────────────────────────────────────────────────────────
+  // ── state ────────────────────────────────────────────────────────────────
   let _active      = false;
   let _stream      = null;
   let _animId      = null;
   let _character   = null;
-  let _orientBeta  = 0;   // device tilt front/back  (-180…180)
-  let _orientGamma = 0;   // device tilt left/right  (-90…90)
-  let _orientAlpha = 0;   // compass heading          (0…360)
+  let _orientBeta  = 0;
+  let _orientGamma = 0;
+  let _orientAlpha = 0;
   let _baseAlpha   = null;
   let _baseGamma   = null;
   let _baseBeta    = null;
-  let _mixer       = null;  // kept for potential future use
+  let _mixer       = null;
   let _clock       = null;
   let _renderer    = null;
   let _scene       = null;
@@ -38,7 +38,7 @@
   let _raycaster   = null;
   let _mouse       = new (window.THREE ? window.THREE.Vector2 : function(){this.x=0;this.y=0;})();
 
-  // ── sprite billboard state ─────────────────────────────────────────────────
+  // ── sprite billboard state ───────────────────────────────────────────────
   let _animator    = null;
   let _texture     = null;
 
@@ -50,7 +50,34 @@
 
   function getEl(id) { return document.getElementById(id); }
 
-  // ── orientation listener ───────────────────────────────────────────────────
+  // ── safe texture disposal ───────────────────────────────────────────────
+  function _disposeTexture(tex) {
+    if (!tex) return;
+    if (tex.image) {
+      tex.image.onload  = null;
+      tex.image.onerror = null;
+    }
+    try { tex.dispose(); } catch (_) {}
+  }
+
+  // ── load a src into a texture, guarding against stale closures ───────────
+  function _loadTextureFrame(texture, material, src) {
+    if (!texture || !src) return;
+    const img = new Image();
+    img.onload = () => {
+      // Guard: if the module-level _texture has been replaced or nulled, bail.
+      if (_texture !== texture) return;
+      texture.image = img;
+      texture.needsUpdate = true;
+      if (material) material.needsUpdate = true;
+    };
+    img.onerror = () => {
+      console.warn('[AR] texture load failed:', src);
+    };
+    img.src = src;
+  }
+
+  // ── orientation listener ───────────────────────────────────────────────
   function _onOrient(e) {
     _orientAlpha = e.alpha || 0;
     _orientBeta  = e.beta  || 0;
@@ -62,7 +89,7 @@
     }
   }
 
-  // ── build / tear down DOM ─────────────────────────────────────────────────
+  // ── build / tear down DOM ─────────────────────────────────────────────
   function _buildDOM() {
     let vid = getEl('ar-video');
     if (!vid) {
@@ -121,7 +148,7 @@
     });
   }
 
-  // ── HUD build ─────────────────────────────────────────────────────────────
+  // ── HUD build ──────────────────────────────────────────────────────────────
   function _buildHUD(ch) {
     const hud = getEl('ar-hud');
     hud.innerHTML = '';
@@ -176,7 +203,7 @@
     hud.appendChild(exitBtn);
   }
 
-  // ── Three.js setup ────────────────────────────────────────────────────────
+  // ── Three.js setup ───────────────────────────────────────────────────────────
   function _initThree(canvas) {
     const THREE = window.THREE;
     const w = window.innerWidth;
@@ -192,7 +219,6 @@
     _camera.position.set(0, 1.2, 3);
     _camera.lookAt(0, 0.8, 0);
 
-    // Lighting (still useful if future mesh materials need it)
     _scene.add(new THREE.HemisphereLight(0xffffff, 0x444466, 1.4));
     const dir = new THREE.DirectionalLight(0xffffff, 0.9);
     dir.position.set(1.5, 3, 2);
@@ -201,7 +227,6 @@
     fill.position.set(-2, 1, -1);
     _scene.add(fill);
 
-    // Halo ring on the ground
     const haloGeo = new THREE.RingGeometry(0.28, 0.38, 48);
     const haloMat = new THREE.MeshBasicMaterial({
       color: 0x4f98a3, side: THREE.DoubleSide,
@@ -216,14 +241,10 @@
     _raycaster = new THREE.Raycaster();
   }
 
-  // ── Sprite billboard ─────────────────────────────────────────────────────
+  // ── Sprite billboard ─────────────────────────────────────────────────────────
   function _buildSpriteBillboard(ch) {
     const THREE = window.THREE;
-
-    // Determine fallback image (animData or photoData)
     const fallbackSrc = ch.animData || ch.photoData || null;
-
-    // Check if SpriteAnimator is available
     const hasAnimator = window.SpriteAnimator && (ch.sprites || fallbackSrc);
 
     if (!hasAnimator && !fallbackSrc) {
@@ -234,40 +255,29 @@
       _model.position.set(0, 0.8, 0);
       _scene.add(_model);
 
-      // CSS name label so the user knows who this is
       const label = document.createElement('div');
       label.id = 'ar-sprite-label';
       label.textContent = ch.name || '?';
       label.style.cssText = [
-        'position:fixed',
-        'top:50%',
-        'left:50%',
+        'position:fixed', 'top:50%', 'left:50%',
         'transform:translate(-50%,-50%)',
-        'color:#fff',
-        'font-size:18px',
-        'font-weight:700',
-        'font-family:inherit',
-        'pointer-events:none',
-        'z-index:2005',
+        'color:#fff', 'font-size:18px', 'font-weight:700',
+        'font-family:inherit', 'pointer-events:none', 'z-index:2005',
         'text-shadow:0 1px 4px rgba(0,0,0,.8)',
       ].join(';');
       document.body.appendChild(label);
       return;
     }
 
-    // Build SpriteAnimator
     _animator = new window.SpriteAnimator(ch.sprites || null, fallbackSrc);
 
-    // Create a THREE.Texture backed by an Image element we control
-    _texture = new THREE.Texture();
-    _texture.image = new Image();
-    _texture.image.onload = () => { _texture.needsUpdate = true; };
-    const firstFrame = _animator.currentFrame();
-    if (firstFrame) _texture.image.src = firstFrame;
+    // Create texture — store in a local const so the onload closure is stable.
+    const texture = new THREE.Texture();
+    _texture = texture;  // expose to module scope for _tickSprite + close()
 
     const geo = new THREE.PlaneGeometry(1.0, 1.6);
     const mat = new THREE.MeshBasicMaterial({
-      map: _texture,
+      map: texture,
       transparent: true,
       alphaTest: 0.05,
       side: THREE.DoubleSide,
@@ -275,24 +285,27 @@
     _model = new THREE.Mesh(geo, mat);
     _model.position.set(0, 0.8, 0);
     _scene.add(_model);
+
+    // Load first frame using the safe helper
+    const firstFrame = _animator.currentFrame();
+    if (firstFrame) _loadTextureFrame(texture, mat, firstFrame);
   }
 
-  // ── Sprite tick ───────────────────────────────────────────────────────────
+  // ── Sprite tick ───────────────────────────────────────────────────────────────
   function _tickSprite(deltaMs) {
     if (!_animator || !_model) return;
     const frame = _animator.tick(deltaMs);
     if (frame !== null && _texture) {
-      _texture.image.src = frame;
-      // needsUpdate is set via the onload handler on the image
+      // Use safe helper — the onload checks _texture is still this texture
+      const mat = _model.material;
+      _loadTextureFrame(_texture, mat, frame);
     }
-    // Billboard always faces camera
     _model.lookAt(_camera.position);
   }
 
-  // ── Hit-test: did the user tap the model? ─────────────────────────────────
+  // ── Hit-test ──────────────────────────────────────────────────────────────────
   function _hitModel(clientX, clientY) {
     if (!_model || !_camera || !_raycaster) return false;
-    const THREE = window.THREE;
     _mouse.x =  (clientX / window.innerWidth)  * 2 - 1;
     _mouse.y = -(clientY / window.innerHeight) * 2 + 1;
     _raycaster.setFromCamera(_mouse, _camera);
@@ -300,16 +313,14 @@
     return hits.length > 0;
   }
 
-  // ── Render loop ───────────────────────────────────────────────────────────
+  // ── Render loop ──────────────────────────────────────────────────────────────
   function _tick() {
     _animId = requestAnimationFrame(_tick);
     const delta = _clock ? _clock.getDelta() : 0.016;
     if (_mixer) _mixer.update(delta);
 
-    // Sprite animation + billboard facing
     _tickSprite(delta * 1000);
 
-    // Gyro parallax
     if (_baseAlpha !== null && _model) {
       let dg = _orientGamma - _baseGamma;
       let db = _orientBeta  - _baseBeta;
@@ -323,11 +334,9 @@
         _haloMesh.position.x = _model.position.x;
         _haloMesh.position.z = _model.position.z;
       }
-      // Gentle Y bob
       _model.position.y += (Math.sin(Date.now() * 0.001) * 0.004);
     }
 
-    // Halo pulse
     if (_haloMesh) {
       const pulse = 0.5 + 0.5 * Math.sin(Date.now() * 0.002);
       _haloMesh.material.opacity = 0.25 + pulse * 0.35;
@@ -336,7 +345,7 @@
     if (_renderer && _scene && _camera) _renderer.render(_scene, _camera);
   }
 
-  // ── Open ──────────────────────────────────────────────────────────────────
+  // ── Open ───────────────────────────────────────────────────────────────────────
   async function open(character) {
     if (_active) close();
     if (!character) { toast('No character selected'); return; }
@@ -347,7 +356,6 @@
     _showDOM();
     const { vid, cv } = _buildDOM();
 
-    // Request camera
     try {
       _stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
@@ -363,7 +371,6 @@
     _buildHUD(character);
     _initThree(cv);
 
-    // Orientation
     _baseAlpha = _baseBeta = _baseGamma = null;
     window.addEventListener('deviceorientation', _onOrient, true);
     if (typeof DeviceOrientationEvent !== 'undefined' &&
@@ -380,7 +387,7 @@
     _tick();
   }
 
-  // ── Canvas tap ────────────────────────────────────────────────────────────
+  // ── Canvas tap ─────────────────────────────────────────────────────────────
   function _onCanvasTap(e) {
     if (!_character) return;
     const hit = _hitModel(e.clientX, e.clientY);
@@ -389,7 +396,6 @@
     const hint = getEl('ar-hint');
     if (hint) hint.style.opacity = '0';
 
-    // Switch to talk animation state
     if (_animator) _animator.setState('talk');
 
     if (typeof openCard === 'function') {
@@ -401,12 +407,12 @@
     }
   }
 
-  // ── Set character animation state (called by card.js on open/close) ───────
+  // ── Set character animation state (called by card.js on open/close) ─────
   function setCharacterState(state) {
     if (_animator) _animator.setState(state);
   }
 
-  // ── Close ─────────────────────────────────────────────────────────────────
+  // ── Close ───────────────────────────────────────────────────────────────────
   function close() {
     _active = false;
 
@@ -414,15 +420,17 @@
     if (_stream) { _stream.getTracks().forEach(t => t.stop()); _stream = null; }
     window.removeEventListener('deviceorientation', _onOrient, true);
 
-    // Dispose Three.js
     try { if (_renderer) _renderer.dispose(); } catch (_) {}
     _renderer = _scene = _camera = _model = _haloMesh = _mixer = _clock = _raycaster = null;
 
-    // Dispose sprite resources
-    if (_texture) { try { _texture.dispose(); } catch (_) {} _texture = null; }
+    // Null _texture BEFORE disposing so any in-flight onload callbacks
+    // see _texture !== their captured local and bail cleanly.
+    const texToDispose = _texture;
+    _texture = null;
+    _disposeTexture(texToDispose);
+
     _animator = null;
 
-    // Remove CSS label if it was created
     const label = getEl('ar-sprite-label');
     if (label) label.remove();
 
@@ -434,7 +442,7 @@
     _character = null;
   }
 
-  // ── Public API ────────────────────────────────────────────────────────────
+  // ── Public API ──────────────────────────────────────────────────────────────
   window.ARView = { open, close, setCharacterState };
   window.lcAR  = { open, close, launchAR: open, setCharacterState };
   window.launchAR = open;
