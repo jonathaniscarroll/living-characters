@@ -8,7 +8,7 @@
    2. Three.js <canvas> sits on top with alpha:true so the video
       shows through
    3. DeviceOrientation drives a gentle parallax/drift so the
-      sprite feels “anchored” in the room
+      sprite feels "anchored" in the room
    4. Tap the sprite → opens the same card + talk panel used in
       room mode (openCard / openTalkPanel from card.js)
    5. Exit button dismisses everything and stops the camera
@@ -64,6 +64,7 @@
   function _loadTextureFrame(texture, material, src) {
     if (!texture || !src) return;
     const img = new Image();
+    img.crossOrigin = 'anonymous';
     img.onload = () => {
       // Guard: if the module-level _texture has been replaced or nulled, bail.
       if (_texture !== texture) return;
@@ -286,7 +287,7 @@
     _model.position.set(0, 0.8, 0);
     _scene.add(_model);
 
-    // Load first frame using the safe helper
+    // Load first frame using the safe helper (crossOrigin set inside)
     const firstFrame = _animator.currentFrame();
     if (firstFrame) _loadTextureFrame(texture, mat, firstFrame);
   }
