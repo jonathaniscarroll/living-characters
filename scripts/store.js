@@ -3,9 +3,7 @@ const GH_REPO = 'living-characters';
 const GH_PATH = 'story/main.twee';
 const GH_BRANCH = 'main';
 
-// Public raw URL — readable by anyone, no token needed
 const GH_RAW_URL = `https://raw.githubusercontent.com/${GH_OWNER}/${GH_REPO}/${GH_BRANCH}/${GH_PATH}`;
-// Cache-bust so browsers don't serve stale content
 function rawUrlFresh() { return GH_RAW_URL + '?v=' + Date.now(); }
 
 let ghFileSha = null;
@@ -30,34 +28,25 @@ async function seedGhFileSha(token) {
     const headers = { Accept: 'application/vnd.github.v3+json' };
     if (token) headers.Authorization = 'token ' + token;
     const res = await fetch(`https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/contents/${GH_PATH}?ref=${GH_BRANCH}`, { headers });
-    if (res.ok) {
-      const data = await res.json();
-      ghFileSha = data.sha;
-      setGhStatus('ready ✓', 'ok');
-    }
+    if (res.ok) { const data = await res.json(); ghFileSha = data.sha; setGhStatus('ready \u2713', 'ok'); }
   } catch (_) {}
 }
 
 function onTokenInput() {
   const t = document.getElementById('gh-token-input').value.trim();
-  if (t) {
-    localStorage.setItem('lc_gh_token', t);
-    setGhStatus('token saved ✓', 'ok');
-    seedGhFileSha(t);
-  }
+  if (t) { localStorage.setItem('lc_gh_token', t); setGhStatus('token saved \u2713', 'ok'); seedGhFileSha(t); }
 }
 
-// ── Auto-load world from public GitHub on startup ────────────────────────────
 async function autoLoadFromGitHub() {
-  setGhStatus('Loading world…');
+  setGhStatus('Loading world\u2026');
   try {
     const res = await fetch(rawUrlFresh());
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const src = await res.text();
     if (src.trim().length < 10) throw new Error('empty');
-    importTweeSource(src, true /* silent */);
-    setGhStatus('World loaded ✓', 'ok');
-    showToast('World loaded ✓', 'ok');
+    importTweeSource(src, true);
+    setGhStatus('World loaded \u2713', 'ok');
+    showToast('World loaded \u2713', 'ok');
     const token = getToken();
     if (token) {
       seedGhFileSha(token);
@@ -71,13 +60,11 @@ async function autoLoadFromGitHub() {
   } catch (e) {
     loadLocal();
     if (e.message === 'empty') {
-      setGhStatus('No world saved yet', '');
-      showToast('No world saved yet — start adding characters!', 'ok');
+      setGhStatus('No world saved yet', ''); showToast('No world saved yet \u2014 start adding characters!', 'ok');
     } else if (e.message.startsWith('HTTP 404')) {
       setGhStatus('No world file yet', '');
     } else {
-      setGhStatus('Offline — local data', '');
-      showToast('Offline — showing local data', '');
+      setGhStatus('Offline \u2014 local data', ''); showToast('Offline \u2014 showing local data', '');
     }
   }
 }
@@ -85,7 +72,7 @@ async function autoLoadFromGitHub() {
 async function ghLoad() {
   const token = getToken();
   if (!token) { setGhStatus('Enter a GitHub token first', 'err'); return; }
-  setGhStatus('Loading…');
+  setGhStatus('Loading\u2026');
   try {
     const res = await fetch(`https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/contents/${GH_PATH}?ref=${GH_BRANCH}`, {
       headers: { Authorization: 'token ' + token, Accept: 'application/vnd.github.v3+json' }
@@ -95,7 +82,7 @@ async function ghLoad() {
     ghFileSha = data.sha;
     const src = decodeBase64Unicode(data.content.replace(/\n/g, ''));
     importTweeSource(src, true);
-    setGhStatus('Loaded ✓  (' + rooms.length + ' rooms, ' + characters.length + ' chars, ' + objects.length + ' objects)', 'ok');
+    setGhStatus('Loaded \u2713  (' + rooms.length + ' rooms, ' + characters.length + ' chars, ' + objects.length + ' objects)', 'ok');
   } catch (e) {
     setGhStatus('Load failed: ' + e.message, 'err');
   }
@@ -107,7 +94,7 @@ async function ghSave() {
   const src = buildTweeSource(rooms, characters, objects);
   const encoded = btoa(unescape(encodeURIComponent(src)));
   const msg = document.getElementById('gh-commit-input').value.trim() || 'Update living-characters world via tool';
-  setGhStatus('Saving…');
+  setGhStatus('Saving\u2026');
   try {
     const body = { message: msg, content: encoded, branch: GH_BRANCH };
     if (ghFileSha) body.sha = ghFileSha;
@@ -119,9 +106,7 @@ async function ghSave() {
     if (!res.ok) {
       const errData = await res.json();
       if (res.status === 409 || res.status === 422) {
-        ghFileSha = null;
-        setGhStatus('SHA conflict — re-syncing, try Save again', 'err');
-        seedGhFileSha(token);
+        ghFileSha = null; setGhStatus('SHA conflict \u2014 re-syncing, try Save again', 'err'); seedGhFileSha(token);
       } else {
         setGhStatus('Save failed: ' + (errData.message || 'HTTP ' + res.status), 'err');
       }
@@ -129,7 +114,7 @@ async function ghSave() {
     }
     const data = await res.json();
     ghFileSha = data.content.sha;
-    setGhStatus('Saved ✓  ' + data.commit.sha.slice(0, 7), 'ok');
+    setGhStatus('Saved \u2713  ' + data.commit.sha.slice(0, 7), 'ok');
     save();
   } catch (e) {
     setGhStatus('Save failed: ' + e.message, 'err');
@@ -139,21 +124,14 @@ async function ghSave() {
 /**
  * buildTweeSource
  * ---------------
- * IMPORTANT: Each character is written exactly ONCE, regardless of how many
- * rooms they belong to. The root character passage stores the full roomIds
- * array in its JSON metadata. Previously characters were emitted once per
- * room they appeared in, which caused duplication on re-import.
- *
- * Serialisation order:
- *   1. Room passages (with lede body)
- *   2. Object passages belonging to that room
- *   3. Characters are written in a SEPARATE pass AFTER all rooms,
- *      keyed by character id so each character appears exactly once.
+ * Each character written EXACTLY ONCE (no per-room duplication).
+ * ch.lat / ch.lng (map-placed characters outside any room) are now
+ * included in the character's JSON metadata so they survive reload.
  */
 function buildTweeSource(roomsList, chars, objs) {
   let out = '';
 
-  // ── 1. Rooms + their objects ─────────────────────────────────────────────
+  // 1. Rooms + their objects
   roomsList.forEach(room => {
     const roomMeta = { id: room.id, lat: room.lat, lng: room.lng, radius: room.radius };
     if (room.cameraX != null) roomMeta.cameraX = room.cameraX;
@@ -178,23 +156,27 @@ function buildTweeSource(roomsList, chars, objs) {
     });
   });
 
-  // ── 2. Characters — each written EXACTLY ONCE ───────────────────────────
-  // Deduplicate by character id in case the in-memory array somehow has dupes.
+  // 2. Characters — each written EXACTLY ONCE
   const seen = new Set();
   chars.forEach(ch => {
     const uid = ch.id || ch.name;
-    if (seen.has(uid)) return; // skip duplicates already in memory
+    if (seen.has(uid)) return;
     seen.add(uid);
 
     const meta = {
-      roomIds: ch.roomIds || (ch.roomId ? [ch.roomId] : []),
+      roomIds:    ch.roomIds || (ch.roomId ? [ch.roomId] : []),
       homeRoomId: ch.homeRoomId || null,
       workRoomId: ch.workRoomId || null,
-      schedule: ch.schedule || null,
-      mood: ch.mood,
-      items: ch.items || []
+      schedule:   ch.schedule || null,
+      mood:       ch.mood,
+      items:      ch.items || []
     };
+    // ── FIX: persist map-placed coordinates ──────────────────────────────────
+    if (typeof ch.lat === 'number') meta.lat = ch.lat;
+    if (typeof ch.lng === 'number') meta.lng = ch.lng;
+    // ─────────────────────────────────────────────────────────────────────────
     if (ch.glbUrl && !ch.glbUrl.startsWith('data:')) meta.glbUrl = ch.glbUrl;
+
     out += `:: ${ch.name} ${JSON.stringify(meta)}\n\n`;
     (ch.passages || []).forEach(p => { out += `:: ${ch.name}-${p.type}\n${p.text}\n\n`; });
   });
@@ -210,22 +192,14 @@ function previewTwee() {
   document.getElementById('twee-source').textContent = buildTweeStandalone(rooms, characters, objects);
   document.getElementById('twee-preview-overlay').classList.add('open');
 }
-
-function closeTweePreview() {
-  document.getElementById('twee-preview-overlay').classList.remove('open');
-}
+function closeTweePreview() { document.getElementById('twee-preview-overlay').classList.remove('open'); }
 
 function downloadTwee() {
   const blob = new Blob([buildTweeStandalone(rooms, characters, objects)], { type: 'text/plain' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'living-characters.twee';
-  a.click();
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'living-characters.twee'; a.click();
 }
 
-function triggerImport() {
-  document.getElementById('twee-import-input').click();
-}
+function triggerImport() { document.getElementById('twee-import-input').click(); }
 
 function handleImportFile(event) {
   const file = event.target.files[0];
@@ -251,7 +225,9 @@ function importTweeSource(src, silent) {
       i++;
       while (i < lines.length && !lines[i].startsWith(':: ')) { bodyLines.push(lines[i]); i++; }
       const body = bodyLines.join('\n').trim();
-      if (meta.lat !== undefined) {
+
+      if (meta.lat !== undefined && (meta.roomIds === undefined && meta.roomId === undefined)) {
+        // Room passage — has lat but no roomIds
         const roomId = meta.id || ('room_' + passName.replace(/\s+/g, '_'));
         newRooms.push({
           id: roomId, name: passName, lede: body,
@@ -270,12 +246,10 @@ function importTweeSource(src, silent) {
           context: meta.context || null, usageTags: meta.usageTags || []
         });
       } else if ((meta.roomIds !== undefined || meta.roomId !== undefined) && !passName.includes('-')) {
-        // Guard: skip if we already imported a character with this name
-        // (handles any residual duplication in an existing twee file).
         if (newChars.find(c => c.name === passName)) { continue; }
         const roomIds = Array.isArray(meta.roomIds) ? meta.roomIds : (meta.roomId ? [meta.roomId] : []);
-        const primaryRoomId = roomIds[0] || meta.roomId;
-        newChars.push({
+        const primaryRoomId = roomIds[0] || meta.roomId || null;
+        const ch = {
           id: 'char_' + passName.replace(/\s+/g, '_'), name: passName,
           roomId: primaryRoomId, roomIds,
           homeRoomId: meta.homeRoomId || null,
@@ -283,7 +257,12 @@ function importTweeSource(src, silent) {
           schedule: meta.schedule || null,
           mood: meta.mood || 'Happy', items: meta.items || [],
           passages: [], photoData: null, animData: null, glbUrl: meta.glbUrl || null
-        });
+        };
+        // ── FIX: restore map-placed coordinates ──────────────────────────────
+        if (typeof meta.lat === 'number') ch.lat = meta.lat;
+        if (typeof meta.lng === 'number') ch.lng = meta.lng;
+        // ─────────────────────────────────────────────────────────────────────
+        newChars.push(ch);
       } else if (passName.includes('-')) {
         const dashIdx = passName.indexOf('-');
         const charName = passName.slice(0, dashIdx);
@@ -304,7 +283,6 @@ function importTweeSource(src, silent) {
   }
 }
 
-// Mirror current state to localStorage as offline cache
 function save() {
   try {
     localStorage.setItem('lc_rooms', JSON.stringify(rooms));
@@ -315,11 +293,7 @@ function save() {
 
 async function uploadRoomBackdropToGitHub(roomId, file) {
   const token = getToken();
-  if (!token) {
-    setGhStatus('Enter a GitHub token first to save backdrops', 'err');
-    showToast('GitHub token required to save backdrop to repo', 'err');
-    return null;
-  }
+  if (!token) { setGhStatus('Enter a GitHub token first to save backdrops', 'err'); showToast('GitHub token required to save backdrop to repo', 'err'); return null; }
   const base64 = await new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = e => resolve(String(e.target.result).replace(/^data:.*?;base64,/, ''));
@@ -340,7 +314,7 @@ async function uploadRoomBackdropToGitHub(roomId, file) {
     showToast('Backdrop upload failed', 'err');
     return null;
   }
-  setGhStatus('Backdrop saved ✓', 'ok');
+  setGhStatus('Backdrop saved \u2713', 'ok');
   showToast('Backdrop saved to GitHub', 'ok');
   return `https://raw.githubusercontent.com/${GH_OWNER}/${GH_REPO}/${GH_BRANCH}/media/room-backdrops/${roomId}.png`;
 }
@@ -363,13 +337,11 @@ function loadLocal() {
     if (r) rooms = JSON.parse(r);
     if (c) {
       characters = JSON.parse(c);
-      // Deduplicate by id on load, just in case
       const seen = new Set();
       characters = characters.filter(ch => {
         const uid = ch.id || ch.name;
         if (seen.has(uid)) return false;
-        seen.add(uid);
-        return true;
+        seen.add(uid); return true;
       });
       characters.forEach(ch => {
         if (!ch.roomIds || !Array.isArray(ch.roomIds)) ch.roomIds = ch.roomId ? [ch.roomId] : [];
@@ -384,9 +356,7 @@ function loadLocal() {
 
 window.addEventListener('DOMContentLoaded', () => {
   const saved = localStorage.getItem('lc_gh_token');
-  if (saved) {
-    document.getElementById('gh-token-input').value = saved;
-  }
+  if (saved) document.getElementById('gh-token-input').value = saved;
   autoLoadFromGitHub();
 });
 

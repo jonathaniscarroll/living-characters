@@ -7,11 +7,10 @@
 (function () {
   'use strict';
 
-  // ── UA sniff ──────────────────────────────────────────────────────────────
   const IS_IOS = /iPhone|iPad|iPod/i.test(navigator.userAgent) ||
     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
-  // ── DOM helpers ───────────────────────────────────────────────────────────
+  // ── DOM helpers ──────────────────────────────────────────────────────────────
   function ensureOverlay() {
     let ov = document.getElementById('ar-overlay');
     if (!ov) {
@@ -49,89 +48,145 @@
     alert(msg);
   }
 
-  // ── Sync canvas backing-store to device pixels ────────────────────────────
   function syncCanvasSize(canvas) {
     const dpr = window.devicePixelRatio || 1;
     const w   = Math.round(window.innerWidth  * dpr);
     const h   = Math.round(window.innerHeight * dpr);
-    if (canvas.width !== w || canvas.height !== h) {
-      canvas.width  = w;
-      canvas.height = h;
-    }
+    if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
   }
 
-  // ── AR Quick Look fallback ────────────────────────────────────────────────
+  // ── iOS Quick Look ────────────────────────────────────────────────────────────
+  //
+  // iOS Safari requires that the AR Quick Look anchor be tapped directly by the
+  // user — programmatic .click() is silently swallowed for rel="ar" links.
+  //
+  // Strategy:
+  //   1. Build a full-screen tap-to-open overlay that sits on top of everything.
+  //   2. The overlay contains the real <a rel="ar"> with a pixel-perfect
+  //      child <img> filling it. iOS triggers Quick Look when the *child img*
+  //      is tapped inside a rel="ar" anchor.
+  //   3. We style it to look like a native "View in AR" prompt so the user
+  //      taps it naturally.
+  //   4. The overlay auto-dismisses after the tap (Quick Look takes over).
+  //
+  let _qlOverlay = null;
+
+  function _removeQlOverlay() {
+    if (_qlOverlay) { _qlOverlay.remove(); _qlOverlay = null; }
+  }
+
   function launchQuickLook(character) {
-    // Quick Look requires a real https:// URL — it cannot open data: URLs.
-    // Only pass through glbUrl / usdzUrl if they are stable https links.
     const candidate = character.usdzUrl || character.glbUrl;
     const href = (candidate && candidate.startsWith('https://')) ? candidate : null;
 
     if (!href) {
-      // Model exists only as an in-session data-URL (no GitHub token was used).
-      // Quick Look can’t open it — give the facilitator a clear action.
       showToastAR(
-        'AR preview needs a saved model. Open Edit, wait for “✓ Model saved to repo!”, then save the character.'
+        'AR preview needs a saved model. Open Edit, wait for \u201c\u2713 Model saved to repo!\u201d, then save the character.'
       );
       return;
     }
 
-    const a = document.createElement('a');
-    a.rel = 'ar';
-    a.href = href;
+    _removeQlOverlay();
+
+    // Build the overlay
+    const overlay = document.createElement('div');
+    overlay.id = 'ar-ql-overlay';
+    Object.assign(overlay.style, {
+      position: 'fixed', inset: '0', zIndex: '9999',
+      background: 'rgba(0,0,0,0.82)',
+      display: 'flex', flexDirection: 'column',
+      alignItems: 'center', justifyContent: 'center',
+      gap: '18px', fontFamily: 'inherit',
+    });
+
+    // Title
+    const title = document.createElement('div');
+    title.style.cssText = 'color:#fff;font-size:18px;font-weight:700;text-align:center;padding:0 24px;';
+    title.textContent = 'Tap below to view ' + character.name + ' in AR';
+
+    // The real Quick Look anchor — iOS needs a child <img> inside it
+    // The anchor href is the model URL; the rel="ar" attribute is the trigger.
+    const anchor = document.createElement('a');
+    anchor.rel  = 'ar';
+    anchor.href = href;
+    Object.assign(anchor.style, {
+      display: 'block', width: '200px', height: '200px',
+      borderRadius: '20px', overflow: 'hidden',
+      border: '3px solid #4f98a3',
+      background: '#111',
+    });
+
+    // The child img — Quick Look fires off the img tap, not the anchor tap
+    // Use a 1x1 transparent gif; the anchor background is the visual
     const img = document.createElement('img');
-    img.src = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
-    a.appendChild(img);
-    a.style.display = 'none';
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(() => a.remove(), 2000);
+    img.src    = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
+    img.width  = 200;
+    img.height = 200;
+    img.alt    = 'View in AR';
+    Object.assign(img.style, { width: '100%', height: '100%', objectFit: 'cover', display: 'block' });
+
+    // Show character photo inside the box if available
+    if (character.photoData || character.animData) {
+      img.src    = character.animData || character.photoData;
+      img.style.objectFit = 'contain';
+    }
+
+    anchor.appendChild(img);
+
+    // Label beneath the box
+    const label = document.createElement('div');
+    label.style.cssText = 'color:#4f98a3;font-size:13px;font-weight:600;text-align:center;';
+    label.textContent = '\uD83D\uDCF7  View in AR';
+
+    // Cancel button
+    const cancel = document.createElement('button');
+    cancel.textContent = 'Cancel';
+    cancel.style.cssText = 'margin-top:12px;padding:10px 32px;border-radius:24px;background:transparent;color:#aaa;border:1px solid #555;font-size:14px;cursor:pointer;';
+    cancel.addEventListener('click', _removeQlOverlay);
+
+    // Dismiss overlay once Quick Look takes over (pageshow fires when
+    // user returns from Quick Look; visibilitychange fires immediately)
+    const _dismiss = () => { setTimeout(_removeQlOverlay, 400); };
+    document.addEventListener('visibilitychange', _dismiss, { once: true });
+
+    overlay.appendChild(title);
+    overlay.appendChild(anchor);
+    overlay.appendChild(label);
+    overlay.appendChild(cancel);
+    document.body.appendChild(overlay);
+    _qlOverlay = overlay;
   }
 
-  // ── Resolve GLB source → usable URL for Three.js GLTFLoader ───────────────
-  // character.glbUrl can be either:
-  //   • a stable https://raw.githubusercontent.com/… URL  (preferred)
-  //   • a data:model/gltf-binary;base64,… string          (session-only, no token)
-  // character.glbData is a legacy field name that may also hold either form.
-  // Three.js GLTFLoader cannot load data: URLs directly — convert to blob: first.
+  // ── Resolve GLB source → usable URL for Three.js GLTFLoader ─────────────────
   async function resolveGlbUrl(character) {
     const src = character.glbData || character.glbUrl;
     if (!src) return window.DEFAULT_GLB_URL || 'https://threejs.org/examples/models/gltf/Soldier.glb';
-
     if (src.startsWith('data:')) {
       const res  = await fetch(src);
       const blob = await res.blob();
       return URL.createObjectURL(blob);
     }
-
-    return src; // stable https:// URL — use directly
+    return src;
   }
 
-  // ── Mood emoji lookup ─────────────────────────────────────────────────────
   function moodEmoji(character) {
     const MOODS = window.MOODS || [];
     const m = MOODS.find(x => x.label === character.mood);
-    return m ? m.emoji : '✨';
+    return m ? m.emoji : '\u2728';
   }
 
-  // ── WebXR markerless AR ───────────────────────────────────────────────────
+  // ── WebXR markerless AR ───────────────────────────────────────────────────────
   async function launchWebXR(character) {
     const THREE      = window.THREE;
     const GLTFLoader = window.GLTFLoader;
-    if (!THREE || !GLTFLoader) {
-      showToastAR('3D engine not ready. Please wait a moment and try again.');
-      return;
-    }
+    if (!THREE || !GLTFLoader) { showToastAR('3D engine not ready. Please wait a moment and try again.'); return; }
 
     const overlay = ensureOverlay();
     const canvas  = ensureCanvas();
     syncCanvasSize(canvas);
 
     const renderer = new THREE.WebGLRenderer({
-      canvas,
-      alpha:           true,
-      antialias:       !IS_IOS,
-      powerPreference: 'high-performance',
+      canvas, alpha: true, antialias: !IS_IOS, powerPreference: 'high-performance',
     });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, IS_IOS ? 2 : 3));
     renderer.setSize(window.innerWidth, window.innerHeight, false);
@@ -159,7 +214,7 @@
     nameTag.textContent = `${moodEmoji(character)}  ${character.name}`;
 
     const exitBtn = document.createElement('button');
-    exitBtn.textContent = '✕ Exit AR';
+    exitBtn.textContent = '\u2715 Exit AR';
     exitBtn.style.cssText = 'pointer-events:all;padding:10px 28px;border-radius:24px;background:#e94560;color:#fff;border:none;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer;';
 
     const hint = document.createElement('div');
@@ -194,26 +249,21 @@
 
     try {
       await renderer.xr.setSession(session, { framebufferScaleFactor: 1.0 });
-    } catch (_) {
-      renderer.xr.setSession(session);
-    }
+    } catch (_) { renderer.xr.setSession(session); }
 
     canvas.style.display = 'block';
 
-    let hitTestSource          = null;
-    let hitTestSourceRequested = false;
-    let characterPlaced        = false;
-    let charModel              = null;
-    let mixer                  = null;
-    const clock                = new THREE.Clock();
-    let blobUrlToRevoke        = null;
+    let hitTestSource = null, hitTestSourceRequested = false;
+    let characterPlaced = false, charModel = null, mixer = null;
+    const clock = new THREE.Clock();
+    let blobUrlToRevoke = null;
 
     let glbUrl;
     try {
       glbUrl = await resolveGlbUrl(character);
     } catch (err) {
       console.error('[AR] could not resolve GLB URL:', err);
-      showToastAR('Could not load 3D model — try re-uploading the .glb file.');
+      showToastAR('Could not load 3D model \u2014 try re-uploading the .glb file.');
       cleanUp(); try { session.end(); } catch (_) {}
       return;
     }
@@ -222,7 +272,7 @@
     const loader = new GLTFLoader();
     loader.load(glbUrl, (gltf) => {
       charModel = gltf.scene;
-      const box    = new THREE.Box3().setFromObject(charModel);
+      const box = new THREE.Box3().setFromObject(charModel);
       const height = box.max.y - box.min.y;
       if (height > 0) charModel.scale.setScalar(1.5 / height);
       charModel.visible = false;
@@ -255,70 +305,52 @@
         characterPlaced = true;
         charModel.position.setFromMatrixPosition(reticle.matrix);
         charModel.visible = true;
-        hint.textContent = `${character.name} placed! Use ✕ to exit.`;
+        hint.textContent = `${character.name} placed! Use \u2715 to exit.`;
       }
     });
 
     renderer.setAnimationLoop((timestamp, frame) => {
       const delta = clock.getDelta();
       if (mixer) mixer.update(delta);
-
       if (frame) {
         const refSpace  = renderer.xr.getReferenceSpace();
         const xrSession = renderer.xr.getSession();
-
         if (!hitTestSourceRequested) {
           hitTestSourceRequested = true;
-          xrSession.requestReferenceSpace('viewer').then((viewerSpace) => {
-            xrSession.requestHitTestSource({ space: viewerSpace }).then((src) => {
-              hitTestSource = src;
-            }).catch((e) => { console.warn('[AR] hit-test source error:', e); });
-          }).catch((e) => { console.warn('[AR] viewer ref space error:', e); });
+          xrSession.requestReferenceSpace('viewer').then(viewerSpace => {
+            xrSession.requestHitTestSource({ space: viewerSpace }).then(src => { hitTestSource = src; })
+              .catch(e => { console.warn('[AR] hit-test source error:', e); });
+          }).catch(e => { console.warn('[AR] viewer ref space error:', e); });
         }
-
         if (hitTestSource && !characterPlaced) {
           const results = frame.getHitTestResults(hitTestSource);
           if (results.length) {
-            const hit  = results[0];
-            const pose = hit.getPose(refSpace);
-            if (pose) {
-              reticle.visible = true;
-              reticle.matrix.fromArray(pose.transform.matrix);
-            }
-          } else {
-            reticle.visible = false;
-          }
-        } else if (characterPlaced) {
-          reticle.visible = false;
-        }
-
+            const pose = results[0].getPose(refSpace);
+            if (pose) { reticle.visible = true; reticle.matrix.fromArray(pose.transform.matrix); }
+          } else { reticle.visible = false; }
+        } else if (characterPlaced) { reticle.visible = false; }
         if (charModel && charModel.visible) {
           const camPos = new THREE.Vector3();
           camera.getWorldPosition(camPos);
           charModel.lookAt(camPos.x, charModel.position.y, camPos.z);
         }
       }
-
       renderer.render(scene, camera);
     });
   }
 
-  // ── Public API ────────────────────────────────────────────────────────────
+  // ── Public API ────────────────────────────────────────────────────────────────
   async function launchAR(character) {
     if (!character) { showToastAR('No character selected.'); return; }
-
-    // Resolve string id → full object if needed
     if (typeof character === 'string') {
       const resolved = (window.characters || []).find(c => c.id === character);
       if (!resolved) { showToastAR('Character not found.'); return; }
       character = resolved;
     }
-
     if (!character.glbData && !character.glbUrl) {
       showToastAR('No 3D model attached. Open Edit and upload a .glb file.');
       return;
     }
-
     if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
       showToastAR('AR requires a secure connection (HTTPS).');
       return;
