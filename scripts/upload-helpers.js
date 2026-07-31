@@ -22,6 +22,30 @@ const GH_OWNER  = 'jonathaniscarroll';
 const GH_REPO   = 'living-characters';
 const GH_BRANCH = 'main';
 
+// ── Upload-in-flight guard ─────────────────────────────────────────────────
+// When a model upload is running we disable the Save button so the user
+// can’t commit a data: URL to the character record before the GitHub push
+// resolves with the stable raw.githubusercontent.com URL.
+let _uploadInFlight = false;
+
+function setUploadInFlight(val) {
+  _uploadInFlight = val;
+  const saveBtn = document.getElementById('char-modal-save-btn') ||
+                  document.querySelector('[onclick*="saveCharacter"]');
+  if (!saveBtn) return;
+  if (val) {
+    saveBtn.disabled = true;
+    saveBtn.dataset.lcUploadPending = '1';
+    saveBtn.title = 'Waiting for model upload to finish…';
+  } else {
+    saveBtn.disabled = false;
+    delete saveBtn.dataset.lcUploadPending;
+    saveBtn.title = '';
+  }
+}
+
+export function isUploadInFlight() { return _uploadInFlight; }
+
 // Lazy singleton — resolved the first time an FBX is uploaded
 let _fbxModule = null;
 async function getFbxConverter() {
@@ -43,8 +67,8 @@ async function uploadGlbToGitHub(slug, dataUrl, statusEl) {
   const token = (document.getElementById('gh-token-input')?.value.trim()) ||
                 localStorage.getItem('lc_gh_token') || '';
   if (!token) {
-    setStatus('\u2713 Model ready (save to GitHub to persist across browsers)', 'var(--accent2)');
-    return null; // caller will keep the data-URL as session-only fallback
+    setStatus('\u2713 Model ready (no GitHub token — works this session only)', 'var(--accent2)');
+    return null; // caller keeps the data-URL as session-only fallback
   }
 
   setStatus('\u2601 Uploading model to repo…', 'var(--accent2)');
@@ -79,7 +103,7 @@ async function uploadGlbToGitHub(slug, dataUrl, statusEl) {
   }
 
   const rawUrl = `https://raw.githubusercontent.com/${GH_OWNER}/${GH_REPO}/${GH_BRANCH}/${path}`;
-  setStatus(`\u2713 Model saved to repo!`, 'var(--accent2)');
+  setStatus('\u2713 Model saved to repo!', 'var(--accent2)');
   return rawUrl;
 }
 
@@ -98,7 +122,8 @@ export async function handleModelUpload(file, statusElId, urlFieldId, dataKey, o
     if (statusEl) { statusEl.textContent = msg; if (colour) statusEl.style.color = colour; }
   }
   function storeResult(dataUrl, persistentUrl) {
-    // Store the persistent URL if available, otherwise the data-URL as session fallback
+    // Always prefer the stable https URL; only fall back to data-URL for
+    // in-session WebXR rendering (Quick Look cannot use data: URLs).
     const effective = persistentUrl || dataUrl;
     if (dataKey) window[dataKey] = effective;
     window.tempGlbData = effective;
@@ -111,48 +136,55 @@ export async function handleModelUpload(file, statusElId, urlFieldId, dataKey, o
   // Slug: strip extension, lowercase, replace spaces/dots with hyphens
   const slug = file.name.replace(/\.[^.]+$/, '').toLowerCase().replace(/[^a-z0-9]+/g, '-');
 
-  // ── GLB / GLTF: FileReader passthrough ──
-  if (name.endsWith('.glb') || name.endsWith('.gltf')) {
-    setStatus('\u231B Reading…', 'var(--accent2)');
-    const dataUrl = await new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload  = e => resolve(e.target.result);
-      reader.onerror = () => reject(new Error('read failed'));
-      reader.readAsDataURL(file);
-    }).catch(err => { setStatus('Could not read file — please try again.', '#ff8a80'); return null; });
-    if (!dataUrl) return null;
-    if (onProgress) onProgress(0.5);
-    const persistentUrl = await uploadGlbToGitHub(slug, dataUrl, statusEl);
-    if (onProgress) onProgress(1);
-    return storeResult(dataUrl, persistentUrl);
+  setUploadInFlight(true);
+  try {
+    // ── GLB / GLTF: FileReader passthrough ───────────────────────────
+    if (name.endsWith('.glb') || name.endsWith('.gltf')) {
+      setStatus('\u231b Reading…', 'var(--accent2)');
+      const dataUrl = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload  = e => resolve(e.target.result);
+        reader.onerror = () => reject(new Error('read failed'));
+        reader.readAsDataURL(file);
+      }).catch(err => { setStatus('Could not read file — please try again.', '#ff8a80'); return null; });
+      if (!dataUrl) return null;
+      if (onProgress) onProgress(0.5);
+      const persistentUrl = await uploadGlbToGitHub(slug, dataUrl, statusEl);
+      if (onProgress) onProgress(1);
+      return storeResult(dataUrl, persistentUrl);
+    }
+
+    // ── FBX: lazy-load converter then convert ─────────────────────────
+    if (name.endsWith('.fbx')) {
+      setStatus('\u23f3 Loading FBX converter…', 'var(--accent2)');
+      let mod;
+      try { mod = await getFbxConverter(); }
+      catch (err) { setStatus('Could not load FBX converter: ' + err.message, '#ff8a80'); return null; }
+
+      setStatus('\u23f3 Converting FBX… (0%)', 'var(--accent2)');
+      const dataUrl = await mod.convertFbxFileToGlbDataUrl(file, {
+        onProgress: pct => {
+          setStatus(`\u23f3 Converting FBX\u2026 (${Math.round(pct * 100)}%)`, 'var(--accent2)');
+          if (onProgress) onProgress(pct * 0.8);
+        }
+      }).catch(err => { setStatus('FBX conversion failed: ' + err.message, '#ff8a80'); return null; });
+      if (!dataUrl) return null;
+
+      const persistentUrl = await uploadGlbToGitHub(slug, dataUrl, statusEl);
+      if (onProgress) onProgress(1);
+      return storeResult(dataUrl, persistentUrl);
+    }
+
+    setStatus('Unsupported format. Use .glb, .gltf, or .fbx', '#ff8a80');
+    return null;
+
+  } finally {
+    // Always re-enable Save, whether upload succeeded, failed, or threw
+    setUploadInFlight(false);
   }
-
-  // ── FBX: lazy-load converter then convert ──
-  if (name.endsWith('.fbx')) {
-    setStatus('\u23F3 Loading FBX converter…', 'var(--accent2)');
-    let mod;
-    try { mod = await getFbxConverter(); }
-    catch (err) { setStatus('Could not load FBX converter: ' + err.message, '#ff8a80'); return null; }
-
-    setStatus('\u23F3 Converting FBX… (0%)', 'var(--accent2)');
-    const dataUrl = await mod.convertFbxFileToGlbDataUrl(file, {
-      onProgress: pct => {
-        setStatus(`\u23F3 Converting FBX\u2026 (${Math.round(pct * 100)}%)`, 'var(--accent2)');
-        if (onProgress) onProgress(pct * 0.8);
-      }
-    }).catch(err => { setStatus('FBX conversion failed: ' + err.message, '#ff8a80'); return null; });
-    if (!dataUrl) return null;
-
-    const persistentUrl = await uploadGlbToGitHub(slug, dataUrl, statusEl);
-    if (onProgress) onProgress(1);
-    return storeResult(dataUrl, persistentUrl);
-  }
-
-  setStatus('Unsupported format. Use .glb, .gltf, or .fbx', '#ff8a80');
-  return null;
 }
 
-// ── Character GLB/FBX upload (wired to #cf-glb-input) ────────────────────────
+// ── Character GLB/FBX upload (wired to #cf-glb-input) ───────────────────────
 export async function uploadCharacterGlb() {
   const input = document.getElementById('cf-glb-input');
   if (!input || !input.files || !input.files[0]) return;
@@ -170,7 +202,7 @@ export async function uploadCharacterGlb() {
   if (!result && progressEl) progressEl.style.display = 'none';
 }
 
-// ── Object GLB/FBX upload (wired to #of-glb-input) ───────────────────────────
+// ── Object GLB/FBX upload (wired to #of-glb-input) ────────────────────────
 export async function uploadObjectGlb() {
   const input = document.getElementById('of-glb-input');
   if (!input || !input.files || !input.files[0]) return;
@@ -188,8 +220,8 @@ export async function uploadObjectGlb() {
   if (!result && progressEl) progressEl.style.display = 'none';
 }
 
-// ── Expose on window so inline onclick handlers (index.html) resolve ──────────
-window.lcUpload = { uploadCharacterGlb, uploadObjectGlb, handleModelUpload };
+// ── Expose on window so inline onclick handlers (index.html) resolve ─────────
+window.lcUpload = { uploadCharacterGlb, uploadObjectGlb, handleModelUpload, isUploadInFlight };
 window.handleModelUpload = handleModelUpload;
 
 export default handleModelUpload;

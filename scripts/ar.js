@@ -37,7 +37,7 @@
       Object.assign(cv.style, {
         position: 'fixed', inset: '0', zIndex: '2999',
         width: '100%', height: '100%', display: 'none',
-        touchAction: 'none',   // required for iOS Safari WebXR input
+        touchAction: 'none',
       });
       document.body.appendChild(cv);
     }
@@ -50,8 +50,6 @@
   }
 
   // ── Sync canvas backing-store to device pixels ────────────────────────────
-  // iOS Safari WebXR produces a blank viewport if the canvas element's
-  // pixel dimensions don't match the actual screen pixel dimensions.
   function syncCanvasSize(canvas) {
     const dpr = window.devicePixelRatio || 1;
     const w   = Math.round(window.innerWidth  * dpr);
@@ -63,18 +61,24 @@
   }
 
   // ── AR Quick Look fallback ────────────────────────────────────────────────
-  // iOS 15+ can preview .glb files via Quick Look — no .usdz needed.
   function launchQuickLook(character) {
-    const href = character.usdzUrl || character.glbUrl ||
-      (character.glbData && !character.glbData.startsWith('data:') ? character.glbData : null);
+    // Quick Look requires a real https:// URL — it cannot open data: URLs.
+    // Only pass through glbUrl / usdzUrl if they are stable https links.
+    const candidate = character.usdzUrl || character.glbUrl;
+    const href = (candidate && candidate.startsWith('https://')) ? candidate : null;
+
     if (!href) {
-      showToastAR('No 3D model available. Attach a .glb or .usdz to this character.');
+      // Model exists only as an in-session data-URL (no GitHub token was used).
+      // Quick Look can’t open it — give the facilitator a clear action.
+      showToastAR(
+        'AR preview needs a saved model. Open Edit, wait for “✓ Model saved to repo!”, then save the character.'
+      );
       return;
     }
+
     const a = document.createElement('a');
     a.rel = 'ar';
     a.href = href;
-    // Quick Look requires an <img> child to trigger on iOS
     const img = document.createElement('img');
     img.src = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
     a.appendChild(img);
@@ -84,38 +88,23 @@
     setTimeout(() => a.remove(), 2000);
   }
 
-  // ── Resolve GLB source → usable URL ──────────────────────────────────────
-  // Character records store the model in one of three places depending on
-  // how it was uploaded and whether a GitHub token was present:
-  //
-  //   character.glbData  — legacy field name; a data: URL
-  //   character.glbUrl   — either a raw.githubusercontent.com URL (preferred)
-  //                        OR a data: base64 URL (session-only / no token)
-  //
-  // All cases must produce a URL the GLTFLoader can fetch.
+  // ── Resolve GLB source → usable URL for Three.js GLTFLoader ───────────────
+  // character.glbUrl can be either:
+  //   • a stable https://raw.githubusercontent.com/… URL  (preferred)
+  //   • a data:model/gltf-binary;base64,… string          (session-only, no token)
+  // character.glbData is a legacy field name that may also hold either form.
+  // Three.js GLTFLoader cannot load data: URLs directly — convert to blob: first.
   async function resolveGlbUrl(character) {
-    // 1. Legacy glbData field (data: URL)
-    if (character.glbData) {
-      if (character.glbData.startsWith('data:')) {
-        const res  = await fetch(character.glbData);
-        const blob = await res.blob();
-        return URL.createObjectURL(blob);
-      }
-      return character.glbData; // plain URL stored in legacy field
+    const src = character.glbData || character.glbUrl;
+    if (!src) return window.DEFAULT_GLB_URL || 'https://threejs.org/examples/models/gltf/Soldier.glb';
+
+    if (src.startsWith('data:')) {
+      const res  = await fetch(src);
+      const blob = await res.blob();
+      return URL.createObjectURL(blob);
     }
 
-    // 2. glbUrl — could be a stable https:// URL or a data: URL
-    if (character.glbUrl) {
-      if (character.glbUrl.startsWith('data:')) {
-        // Convert data-URL → blob URL so Three.js can load it
-        const res  = await fetch(character.glbUrl);
-        const blob = await res.blob();
-        return URL.createObjectURL(blob);
-      }
-      return character.glbUrl; // stable https URL — use directly
-    }
-
-    return window.DEFAULT_GLB_URL || 'https://threejs.org/examples/models/gltf/Soldier.glb';
+    return src; // stable https:// URL — use directly
   }
 
   // ── Mood emoji lookup ─────────────────────────────────────────────────────
@@ -136,11 +125,8 @@
 
     const overlay = ensureOverlay();
     const canvas  = ensureCanvas();
-    syncCanvasSize(canvas);   // must happen before renderer creation on iOS
+    syncCanvasSize(canvas);
 
-    // Build renderer
-    // • antialias: false on iOS — triggers GPU command-buffer errors on A-series chips
-    // • setSize(..., false) — don't let Three.js override the CSS sizing we already set
     const renderer = new THREE.WebGLRenderer({
       canvas,
       alpha:           true,
@@ -154,13 +140,11 @@
     const scene  = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 100);
 
-    // Lighting
     scene.add(new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1.5));
     const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
     dirLight.position.set(1, 2, 1);
     scene.add(dirLight);
 
-    // Reticle
     const reticleGeo = new THREE.RingGeometry(0.08, 0.12, 32);
     const reticleMat = new THREE.MeshBasicMaterial({ color: 0x00ffcc, side: THREE.DoubleSide, transparent: true, opacity: 0.72 });
     const reticle    = new THREE.Mesh(reticleGeo, reticleMat);
@@ -169,7 +153,6 @@
     reticle.visible = false;
     scene.add(reticle);
 
-    // Build overlay HUD
     overlay.innerHTML = '';
     const nameTag = document.createElement('div');
     nameTag.style.cssText = 'background:rgba(10,15,30,.82);color:#eaeaea;font-family:inherit;font-size:15px;font-weight:700;padding:7px 18px;border-radius:20px;pointer-events:none;';
@@ -186,14 +169,10 @@
     overlay.appendChild(nameTag);
     overlay.appendChild(hint);
     overlay.appendChild(exitBtn);
-    overlay.style.display      = 'flex';
+    overlay.style.display       = 'flex';
     overlay.style.pointerEvents = 'none';
     exitBtn.style.pointerEvents = 'all';
 
-    // ── iOS Safari 18 session init ────────────────────────────────────────
-    // • 'dom-overlay' MUST stay in optionalFeatures only.
-    //   iOS Safari 18 rejects the session if it's in requiredFeatures.
-    // • 'hit-test' is supported on iOS 18 Safari and is genuinely required.
     const sessionInit = {
       requiredFeatures: ['hit-test'],
       optionalFeatures: ['dom-overlay', 'light-estimation'],
@@ -207,14 +186,12 @@
       console.error('[AR] session request failed:', err);
       cleanUp();
       if (err && (err.name === 'NotSupportedError' || err.name === 'SecurityError')) {
-        launchQuickLook(character);
-        return;
+        launchQuickLook(character); return;
       }
       showToastAR('Could not start AR. Grant camera access and use HTTPS.');
       return;
     }
 
-    // framebufferScaleFactor=1 prevents a blank-viewport bug on some iOS 18 builds.
     try {
       await renderer.xr.setSession(session, { framebufferScaleFactor: 1.0 });
     } catch (_) {
@@ -231,7 +208,6 @@
     const clock                = new THREE.Clock();
     let blobUrlToRevoke        = null;
 
-    // Load the GLB
     let glbUrl;
     try {
       glbUrl = await resolveGlbUrl(character);
@@ -260,21 +236,19 @@
       showToastAR('Could not load 3D model for AR.');
     });
 
-    // ── Clean-up ──────────────────────────────────────────────────────────
     function cleanUp() {
       renderer.setAnimationLoop(null);
       try { renderer.dispose(); } catch (_) {}
-      canvas.style.display   = 'none';
-      overlay.style.display  = 'none';
-      overlay.innerHTML      = '';
-      hitTestSource          = null;
+      canvas.style.display  = 'none';
+      overlay.style.display = 'none';
+      overlay.innerHTML     = '';
+      hitTestSource         = null;
       if (blobUrlToRevoke) { URL.revokeObjectURL(blobUrlToRevoke); blobUrlToRevoke = null; }
     }
 
     exitBtn.addEventListener('click', () => { try { session.end(); } catch (_) {} });
     session.addEventListener('end', cleanUp);
 
-    // Tap to place
     session.addEventListener('select', () => {
       if (!reticle.visible || !charModel) return;
       if (!characterPlaced) {
@@ -285,7 +259,6 @@
       }
     });
 
-    // ── Render loop ───────────────────────────────────────────────────────
     renderer.setAnimationLoop((timestamp, frame) => {
       const delta = clock.getDelta();
       if (mixer) mixer.update(delta);
@@ -319,7 +292,6 @@
           reticle.visible = false;
         }
 
-        // Face character toward camera
         if (charModel && charModel.visible) {
           const camPos = new THREE.Vector3();
           camera.getWorldPosition(camPos);
@@ -335,22 +307,20 @@
   async function launchAR(character) {
     if (!character) { showToastAR('No character selected.'); return; }
 
-    // If a string id was passed instead of the full object, resolve it
+    // Resolve string id → full object if needed
     if (typeof character === 'string') {
       const resolved = (window.characters || []).find(c => c.id === character);
       if (!resolved) { showToastAR('Character not found.'); return; }
       character = resolved;
     }
 
-    // Must have a model
     if (!character.glbData && !character.glbUrl) {
-      showToastAR('No 3D model attached to this character. Upload a .glb file in the edit screen.');
+      showToastAR('No 3D model attached. Open Edit and upload a .glb file.');
       return;
     }
 
-    // WebXR requires HTTPS — Safari enforces this strictly on iOS 18
     if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
-      showToastAR('AR requires a secure connection (HTTPS). Open the site over https://.');
+      showToastAR('AR requires a secure connection (HTTPS).');
       return;
     }
 
@@ -363,7 +333,6 @@
     if (supported) {
       await launchWebXR(character);
     } else {
-      // iOS Safari < 18, WebXR flag off, or unsupported device → Quick Look
       launchQuickLook(character);
     }
   }

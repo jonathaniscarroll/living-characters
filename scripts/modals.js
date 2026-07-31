@@ -62,7 +62,7 @@ function rebuildObjectUsagePrompts() {
     const roomObjs = objects.filter(o => o.roomId === roomId);
     if (!roomObjs.length) return;
     const isHome = roomId === homeId;
-    const label = isHome ? '🏠' : '💼';
+    const label = isHome ? '\uD83C\uDFE0' : '\uD83D\uDCBC';
     roomObjs.forEach(obj => {
       const passageType = (isHome ? 'home' : 'work') + '-object-' + obj.name.toLowerCase().replace(/\s+/g, '-');
       const existing = ch ? (ch.passages || []).find(p => p.type === passageType) : null;
@@ -82,11 +82,11 @@ function rebuildObjectUsagePrompts() {
 
 // Camera presets
 const CAM_PRESETS = [
-  { label: '🎲 Isometric', x: 9, y: 9, z: 9 },
-  { label: '👁 Front',     x: 0, y: 4, z: 14 },
-  { label: '↔ Side',      x: 14, y: 4, z: 0 },
-  { label: '⬆ Top',       x: 0, y: 18, z: 0.01 },
-  { label: '🎬 Low',      x: 6, y: 2, z: 10 },
+  { label: '\uD83C\uDFB2 Isometric', x: 9, y: 9, z: 9 },
+  { label: '\uD83D\uDC41 Front',     x: 0, y: 4, z: 14 },
+  { label: '\u2194 Side',      x: 14, y: 4, z: 0 },
+  { label: '\u2B06 Top',       x: 0, y: 18, z: 0.01 },
+  { label: '\uD83C\uDFAC Low',      x: 6, y: 2, z: 10 },
 ];
 
 function setCamPreset(x, y, z) {
@@ -108,12 +108,11 @@ function openRoomModal(roomId) {
   document.getElementById('rf-cam-x').value = room?.cameraX ?? 9;
   document.getElementById('rf-cam-y').value = room?.cameraY ?? 9;
   document.getElementById('rf-cam-z').value = room?.cameraZ ?? 9;
-  // Camera focus (look-at target) — new fields, default to 0/0/0
   document.getElementById('rf-cam-tx').value = room?.cameraTargetX ?? 0;
   document.getElementById('rf-cam-ty').value = room?.cameraTargetY ?? 0;
   document.getElementById('rf-cam-tz').value = room?.cameraTargetZ ?? 0;
-  // Camera zoom — new field, default 2
-  document.getElementById('rf-cam-zoom').value = room?.cameraZoom ?? 2;
+  const rawZoom2 = room?.cameraZoom;
+  document.getElementById('rf-cam-zoom').value = rawZoom2 ?? 2;
   const bp = document.getElementById('rf-backdrop-preview');
   const existingPreview = (room && room.backdropData) ? room.backdropData : ((room && room.backdropUrl) ? room.backdropUrl : null);
   if (existingPreview) {
@@ -145,11 +144,9 @@ function saveRoom() {
   const cameraX = parseFloat(document.getElementById('rf-cam-x').value);
   const cameraY = parseFloat(document.getElementById('rf-cam-y').value);
   const cameraZ = parseFloat(document.getElementById('rf-cam-z').value);
-  // New camera look-at target fields
   const cameraTargetX = parseFloat(document.getElementById('rf-cam-tx').value);
   const cameraTargetY = parseFloat(document.getElementById('rf-cam-ty').value);
   const cameraTargetZ = parseFloat(document.getElementById('rf-cam-tz').value);
-  // New zoom field — clamp to 0.5–5
   const rawZoom = parseFloat(document.getElementById('rf-cam-zoom').value);
   const cameraZoom = Number.isNaN(rawZoom) ? 2 : Math.min(5, Math.max(0.5, rawZoom));
   if (!name || Number.isNaN(lat) || Number.isNaN(lng)) return alert('Needs a name and coordinates.');
@@ -233,11 +230,10 @@ function uploadRoomBackdrop() {
 
 function openCharModal(charId) {
   editingCharId = charId;
-  // Reset all temp upload state — both the module-local var AND window globals
   tempPhotoData = null;
   tempAnimData  = null;
   tempGlbData   = null;
-  window.tempGlbData = null;   // ← clear the global so a stale upload can't bleed through
+  window.tempGlbData = null;
   const ch = charId ? characters.find(c => c.id === charId) : null;
   document.getElementById('char-modal-title').textContent = ch ? 'Edit Character' : 'Add a Character';
   document.getElementById('cf-name').value = ch ? ch.name : '';
@@ -246,10 +242,8 @@ function openCharModal(charId) {
   const currentIds = ch ? (ch.roomIds || (ch.roomId ? [ch.roomId] : [])) : [];
   buildRoomChipPicker(currentIds);
 
-  // Home / work selects
   populateHomeWorkSelects(currentIds, ch?.homeRoomId || null, ch?.workRoomId || null);
 
-  // Schedule editor
   const segs = ['morning', 'midday', 'afternoon', 'evening', 'night'];
   const schedule = ch?.schedule || { morning: 'home', midday: 'work', afternoon: 'work', evening: 'home', night: 'home' };
   segs.forEach(seg => {
@@ -260,7 +254,6 @@ function openCharModal(charId) {
     });
   });
 
-  // Photo / anim previews
   const pp = document.getElementById('cf-photo-preview');
   if (ch && ch.photoData) { pp.src = ch.photoData; pp.style.display = 'block'; tempPhotoData = ch.photoData; }
   else { pp.src = ''; pp.style.display = 'none'; }
@@ -268,15 +261,17 @@ function openCharModal(charId) {
   if (ch && ch.animData) { ap.src = ch.animData; ap.style.display = 'block'; tempAnimData = ch.animData; }
   else { ap.src = ''; ap.style.display = 'none'; }
 
-  // GLB status — if there's already a data URL on the character, seed it into
-  // BOTH the module-local var and window.tempGlbData so saveCharacter() finds it.
   const glbStatus = document.getElementById('cf-glb-status');
   if (ch && ch.glbUrl && ch.glbUrl.startsWith('data:')) {
-    tempGlbData = ch.glbUrl;
-    window.tempGlbData = ch.glbUrl;
-    glbStatus.textContent = '\u2713 Your 3D model is ready to save.';
+    // data: URL on the character means it was saved without a GitHub token.
+    // Don’t seed it back into tempGlbData — show a prompt to re-upload instead.
+    tempGlbData = null;
+    window.tempGlbData = null;
+    glbStatus.textContent = '\u26A0\uFE0F Model saved without GitHub token — re-upload to enable AR on other devices.';
+    glbStatus.style.color = 'var(--accent)';
   } else if (ch && ch.glbUrl) {
-    glbStatus.textContent = '\u2713 Using a web link for this character.';
+    glbStatus.textContent = '\u2713 3D model linked (' + ch.glbUrl.split('/').pop() + ')';
+    glbStatus.style.color = 'var(--accent2)';
   } else {
     glbStatus.textContent = '';
   }
@@ -286,7 +281,6 @@ function openCharModal(charId) {
   if (wrap) wrap.style.display = 'none';
   if (bar)  bar.style.width = '0%';
 
-  // Mood picker
   const mp = document.getElementById('mood-picker');
   mp.innerHTML = '';
   MOODS.forEach(m => {
@@ -302,7 +296,6 @@ function openCharModal(charId) {
     mp.appendChild(btn);
   });
 
-  // Standard dialogue builder
   const db = document.getElementById('dialogue-builder');
   db.innerHTML = '';
   PROMPT_TYPES.forEach(pt => {
@@ -319,10 +312,9 @@ function openCharModal(charId) {
     db.appendChild(row);
   });
 
-  // Home / work context passages
   const contextTypes = [
-    { key: 'home', label: '🏠 At home they say…', placeholder: 'What do they talk about at home?', hint: 'Shown when visiting this character at their home room.' },
-    { key: 'work', label: '💼 At work they say…', placeholder: 'What do they talk about at work?', hint: 'Shown when visiting this character at their work room.' },
+    { key: 'home', label: '\uD83C\uDFE0 At home they say\u2026', placeholder: 'What do they talk about at home?', hint: 'Shown when visiting this character at their home room.' },
+    { key: 'work', label: '\uD83D\uDCBC At work they say\u2026', placeholder: 'What do they talk about at work?', hint: 'Shown when visiting this character at their work room.' },
   ];
   contextTypes.forEach(pt => {
     const existing = ch && ch.passages ? ch.passages.find(p => p.type === pt.key) : null;
@@ -338,19 +330,17 @@ function openCharModal(charId) {
     db.appendChild(row);
   });
 
-  // Object usage prompts (populated after home/work selects are set)
   rebuildObjectUsagePrompts();
 
-  // If opened via map tap, show a hint that location is pre-set
   const hint = document.getElementById('cf-room-chips-hint');
   if (hint) {
     if (window._pendingCharLat !== undefined) {
       hint.style.display = '';
       hint.style.color = 'var(--accent2)';
-      hint.textContent = `📍 Placing at ${window._pendingCharLat.toFixed(4)}, ${window._pendingCharLng.toFixed(4)} — rooms are optional.`;
+      hint.textContent = `\uD83D\uDCCD Placing at ${window._pendingCharLat.toFixed(4)}, ${window._pendingCharLng.toFixed(4)} \u2014 rooms are optional.`;
     } else if (!rooms.length) {
       hint.style.display = ''; hint.style.color = 'var(--accent)';
-      hint.textContent = '⚠️ Create a room first before adding a character.';
+      hint.textContent = '\u26A0\uFE0F Create a room first before adding a character.';
     } else {
       hint.style.display = 'none';
     }
@@ -367,13 +357,12 @@ function closeCharModal() {
   tempPhotoData = null;
   tempAnimData  = null;
   tempGlbData   = null;
-  window.tempGlbData = null;   // ← also clear global on close
+  window.tempGlbData = null;
   document.getElementById('cf-glb-status').textContent = '';
   const wrap = document.getElementById('cf-fbx-progress');
   const bar  = document.getElementById('cf-fbx-progress-bar');
   if (wrap) wrap.style.display = 'none';
   if (bar)  bar.style.width = '0%';
-  // Clear pending coords if user cancels
   delete window._pendingCharLat;
   delete window._pendingCharLng;
 }
@@ -392,12 +381,18 @@ function previewFile(inputId, previewId, dataKey) {
 }
 
 function saveCharacter() {
+  // Guard: if an upload is still in flight, don’t save yet.
+  // (Belt-and-suspenders: the Save button should already be disabled,
+  // but protect against inline-onclick callers too.)
+  if (window.lcUpload && window.lcUpload.isUploadInFlight && window.lcUpload.isUploadInFlight()) {
+    if (typeof showToast === 'function') showToast('Still uploading model \u2014 please wait a moment.', 'info');
+    return;
+  }
+
   const name = document.getElementById('cf-name').value.trim();
   if (!name) { alert('Please give the character a name.'); return; }
   const roomIds = getSelectedRoomIds();
 
-  // A room is only required if the character is NOT being placed directly on
-  // the map via a tap (i.e. no pending lat/lng coords from map.js).
   const hasMapCoords = (window._pendingCharLat !== undefined) ||
     (editingCharId && (() => { const ch = characters.find(c => c.id === editingCharId); return ch && typeof ch.lat === 'number'; })());
 
@@ -412,7 +407,7 @@ function saveCharacter() {
     }
     if (hint) {
       hint.style.display = ''; hint.style.color = 'var(--accent)';
-      hint.textContent = '⚠️ Please choose at least one room for this character.';
+      hint.textContent = '\u26A0\uFE0F Please choose at least one room for this character.';
       setTimeout(() => { hint.textContent = ''; hint.style.color = ''; }, 3000);
     }
     alert('Please choose at least one room before saving.'); return;
@@ -421,9 +416,17 @@ function saveCharacter() {
   const primaryRoomId = roomIds[0] || '';
   const items = document.getElementById('cf-items').value.split(',').map(s => s.trim()).filter(Boolean);
 
-  // Resolve GLB: prefer the module-local var, then the window global (set by
-  // upload-helpers.js), then the URL text field.
-  const glbUrl = tempGlbData || window.tempGlbData || document.getElementById('cf-glb-url').value.trim() || null;
+  // Resolve GLB: prefer module-local var, then window global, then URL field.
+  // Never write a data: URL if a persistent https:// URL is available anywhere.
+  const urlFieldVal = document.getElementById('cf-glb-url').value.trim();
+  const candidate   = tempGlbData || window.tempGlbData || urlFieldVal || null;
+  // If we somehow still have a data: URL but the existing character already
+  // has a persistent https:// URL, keep the persistent one.
+  const existingChar = editingCharId ? characters.find(c => c.id === editingCharId) : null;
+  const existingPersistent = existingChar?.glbUrl?.startsWith('https://') ? existingChar.glbUrl : null;
+  const glbUrl = (candidate && !candidate.startsWith('data:'))
+    ? candidate
+    : (existingPersistent || candidate || null);
 
   const activeMoodBtn = document.querySelector('#mood-picker .mood-opt.active');
   const moodLabel = MOODS.find(m => activeMoodBtn && activeMoodBtn.textContent.includes(m.emoji))?.label || 'Happy';
@@ -446,14 +449,12 @@ function saveCharacter() {
     animData:  tempAnimData,
   };
 
-  // Bake pending map-tap coords directly into data before any push/assign
   if (window._pendingCharLat !== undefined) {
     data.lat = window._pendingCharLat;
     data.lng = window._pendingCharLng;
     delete window._pendingCharLat;
     delete window._pendingCharLng;
   } else if (editingCharId) {
-    // Carry over existing lat/lng on edit so map position is preserved
     const existing = characters.find(c => c.id === editingCharId);
     if (existing && typeof existing.lat === 'number') {
       data.lat = existing.lat;
@@ -475,12 +476,10 @@ function saveCharacter() {
   renderMapPins();
   save();
 
-  // Notify map.js so it can apply pending lat/lng to the newly saved character
   if (savedId) {
     document.dispatchEvent(new CustomEvent('lc:character-saved', { detail: { id: savedId } }));
   }
 
-  // Auto-save to GitHub with a descriptive commit message
   const charLabel   = isNew ? `Add character: ${name}` : `Update character: ${name}`;
   const commitInput = document.getElementById('gh-commit-input');
   const prevMsg     = commitInput ? commitInput.value : '';
