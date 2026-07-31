@@ -4,10 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Living Characters — Virtual World</title>
+  <link rel="icon" href="data:," />
 
-  <!-- globals.js MUST be first: declares shared mutable state (rooms, characters,
-       objects, map, MOODS, save, load, showToast) as window-scoped vars so every
-       module script below can read/write the same live arrays. -->
   <script src="./scripts/globals.js"></script>
 
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -97,38 +95,58 @@
     .heading-needle{position:absolute;left:50%;top:50%;width:3px;height:52px;margin-left:-1.5px;margin-top:-52px;background:var(--accent);transform-origin:50% 100%;}
     .heading-needle::before{content:'';position:absolute;left:-5px;top:-8px;border-left:6.5px solid transparent;border-right:6.5px solid transparent;border-bottom:10px solid var(--accent);}
     .compass-list{font-size:11px;display:flex;flex-direction:column;gap:5px;}
-    .compass-item{display:flex;align-items:center;gap:6px;cursor:pointer;padding:3px 5px;border-radius:6px;transition:background .15s;}
-    .compass-item:hover{background:rgba(255,255,255,.08);}
-    .compass-arrow{font-size:16px;line-height:1;transition:transform .3s;}
-    .compass-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-    .compass-dist{font-size:9px;color:var(--text-muted);}
-    #card-panel{position:fixed;top:var(--map-top);right:0;bottom:0;width:var(--card-w);z-index:1050;background:var(--surface);border-left:1px solid var(--border);overflow-y:auto;transform:translateX(100%);transition:transform .3s;display:flex;flex-direction:column;}
-    #card-panel.open{transform:translateX(0);}
-    .card-header{display:flex;align-items:center;gap:10px;padding:14px 14px 10px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface);z-index:2;}
-    .card-photo-wrap{width:56px;height:56px;border-radius:50%;overflow:hidden;background:var(--surface2);flex-shrink:0;border:2px solid var(--border);}
-    .card-photo-wrap img{width:100%;height:100%;object-fit:cover;}
-    .card-info{flex:1;min-width:0;}
-    .card-name{font-size:15px;font-weight:700;margin-bottom:2px;}
-    .card-mood{font-size:11px;color:var(--text-muted);}
-    #card-close{background:none;border:none;color:var(--text-muted);font-size:20px;cursor:pointer;padding:4px;}
-    .card-anim-wrap{width:100%;aspect-ratio:1;background:#000;overflow:hidden;position:relative;}
-    .card-anim-wrap img,.card-anim-wrap video{width:100%;height:100%;object-fit:contain;}
-    #card-sprite-stage{width:100%;aspect-ratio:1;background:#111;display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative;}
-    #card-sprite-canvas{image-rendering:pixelated;}
+    .compass-list-item{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:3px 5px;border-radius:6px;font-size:10px;}
+    .compass-list-item.inside{background:rgba(245,166,35,.15);color:var(--accent2);}
+
+    /* ── Character card — IDs from card.js: #card, #card-anim, #card-name,
+          #card-location, #card-mood-dot, #card-mood-text,
+          #card-items-list, #card-passage-list ── */
+    #card{position:fixed;top:var(--map-top);right:0;bottom:0;width:var(--card-w);z-index:1050;
+          background:var(--surface);border-left:1px solid var(--border);overflow-y:auto;
+          transform:translateX(100%);transition:transform .3s;display:flex;flex-direction:column;}
+    #card.open{transform:translateX(0);}
+    .card-header{display:flex;align-items:center;gap:10px;padding:14px 14px 10px;
+                 border-bottom:1px solid var(--border);position:sticky;top:0;
+                 background:var(--surface);z-index:2;}
+    #card-anim{width:100%;aspect-ratio:1;background:#000;overflow:hidden;display:none;
+               align-items:center;justify-content:center;}
+    #card-anim img{width:100%;height:100%;object-fit:contain;}
+    #card-anim .placeholder{font-size:48px;}
+    .card-meta{padding:8px 14px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border);}
+    .card-mood-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+    .card-location-row{font-size:11px;color:var(--text-muted);}
     .card-items{padding:10px 14px;border-top:1px solid var(--border);}
     .card-items h4{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);margin-bottom:8px;}
     .items-list{display:flex;flex-wrap:wrap;gap:6px;}
     .item-chip{font-size:11px;background:var(--surface2);padding:3px 9px;border-radius:20px;border:1px solid var(--border);}
     .card-dialogue{padding:10px 14px;border-top:1px solid var(--border);}
     .card-dialogue h4{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);margin-bottom:8px;}
-    .dialogue-option{display:block;width:100%;text-align:left;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;margin-bottom:6px;color:var(--text);cursor:pointer;font-size:12px;font-family:inherit;transition:background .15s;}
-    .dialogue-option:hover{background:#1a3050;}
-    .dialogue-response{background:rgba(255,255,255,.04);border-radius:8px;padding:10px 12px;font-size:12px;line-height:1.5;margin-top:4px;border:1px solid var(--border);}
-    .card-edit-btn{display:block;width:calc(100% - 28px);margin:10px 14px;padding:8px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text-muted);font-size:11px;cursor:pointer;font-family:inherit;}
-    .card-edit-btn:hover{color:var(--text);border-color:#ffffff40;}
+    .dialogue-block{margin-bottom:8px;}
+    .passage-type{font-size:9px;text-transform:uppercase;letter-spacing:.06em;color:var(--accent2);margin-bottom:2px;}
+    .passage-text{font-size:12px;line-height:1.5;}
     .card-actions{padding:8px 14px;display:flex;gap:6px;border-top:1px solid var(--border);}
     .card-act-btn{flex:1;padding:7px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:11px;cursor:pointer;font-family:inherit;}
     .card-act-btn:hover{background:#1a3050;}
+
+    /* ── Talk panel — IDs from card.js: #talk-panel, #talk-char-name,
+          #talk-bubble, #talk-btns ── */
+    #talk-panel{position:fixed;bottom:70px;left:50%;transform:translateX(-50%);
+                background:rgba(10,15,30,.96);border:1px solid var(--border);
+                border-radius:12px;padding:14px;width:300px;z-index:1200;
+                display:none;flex-direction:column;gap:8px;}
+    #talk-panel.open{display:flex;}
+    #talk-panel h5{font-size:12px;font-weight:700;}
+    #talk-bubble{font-size:12px;line-height:1.5;min-height:40px;padding:8px;
+                 background:rgba(255,255,255,.06);border-radius:8px;color:var(--accent2);}
+    #talk-bubble.empty{color:var(--text-muted);font-style:italic;}
+    #talk-btns{display:flex;flex-wrap:wrap;gap:6px;}
+    .talk-btn{padding:4px 12px;border-radius:20px;border:1px solid var(--border);
+              background:var(--surface2);color:var(--text);font-size:11px;
+              cursor:pointer;font-family:inherit;}
+    .talk-btn:hover,.talk-btn.active{background:rgba(245,166,35,.18);border-color:var(--accent2);color:var(--accent2);}
+    #talk-close{background:none;border:none;color:var(--text-muted);font-size:13px;cursor:pointer;align-self:flex-end;}
+
+    /* ── Room view ── */
     #room-view{position:fixed;top:var(--map-top);left:0;right:0;bottom:0;z-index:1040;background:var(--bg);display:none;flex-direction:column;}
     #room-view.open{display:flex;}
     #room-header{padding:10px 14px;border-bottom:1px solid var(--border);background:var(--surface);display:flex;flex-direction:column;gap:6px;}
@@ -150,15 +168,19 @@
     .obj-list-item{font-size:11px;padding:5px 8px;background:var(--surface2);border-radius:6px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;}
     .obj-list-item:hover{background:#1a3050;}
     .obj-list-item .obj-del{background:none;border:none;color:var(--accent);font-size:14px;cursor:pointer;padding:0 2px;}
-    #talk-panel{position:absolute;top:10px;left:10px;background:rgba(10,15,30,.95);border:1px solid var(--border);border-radius:10px;padding:12px;width:240px;z-index:12;display:none;}
-    #talk-panel.show{display:block;}
-    #talk-panel h5{font-size:11px;font-weight:700;margin-bottom:8px;}
-    .talk-opt{display:block;width:100%;text-align:left;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:6px 10px;margin-bottom:5px;color:var(--text);cursor:pointer;font-size:11px;font-family:inherit;}
-    .talk-opt:hover{background:#1a3050;}
-    #talk-response{font-size:11px;color:var(--accent2);margin-top:6px;line-height:1.4;display:none;}
-    #talk-close{background:none;border:none;color:var(--text-muted);font-size:13px;cursor:pointer;float:right;margin-top:-4px;}
+    .room-edit-overlay{position:absolute;inset:0;z-index:50;background:rgba(245,166,35,.05);border:2px dashed var(--accent2);display:none;pointer-events:none;}
+    .room-edit-overlay.active{display:block;}
 
-    /* ── Modal overlay (used by char, room, obj modals in modals.js) ── */
+    /* ── Tooltip (map.js: #tooltip, #tt-name, #tt-loc, #tt-mood) ── */
+    #tooltip{position:fixed;z-index:2000;background:rgba(10,15,30,.96);
+             border:1px solid var(--border);border-radius:8px;padding:8px 12px;
+             pointer-events:none;opacity:0;transition:opacity .15s;min-width:130px;}
+    #tooltip.show{opacity:1;}
+    #tt-name{font-size:13px;font-weight:700;margin-bottom:3px;}
+    #tt-loc{font-size:10px;color:var(--text-muted);margin-bottom:2px;}
+    #tt-mood{font-size:11px;}
+
+    /* ── Modal overlay ── */
     .modal-overlay{position:fixed;inset:0;z-index:1400;background:rgba(0,0,0,.65);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s;}
     .modal-overlay.open{opacity:1;pointer-events:all;}
     .modal-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px;width:500px;max-width:calc(100vw - 32px);max-height:calc(100vh - 64px);overflow-y:auto;display:flex;flex-direction:column;gap:14px;}
@@ -197,7 +219,6 @@
     .sch-pill{padding:3px 10px;border-radius:20px;border:1px solid var(--border);font-size:11px;cursor:pointer;background:rgba(255,255,255,.06);color:var(--text-muted);}
     .sch-pill.active{background:rgba(245,166,35,.18);border-color:var(--accent2);color:var(--accent2);}
     #room-latlng-map{width:100%;height:200px;border-radius:8px;border:1px solid var(--border);z-index:0;}
-
     .overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:2000;display:none;align-items:center;justify-content:center;padding:16px;}
     .overlay.open{display:flex;}
     .modal{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;display:flex;flex-direction:column;gap:12px;}
@@ -216,20 +237,9 @@
     #toast.show{opacity:1;}
     .mood-ring{width:14px;height:14px;border-radius:50%;display:inline-block;margin-right:4px;vertical-align:middle;animation:pulse 2s infinite;}
     @keyframes pulse{0%,100%{transform:scale(1);opacity:1;}50%{transform:scale(1.3);opacity:.7;}}
-    .pin-label{font-size:10px;font-weight:700;color:#fff;text-shadow:0 1px 3px #000;text-align:center;margin-top:2px;pointer-events:none;}
     .leaflet-marker-icon{background:none!important;border:none!important;}
-    .char-pin-wrap{display:flex;flex-direction:column;align-items:center;}
-    .char-pin-img{width:var(--pin-size);height:var(--pin-size);border-radius:50%;object-fit:cover;border:3px solid #fff;box-shadow:0 2px 8px #0008;background:#222;}
-    .char-pin-ring{width:calc(var(--pin-size) + 10px);height:calc(var(--pin-size) + 10px);border-radius:50%;position:absolute;top:-5px;left:-5px;animation:pulse 2s infinite;pointer-events:none;}
-    .sprite-pin-wrap{display:flex;flex-direction:column;align-items:center;}
-    .sprite-pin-canvas{width:var(--pin-size);height:var(--pin-size);image-rendering:pixelated;border-radius:50%;border:3px solid #fff;box-shadow:0 2px 8px #0008;}
-    .room-pin-wrap{display:flex;flex-direction:column;align-items:center;cursor:pointer;}
-    .room-pin-dot{width:22px;height:22px;border-radius:50%;background:var(--surface2);border:3px solid var(--accent2);box-shadow:0 2px 8px #0008;display:flex;align-items:center;justify-content:center;font-size:12px;}
-    .room-pin-label{font-size:9px;font-weight:700;color:#fff;text-shadow:0 1px 3px #000;margin-top:2px;white-space:nowrap;}
     #mini-map-wrap{position:relative;width:100%;height:160px;border-radius:8px;overflow:hidden;border:1px solid var(--border);}
     #mini-map{width:100%;height:100%;}
-    .room-edit-overlay{position:absolute;inset:0;z-index:50;background:rgba(245,166,35,.05);border:2px dashed var(--accent2);display:none;pointer-events:none;}
-    .room-edit-overlay.active{display:block;}
     ::-webkit-scrollbar{width:6px;} ::-webkit-scrollbar-track{background:transparent;} ::-webkit-scrollbar-thumb{background:#ffffff20;border-radius:3px;}
   </style>
 </head>
@@ -239,8 +249,8 @@
   <h1>🏠 Living Characters</h1>
   <div class="btns">
     <span id="gps-status">GPS: off</span>
-    <button class="hbtn gps-btn"   onclick="startGPS()">📍 GPS</button>
-    <button class="hbtn sim-btn"   onclick="startSim()">🚶 Simulate</button>
+    <button class="hbtn gps-btn"    onclick="startGPS()">📍 GPS</button>
+    <button class="hbtn sim-btn"    onclick="startSim()">🚶 Simulate</button>
     <button class="hbtn day-seg active" data-seg="morning"   onclick="setDaySegment('morning')">🌅</button>
     <button class="hbtn day-seg"        data-seg="midday"    onclick="setDaySegment('midday')">☀️</button>
     <button class="hbtn day-seg"        data-seg="afternoon" onclick="setDaySegment('afternoon')">🌤</button>
@@ -267,13 +277,15 @@
 
 <div id="map"></div>
 
+<!-- Tooltip (map.js: showTooltip / hideTooltip) -->
+<div id="tooltip">
+  <div id="tt-name"></div>
+  <div id="tt-loc"></div>
+  <div id="tt-mood"></div>
+</div>
+
 <div id="compass-panel">
-  <h4>🧭 Rooms from here</h4>
-  <div class="compass-rose" id="compass-rose">
-    <div class="north">N</div>
-    <div class="heading-needle" id="heading-needle"></div>
-    <div class="center-dot"></div>
-  </div>
+  <h4>🧭 Nearby</h4>
   <div class="compass-list" id="compass-list"></div>
 </div>
 
@@ -297,69 +309,63 @@
       <h5>Objects in room</h5>
       <div id="obj-list-container"></div>
     </div>
-    <div id="talk-panel">
-      <button id="talk-close" onclick="document.getElementById('talk-panel').classList.remove('show')">✕</button>
-      <h5 id="talk-char-name">Character</h5>
-      <div id="talk-options"></div>
-      <div id="talk-response"></div>
-    </div>
     <div class="room-edit-overlay" id="room-edit-overlay"></div>
   </div>
 </div>
 
-<div id="card-panel">
+<!-- Character card (card.js: openCard / closeCard) -->
+<div id="card">
   <div class="card-header">
-    <div class="card-photo-wrap"><img id="card-photo" src="" alt="" /></div>
-    <div class="card-info">
+    <div style="flex:1;min-width:0">
       <div class="card-name" id="card-name"></div>
-      <div class="card-mood" id="card-mood"></div>
     </div>
-    <button id="card-close" onclick="closeCard()">✕</button>
+    <button style="background:none;border:none;color:var(--text-muted);font-size:20px;cursor:pointer;padding:4px;" onclick="closeCard()">✕</button>
   </div>
-  <div id="card-sprite-stage" style="display:none"><canvas id="card-sprite-canvas"></canvas></div>
-  <div class="card-anim-wrap" id="card-anim-wrap" style="display:none">
-    <img id="card-anim-gif" src="" alt="" style="display:none" />
-    <video id="card-anim-video" autoplay loop muted playsinline style="display:none"></video>
+  <!-- anim area: card.js writes innerHTML directly -->
+  <div id="card-anim" style="width:100%;aspect-ratio:1;background:#000;overflow:hidden;display:flex;align-items:center;justify-content:center;"></div>
+  <div class="card-meta">
+    <div id="card-mood-dot" class="card-mood-dot"></div>
+    <div id="card-mood-text" style="font-size:11px;color:var(--text-muted);flex:1"></div>
+    <div id="card-location" class="card-location-row"></div>
   </div>
   <div class="card-items">
     <h4>Items</h4>
     <div class="items-list" id="card-items-list"></div>
   </div>
   <div class="card-dialogue">
-    <h4>Talk</h4>
-    <div id="card-dialogue-options"></div>
-    <div class="dialogue-response" id="card-dialogue-response" style="display:none"></div>
+    <h4>Dialogue</h4>
+    <div id="card-passage-list"></div>
   </div>
   <div class="card-actions">
-    <button class="card-act-btn" data-facilitator-only id="card-edit-btn" onclick="editCardChar()">✏️ Edit</button>
-    <button class="card-act-btn" data-facilitator-only id="card-delete-btn" onclick="deleteCardChar()">🗑 Delete</button>
+    <button class="card-act-btn" data-facilitator-only onclick="editCardChar()">✏️ Edit</button>
+    <button class="card-act-btn" data-facilitator-only onclick="deleteCardChar()">🗑 Delete</button>
+    <button class="card-act-btn" onclick="talkToCard()">💬 Talk</button>
   </div>
 </div>
 
-<!-- ═══════════════════════════════════════════════════════════════════════════
-     CHARACTER MODAL  — IDs must match modals.js exactly
-     ═══════════════════════════════════════════════════════════════════════════ -->
+<!-- Talk panel (card.js: openTalkPanel / closeTalkPanel) -->
+<div id="talk-panel">
+  <button id="talk-close" onclick="closeTalkCard()">✕ Close</button>
+  <h5 id="talk-char-name"></h5>
+  <div id="talk-bubble" class="empty">Tap a prompt below…</div>
+  <div id="talk-btns"></div>
+</div>
+
+<!-- ══════════════════════ CHARACTER MODAL (modals.js) ══════════════════════ -->
 <div class="modal-overlay" id="char-modal-overlay">
   <div class="modal-box">
     <h2 id="char-modal-title">Add a Character</h2>
 
     <div class="modal-section-title">👤 Who are they?</div>
-    <div class="field"><label>Character name</label><input id="cf-name" type="text" placeholder="e.g. Mop, Gravel, Biscuit…" /></div>
+    <div class="field"><label>Name</label><input id="cf-name" type="text" placeholder="e.g. Mop, Gravel, Biscuit…" /></div>
 
     <div class="field">
-      <label>Which room(s)? <span style="font-weight:400;text-transform:none;letter-spacing:0">(tap to toggle)</span></label>
+      <label>Room(s) <span style="font-weight:400;text-transform:none;letter-spacing:0">(tap to toggle)</span></label>
       <div class="room-chips" id="cf-room-chips"></div>
       <div class="room-chips-hint" id="cf-room-chips-hint"></div>
     </div>
-
-    <div class="field">
-      <label>Home room</label>
-      <select id="cf-home-room"><option value="">— choose —</option></select>
-    </div>
-    <div class="field">
-      <label>Work room</label>
-      <select id="cf-work-room"><option value="">— choose —</option></select>
-    </div>
+    <div class="field"><label>Home room</label><select id="cf-home-room"><option value="">— choose —</option></select></div>
+    <div class="field"><label>Work room</label><select id="cf-work-room"><option value="">— choose —</option></select></div>
 
     <div class="field">
       <label>Daily schedule</label>
@@ -371,27 +377,25 @@
         <div class="schedule-segment" data-seg="night">    <span class="sch-label">🌙 Night</span>    <button class="sch-pill active" data-val="home">Home</button><button class="sch-pill" data-val="work">Work</button><button class="sch-pill" data-val="roam">Roam</button></div>
       </div>
     </div>
-    <!-- wire up sch-pill clicks -->
     <script>
-      document.addEventListener('click', function(e) {
+      document.addEventListener('click', function(e){
         const pill = e.target.closest('.sch-pill');
-        if (!pill) return;
+        if(!pill) return;
         const seg = pill.closest('.schedule-segment');
-        if (!seg) return;
+        if(!seg) return;
         seg.querySelectorAll('.sch-pill').forEach(p => p.classList.remove('active'));
         pill.classList.add('active');
       });
     </script>
 
-    <div class="field"><label>Photo (felt / clay)</label>
+    <div class="field"><label>Photo</label>
       <div class="file-row">
         <img id="cf-photo-preview" class="file-preview" src="" style="display:none" />
         <label class="file-btn" for="cf-photo-input">Upload photo</label>
         <input id="cf-photo-input" type="file" accept="image/*" style="display:none" onchange="previewFile('cf-photo-input','cf-photo-preview','photoData')" />
       </div>
     </div>
-
-    <div class="field"><label>Mixamo animation (GIF)</label>
+    <div class="field"><label>Mixamo GIF</label>
       <div class="file-row">
         <img id="cf-anim-preview" class="file-preview" src="" style="display:none" />
         <label class="file-btn" for="cf-anim-input">Upload GIF</label>
@@ -415,15 +419,13 @@
   </div>
 </div>
 
-<!-- ═══════════════════════════════════════════════════════════════════════════
-     ROOM MODAL  — IDs must match modals.js exactly
-     ═══════════════════════════════════════════════════════════════════════════ -->
+<!-- ═══════════════════════ ROOM MODAL (modals.js) ═══════════════════════ -->
 <div class="modal-overlay" id="room-modal-overlay">
   <div class="modal-box">
     <h2 id="room-modal-title">Add a Room</h2>
-    <div class="modal-section-title">🗺️ Where is it?</div>
-    <div class="field"><label>Room name</label><input id="rf-name" type="text" placeholder="e.g. The Library, The Garden…" /></div>
-    <div class="field"><label>Description / lede</label><textarea id="rf-lede" rows="2" placeholder="A short description shown when players enter."></textarea></div>
+    <div class="modal-section-title">🗺️ Where?</div>
+    <div class="field"><label>Name</label><input id="rf-name" type="text" placeholder="e.g. The Library…" /></div>
+    <div class="field"><label>Description</label><textarea id="rf-lede" rows="2" placeholder="Shown when players enter."></textarea></div>
     <div class="field"><label>Click map to place — or type lat, lng</label>
       <div style="display:flex;gap:8px">
         <input id="rf-lat" type="number" step="any" placeholder="Lat" style="flex:1" />
@@ -432,20 +434,18 @@
       <div id="room-latlng-map"></div>
     </div>
     <div class="field"><label>Trigger radius (metres)</label><input id="rf-radius" type="number" value="30" min="5" max="500" /></div>
-
-    <div class="modal-section-title">📷 Backdrop image</div>
+    <div class="modal-section-title">📷 Backdrop</div>
     <div class="field">
       <img id="rf-backdrop-preview" src="" style="max-height:100px;border-radius:8px;display:none;margin-bottom:4px;" />
       <label class="file-btn" for="rf-backdrop-input" style="display:block;text-align:center;padding:10px;">Upload backdrop image</label>
-      <input id="rf-backdrop-input" type="file" accept="image/*" style="display:none" onchange="window.lcModals && window.lcModals.uploadRoomBackdrop()" />
+      <input id="rf-backdrop-input" type="file" accept="image/*" style="display:none" onchange="window.lcModals&&window.lcModals.uploadRoomBackdrop()" />
       <div id="rf-backdrop-status" style="font-size:10px;color:var(--text-muted);margin-top:4px;"></div>
     </div>
-
-    <div class="modal-section-title">📷 Camera position</div>
+    <div class="modal-section-title">📷 Camera</div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;">
-      <div class="field" style="flex:1;min-width:80px"><label>Cam X</label><input id="rf-cam-x" type="number" step="0.5" value="9" /></div>
-      <div class="field" style="flex:1;min-width:80px"><label>Cam Y</label><input id="rf-cam-y" type="number" step="0.5" value="9" /></div>
-      <div class="field" style="flex:1;min-width:80px"><label>Cam Z</label><input id="rf-cam-z" type="number" step="0.5" value="9" /></div>
+      <div class="field" style="flex:1;min-width:80px"><label>X</label><input id="rf-cam-x" type="number" step="0.5" value="9" /></div>
+      <div class="field" style="flex:1;min-width:80px"><label>Y</label><input id="rf-cam-y" type="number" step="0.5" value="9" /></div>
+      <div class="field" style="flex:1;min-width:80px"><label>Z</label><input id="rf-cam-z" type="number" step="0.5" value="9" /></div>
     </div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;">
       <div class="field" style="flex:1;min-width:80px"><label>Target X</label><input id="rf-cam-tx" type="number" step="0.5" value="0" /></div>
@@ -454,13 +454,12 @@
     </div>
     <div class="field"><label>Zoom (0.5–5)</label><input id="rf-cam-zoom" type="number" step="0.1" value="2" min="0.5" max="5" /></div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:2px;">
-      <button class="mbtn cancel" style="flex:0;font-size:10px;padding:5px 8px;" onclick="window.lcModals && window.lcModals.setCamPreset(9,9,9)">Isometric</button>
-      <button class="mbtn cancel" style="flex:0;font-size:10px;padding:5px 8px;" onclick="window.lcModals && window.lcModals.setCamPreset(0,4,14)">Front</button>
-      <button class="mbtn cancel" style="flex:0;font-size:10px;padding:5px 8px;" onclick="window.lcModals && window.lcModals.setCamPreset(14,4,0)">Side</button>
-      <button class="mbtn cancel" style="flex:0;font-size:10px;padding:5px 8px;" onclick="window.lcModals && window.lcModals.setCamPreset(0,18,0.01)">Top</button>
-      <button class="mbtn cancel" style="flex:0;font-size:10px;padding:5px 8px;" onclick="window.lcModals && window.lcModals.setCamPreset(6,2,10)">Low</button>
+      <button class="mbtn cancel" style="flex:0;font-size:10px;padding:5px 8px;" onclick="window.lcModals&&window.lcModals.setCamPreset(9,9,9)">Isometric</button>
+      <button class="mbtn cancel" style="flex:0;font-size:10px;padding:5px 8px;" onclick="window.lcModals&&window.lcModals.setCamPreset(0,4,14)">Front</button>
+      <button class="mbtn cancel" style="flex:0;font-size:10px;padding:5px 8px;" onclick="window.lcModals&&window.lcModals.setCamPreset(14,4,0)">Side</button>
+      <button class="mbtn cancel" style="flex:0;font-size:10px;padding:5px 8px;" onclick="window.lcModals&&window.lcModals.setCamPreset(0,18,0.01)">Top</button>
+      <button class="mbtn cancel" style="flex:0;font-size:10px;padding:5px 8px;" onclick="window.lcModals&&window.lcModals.setCamPreset(6,2,10)">Low</button>
     </div>
-
     <div class="modal-actions">
       <button class="mbtn cancel" onclick="closeRoomModal()">Cancel</button>
       <button class="mbtn save"   onclick="saveRoom()">Save Room</button>
@@ -468,27 +467,23 @@
   </div>
 </div>
 
-<!-- ═══════════════════════════════════════════════════════════════════════════
-     OBJECT MODAL  — IDs must match modals.js exactly
-     ═══════════════════════════════════════════════════════════════════════════ -->
+<!-- ═══════════════════════ OBJECT MODAL (modals.js) ═══════════════════════ -->
 <div class="modal-overlay" id="obj-modal-overlay">
   <div class="modal-box">
     <h2 id="obj-modal-title">Add an Object</h2>
-    <div class="modal-section-title">📦 What is it?</div>
-    <div class="field"><label>Object name</label><input id="of-name" type="text" placeholder="e.g. Mossy log, Giant mushroom…" /></div>
-    <div class="field"><label>Description (shows on hover)</label><textarea id="of-desc" rows="2" placeholder="An old log covered in soft moss."></textarea></div>
-    <div class="field">
-      <label>Position (X, Z) and Scale</label>
+    <div class="field"><label>Name</label><input id="of-name" type="text" placeholder="e.g. Mossy log…" /></div>
+    <div class="field"><label>Description</label><textarea id="of-desc" rows="2" placeholder="An old log covered in soft moss."></textarea></div>
+    <div class="field"><label>Position (X, Z) and Scale</label>
       <div style="display:flex;gap:8px">
         <input id="of-px" type="number" step="0.1" placeholder="X" style="flex:1" />
         <input id="of-pz" type="number" step="0.1" placeholder="Z" style="flex:1" />
-        <input id="of-scale" type="number" step="0.1" placeholder="Scale (1.0)" style="flex:1" value="1" />
+        <input id="of-scale" type="number" step="0.1" placeholder="Scale" style="flex:1" value="1" />
       </div>
     </div>
     <div class="modal-actions">
-      <button class="mbtn cancel"  onclick="closeObjModal()">Cancel</button>
-      <button class="mbtn save"    onclick="saveObj()">Save Object</button>
-      <button class="mbtn danger"  id="of-delete" onclick="deleteObj()" style="display:none">Remove</button>
+      <button class="mbtn cancel" onclick="closeObjModal()">Cancel</button>
+      <button class="mbtn save"   onclick="saveObj()">Save Object</button>
+      <button class="mbtn danger" id="of-delete" onclick="deleteObj()" style="display:none">Remove</button>
     </div>
   </div>
 </div>
@@ -510,7 +505,7 @@
 <div id="toast"></div>
 
 <script>
-  // ── Mode management ────────────────────────────────────────────────────────
+  // ── Mode ──
   window._lcCurrentMode = 'facilitator';
   window.lcMode    = function()     { return window._lcCurrentMode; };
   window.lcSetMode = function(mode) {
@@ -519,7 +514,7 @@
   };
   window.lcSetMode(window._lcCurrentMode);
 
-  // ── map.js proxies ─────────────────────────────────────────────────────────
+  // ── map.js proxies ──
   window.startGPS        = function()    { window.lcMap && window.lcMap.startGPS(); };
   window.startSim        = function()    { window.lcMap && window.lcMap.startSim(); };
   window.setDaySegment   = function(seg) { window.lcMap && window.lcMap.setDaySegment(seg); };
@@ -527,57 +522,57 @@
   window.renderMapPins   = function()    { window.lcMap && window.lcMap.renderMapPins(); };
   window.updateCompass   = function()    { window.lcMap && window.lcMap.updateCompass(); };
 
-  // ── modals.js proxies ──────────────────────────────────────────────────────
-  window.openRoomModal   = function(id)  { window.lcModals && window.lcModals.openRoomModal(id); };
-  window.closeRoomModal  = function()    { window.lcModals && window.lcModals.closeRoomModal(); };
-  window.saveRoom        = function()    { window.lcModals && window.lcModals.saveRoom(); };
-  window.openCharModal   = function(id)  { window.lcModals && window.lcModals.openCharModal(id); };
-  window.closeCharModal  = function()    { window.lcModals && window.lcModals.closeCharModal(); };
-  window.saveChar        = function()    { window.lcModals && window.lcModals.saveCharacter(); };
-  window.deleteChar      = function()    { window.lcModals && window.lcModals.deleteChar && window.lcModals.deleteChar(); };
-  window.openObjModal    = function(id)  { window.lcModals && window.lcModals.openObjModal(id); };
-  window.closeObjModal   = function()    { window.lcModals && window.lcModals.closeObjModal(); };
-  window.saveObj         = function()    { window.lcModals && window.lcModals.saveObject(); };
-  window.deleteObj       = function()    { window.lcModals && window.lcModals.deleteObject(); };
-  window.addPassage      = function()    { window.lcModals && window.lcModals.addPassage && window.lcModals.addPassage(); };
-  window.editActiveRoom  = function()    { window.lcModals && window.lcModals.openRoomModal(window.activeRoomId || null); };
-  window.enableRoomEdit  = function()    { window.lcRoom   && window.lcRoom.enableRoomEdit && window.lcRoom.enableRoomEdit(); };
-  window.previewFile     = function(a,b,c){ window.lcModals && window.lcModals.previewFile(a,b,c); };
-  window.togglePromptPill = function(btn){ window.lcModals && window.lcModals.togglePromptPill(btn); };
+  // ── modals.js proxies ──
+  window.openRoomModal    = function(id)   { window.lcModals && window.lcModals.openRoomModal(id); };
+  window.closeRoomModal   = function()     { window.lcModals && window.lcModals.closeRoomModal(); };
+  window.saveRoom         = function()     { window.lcModals && window.lcModals.saveRoom(); };
+  window.openCharModal    = function(id)   { window.lcModals && window.lcModals.openCharModal(id); };
+  window.closeCharModal   = function()     { window.lcModals && window.lcModals.closeCharModal(); };
+  window.saveChar         = function()     { window.lcModals && window.lcModals.saveCharacter(); };
+  window.openObjModal     = function(id)   { window.lcModals && window.lcModals.openObjModal(id); };
+  window.closeObjModal    = function()     { window.lcModals && window.lcModals.closeObjModal(); };
+  window.saveObj          = function()     { window.lcModals && window.lcModals.saveObject(); };
+  window.deleteObj        = function()     { window.lcModals && window.lcModals.deleteObject(); };
+  window.editActiveRoom   = function()     { window.lcModals && window.lcModals.openRoomModal(window.activeRoomId || null); };
+  window.enableRoomEdit   = function()     { window.lcRoom   && window.lcRoom.enableRoomEdit && window.lcRoom.enableRoomEdit(); };
+  window.previewFile      = function(a,b,c){ window.lcModals && window.lcModals.previewFile(a,b,c); };
+  window.togglePromptPill = function(btn)  { window.lcModals && window.lcModals.togglePromptPill(btn); };
 
-  // ── store.js proxies ───────────────────────────────────────────────────────
-  window.ghLoad          = function()    { window.lcStore && window.lcStore.ghLoad(); };
-  window.ghSave          = function()    { window.lcStore && window.lcStore.ghSave(); };
-  window.onTokenInput    = function()    {
+  // ── store.js proxies ──
+  window.ghLoad           = function()    { window.lcStore && window.lcStore.ghLoad(); };
+  window.ghSave           = function()    { window.lcStore && window.lcStore.ghSave(); };
+  window.onTokenInput     = function()    {
     const val = document.getElementById('gh-token-input').value.trim();
     if (val) localStorage.setItem('lc_gh_token', val);
     window.lcStore && window.lcStore.validateToken(val);
   };
-  window.previewTwee     = function()    {
+  window.previewTwee      = function()    {
     const src = window.lcStore && window.lcStore.buildTweeSource ? window.lcStore.buildTweeSource() : '';
     const el = document.getElementById('twee-source');
     if (el) el.textContent = src;
     document.getElementById('twee-preview-overlay').classList.add('open');
   };
-  window.closeTweePreview = function()   { document.getElementById('twee-preview-overlay').classList.remove('open'); };
-  window.downloadTwee    = function()    { window.lcStore && window.lcStore.exportTwee && window.lcStore.exportTwee(); };
-  window.triggerImport   = function()    { document.getElementById('twee-import-input').click(); };
-  window.handleImportFile = function(e)  {
+  window.closeTweePreview  = function()   { document.getElementById('twee-preview-overlay').classList.remove('open'); };
+  window.downloadTwee      = function()   { window.lcStore && window.lcStore.exportTwee && window.lcStore.exportTwee(); };
+  window.triggerImport     = function()   { document.getElementById('twee-import-input').click(); };
+  window.handleImportFile  = function(e)  {
     const file = e.target.files[0]; if (!file) return;
     const reader = new FileReader();
     reader.onload = ev => window.lcStore && window.lcStore.importTweeSource && window.lcStore.importTweeSource(ev.target.result);
     reader.readAsText(file);
   };
 
-  // ── card.js proxies ────────────────────────────────────────────────────────
-  window.closeCard       = function()    { window.lcCard && window.lcCard.closeCard(); };
-  window.openCard        = function(id)  { window.lcCard && window.lcCard.openCard(id); };
-  window.editCardChar    = function()    { window.lcCard && window.lcCard.editCardChar && window.lcCard.editCardChar(); };
-  window.deleteCardChar  = function()    { window.lcCard && window.lcCard.deleteCardChar && window.lcCard.deleteCardChar(); };
+  // ── card.js proxies ──
+  window.openCard     = function(id) { window.lcCard && window.lcCard.openCard(id); };
+  window.closeCard    = function()   { window.lcCard && window.lcCard.closeCard(); };
+  window.editCardChar = function()   { window.lcCard && window.lcCard.editSelectedChar && window.lcCard.editSelectedChar(); };
+  window.deleteCardChar = function() { window.lcCard && window.lcCard.deleteSelectedChar && window.lcCard.deleteSelectedChar(); };
+  window.talkToCard   = function()   { window.lcCard && window.lcCard.talkToSelectedChar && window.lcCard.talkToSelectedChar(); };
+  window.closeTalkCard = function()  { window.lcCard && window.lcCard.closeTalkPanel && window.lcCard.closeTalkPanel(); };
 
-  // ── room.js proxies ────────────────────────────────────────────────────────
-  window.openRoom        = function(id)  { window.lcRoom && window.lcRoom.openRoom(id); };
-  window.closeRoom       = function()    { window.lcRoom && window.lcRoom.closeRoom(); };
+  // ── room.js proxies ──
+  window.openRoom  = function(id) { window.lcRoom && window.lcRoom.openRoom(id); };
+  window.closeRoom = function()   { window.lcRoom && window.lcRoom.closeRoom(); };
 </script>
 
 </body>
