@@ -549,6 +549,16 @@ function loadLocal() {
   } catch (e) {}
 }
 
+// ── Visitor / Facilitator mode ─────────────────────────────────────────────────
+let _lcMode = localStorage.getItem('lc_mode') || 'visitor';
+function lcSetMode(m) {
+  _lcMode = m;
+  localStorage.setItem('lc_mode', m);
+  document.body.classList.toggle('facilitator-mode', m === 'facilitator');
+}
+window.lcMode = () => _lcMode;
+window.lcSetMode = lcSetMode;
+
 window.addEventListener('DOMContentLoaded', () => {
   const saved = localStorage.getItem('lc_gh_token');
   if (saved) {
@@ -557,6 +567,11 @@ window.addEventListener('DOMContentLoaded', () => {
     // before the facilitator attempts a save.
     validateToken(saved);
   }
+  // Apply persisted mode on load
+  lcSetMode(_lcMode);
+  // Sync mode toggle button label
+  const modeBtn = document.querySelector('[data-mode-toggle]');
+  if (modeBtn) modeBtn.textContent = _lcMode === 'facilitator' ? '\uD83D\uDC65 Visitor' : '\uD83D\uDD27 Facilitator';
   autoLoadFromGitHub();
 });
 
@@ -566,7 +581,7 @@ window.lcStore = {
   previewTwee, closeTweePreview, downloadTwee, triggerImport, handleImportFile,
   importTweeSource, onTokenInput, setGhStatus, getToken, decodeBase64Unicode,
   seedGhFileSha, validateToken, uploadRoomBackdropToGitHub, uploadCharacterAsset,
-  uploadAllPendingAssets, uploadPendingSprites, showToast
+  uploadAllPendingAssets, uploadPendingSprites, showToast, lcSetMode
 };
 
 export {
@@ -575,5 +590,5 @@ export {
   previewTwee, closeTweePreview, downloadTwee, triggerImport, handleImportFile,
   importTweeSource, onTokenInput, setGhStatus, getToken, decodeBase64Unicode,
   seedGhFileSha, validateToken, uploadRoomBackdropToGitHub, uploadCharacterAsset,
-  uploadAllPendingAssets, uploadPendingSprites, showToast
+  uploadAllPendingAssets, uploadPendingSprites, showToast, lcSetMode
 };
