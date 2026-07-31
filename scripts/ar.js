@@ -1,375 +1,446 @@
 /* ============================================================
-   scripts/ar.js  —  Living Characters AR module
-   WebXR markerless AR (iOS 18+ Safari / Chrome Android)
-   AR Quick Look fallback (iOS < 18 / no WebXR)
+   scripts/ar.js  —  Living Characters pseudo-AR
+   ────────────────────────────────────────────────────────────
+   No WebXR. No Quick Look. Works on every modern iPhone/Android.
+
+   How it works:
+   1. getUserMedia (rear camera) → <video> fills the screen
+   2. Three.js <canvas> sits on top with alpha:true so the video
+      shows through
+   3. DeviceOrientation drives a gentle parallax/drift so the
+      model feels "anchored" in the room
+   4. Tap the model → opens the same card + talk panel used in
+      room mode (openCard / openTalkPanel from card.js)
+   5. Exit button dismisses everything and stops the camera
    ============================================================ */
 
 (function () {
   'use strict';
 
-  const IS_IOS = /iPhone|iPad|iPod/i.test(navigator.userAgent) ||
-    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  // ── state ──────────────────────────────────────────────────────────────────
+  let _active      = false;
+  let _stream      = null;
+  let _animId      = null;
+  let _character   = null;
+  let _orientBeta  = 0;   // device tilt front/back  (-180…180)
+  let _orientGamma = 0;   // device tilt left/right  (-90…90)
+  let _orientAlpha = 0;   // compass heading          (0…360)
+  let _baseAlpha   = null;
+  let _baseGamma   = null;
+  let _baseBeta    = null;
+  let _mixer       = null;
+  let _clock       = null;
+  let _renderer    = null;
+  let _scene       = null;
+  let _camera      = null;
+  let _model       = null;
+  let _haloMesh    = null;
+  let _blobUrl     = null;
+  let _raycaster   = null;
+  let _mouse       = new (window.THREE ? window.THREE.Vector2 : function(){this.x=0;this.y=0;})();
 
-  // ── DOM helpers ──────────────────────────────────────────────────────────────
-  function ensureOverlay() {
-    let ov = document.getElementById('ar-overlay');
-    if (!ov) {
-      ov = document.createElement('div');
-      ov.id = 'ar-overlay';
-      Object.assign(ov.style, {
-        position: 'fixed', inset: '0', zIndex: '3000',
-        background: 'transparent', pointerEvents: 'none',
-        display: 'none', flexDirection: 'column',
-        alignItems: 'center', justifyContent: 'flex-end',
-        paddingBottom: '48px', gap: '12px',
-      });
-      document.body.appendChild(ov);
-    }
-    return ov;
+  // ── helpers ────────────────────────────────────────────────────────────────
+  function toast(msg) {
+    if (typeof showToast === 'function') showToast(msg);
+    else console.warn('[AR]', msg);
   }
 
-  function ensureCanvas() {
-    let cv = document.getElementById('ar-canvas');
+  function getEl(id) { return document.getElementById(id); }
+
+  // ── orientation listener ───────────────────────────────────────────────────
+  function _onOrient(e) {
+    _orientAlpha = e.alpha || 0;
+    _orientBeta  = e.beta  || 0;
+    _orientGamma = e.gamma || 0;
+    // Capture baseline on first reading so model starts centred
+    if (_baseAlpha === null) {
+      _baseAlpha = _orientAlpha;
+      _baseBeta  = _orientBeta;
+      _baseGamma = _orientGamma;
+    }
+  }
+
+  // ── build / tear down DOM ─────────────────────────────────────────────────
+  function _buildDOM() {
+    // Video layer
+    let vid = getEl('ar-video');
+    if (!vid) {
+      vid = document.createElement('video');
+      vid.id = 'ar-video';
+      vid.setAttribute('playsinline', '');
+      vid.setAttribute('autoplay', '');
+      vid.setAttribute('muted', '');
+      Object.assign(vid.style, {
+        position: 'fixed', inset: '0', width: '100%', height: '100%',
+        objectFit: 'cover', zIndex: '2000', display: 'none',
+        background: '#000',
+      });
+      document.body.appendChild(vid);
+    }
+
+    // Three.js canvas layer
+    let cv = getEl('ar-canvas');
     if (!cv) {
       cv = document.createElement('canvas');
       cv.id = 'ar-canvas';
       Object.assign(cv.style, {
-        position: 'fixed', inset: '0', zIndex: '2999',
-        width: '100%', height: '100%', display: 'none',
-        touchAction: 'none',
+        position: 'fixed', inset: '0', width: '100%', height: '100%',
+        zIndex: '2001', display: 'none', touchAction: 'none',
+        pointerEvents: 'all',
       });
       document.body.appendChild(cv);
     }
-    return cv;
+
+    // HUD overlay
+    let hud = getEl('ar-hud');
+    if (!hud) {
+      hud = document.createElement('div');
+      hud.id = 'ar-hud';
+      Object.assign(hud.style, {
+        position: 'fixed', inset: '0', zIndex: '2002',
+        display: 'none', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'flex-end',
+        paddingBottom: '36px', gap: '10px',
+        pointerEvents: 'none',
+      });
+      document.body.appendChild(hud);
+    }
+    return { vid, cv, hud };
   }
 
-  function showToastAR(msg) {
-    if (typeof showToast === 'function') { showToast(msg, 'info'); return; }
-    alert(msg);
+  function _showDOM() {
+    const { vid, cv, hud } = _buildDOM();
+    vid.style.display = 'block';
+    cv.style.display  = 'block';
+    hud.style.display = 'flex';
   }
 
-  function syncCanvasSize(canvas) {
-    const dpr = window.devicePixelRatio || 1;
-    const w   = Math.round(window.innerWidth  * dpr);
-    const h   = Math.round(window.innerHeight * dpr);
-    if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+  function _hideDOM() {
+    ['ar-video','ar-canvas','ar-hud'].forEach(id => {
+      const el = getEl(id);
+      if (el) el.style.display = 'none';
+    });
   }
 
-  // ── iOS Quick Look ────────────────────────────────────────────────────────────
-  //
-  // iOS Safari requires that the AR Quick Look anchor be tapped directly by the
-  // user — programmatic .click() is silently swallowed for rel="ar" links.
-  //
-  // Strategy:
-  //   1. Build a full-screen tap-to-open overlay that sits on top of everything.
-  //   2. The overlay contains the real <a rel="ar"> with a pixel-perfect
-  //      child <img> filling it. iOS triggers Quick Look when the *child img*
-  //      is tapped inside a rel="ar" anchor.
-  //   3. We style it to look like a native "View in AR" prompt so the user
-  //      taps it naturally.
-  //   4. The overlay auto-dismisses after the tap (Quick Look takes over).
-  //
-  let _qlOverlay = null;
+  // ── HUD build ─────────────────────────────────────────────────────────────
+  function _buildHUD(ch) {
+    const hud = getEl('ar-hud');
+    hud.innerHTML = '';
 
-  function _removeQlOverlay() {
-    if (_qlOverlay) { _qlOverlay.remove(); _qlOverlay = null; }
+    const mood = (window.MOODS || []).find(m => m.label === ch.mood);
+    const moodEmoji = mood ? mood.emoji : '✨';
+
+    // Tap-hint (shown until first model tap)
+    const hint = document.createElement('div');
+    hint.id = 'ar-hint';
+    hint.style.cssText = [
+      'background:rgba(10,15,30,.78)',
+      'color:#eaeaea',
+      'font-family:inherit',
+      'font-size:13px',
+      'padding:6px 16px',
+      'border-radius:20px',
+      'pointer-events:none',
+    ].join(';');
+    hint.textContent = `Tap ${ch.name} to talk`;
+
+    // Name badge
+    const badge = document.createElement('div');
+    badge.style.cssText = [
+      'background:rgba(10,15,30,.82)',
+      'color:#eaeaea',
+      'font-family:inherit',
+      'font-size:15px',
+      'font-weight:700',
+      'padding:7px 18px',
+      'border-radius:20px',
+      'pointer-events:none',
+    ].join(';');
+    badge.textContent = `${moodEmoji}  ${ch.name}`;
+
+    // Exit button
+    const exitBtn = document.createElement('button');
+    exitBtn.textContent = '✕ Exit AR';
+    exitBtn.style.cssText = [
+      'pointer-events:all',
+      'padding:10px 28px',
+      'border-radius:24px',
+      'background:#e94560',
+      'color:#fff',
+      'border:none',
+      'font-size:14px',
+      'font-weight:700',
+      'font-family:inherit',
+      'cursor:pointer',
+    ].join(';');
+    exitBtn.addEventListener('click', close);
+
+    hud.appendChild(hint);
+    hud.appendChild(badge);
+    hud.appendChild(exitBtn);
   }
 
-  function launchQuickLook(character) {
-    const candidate = character.usdzUrl || character.glbUrl;
-    const href = (candidate && candidate.startsWith('https://')) ? candidate : null;
+  // ── Three.js setup ────────────────────────────────────────────────────────
+  function _initThree(canvas) {
+    const THREE = window.THREE;
+    const w = window.innerWidth;
+    const h = window.innerHeight;
 
-    if (!href) {
-      showToastAR(
-        'AR preview needs a saved model. Open Edit, wait for \u201c\u2713 Model saved to repo!\u201d, then save the character.'
-      );
+    _renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+    _renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    _renderer.setSize(w, h, false);
+    _renderer.setClearColor(0x000000, 0);  // fully transparent
+
+    _scene  = new THREE.Scene();
+    _camera = new THREE.PerspectiveCamera(60, w / h, 0.01, 100);
+    _camera.position.set(0, 1.2, 3);
+    _camera.lookAt(0, 0.8, 0);
+
+    // Lighting
+    _scene.add(new THREE.HemisphereLight(0xffffff, 0x444466, 1.4));
+    const dir = new THREE.DirectionalLight(0xffffff, 0.9);
+    dir.position.set(1.5, 3, 2);
+    _scene.add(dir);
+    const fill = new THREE.DirectionalLight(0x8899ff, 0.3);
+    fill.position.set(-2, 1, -1);
+    _scene.add(fill);
+
+    // Halo ring on the ground
+    const haloGeo = new THREE.RingGeometry(0.28, 0.38, 48);
+    const haloMat = new THREE.MeshBasicMaterial({
+      color: 0x4f98a3, side: THREE.DoubleSide,
+      transparent: true, opacity: 0.55,
+    });
+    _haloMesh = new THREE.Mesh(haloGeo, haloMat);
+    _haloMesh.rotation.x = -Math.PI / 2;
+    _haloMesh.position.set(0, 0.01, 0);
+    _scene.add(_haloMesh);
+
+    _clock     = new THREE.Clock();
+    _raycaster = new THREE.Raycaster();
+  }
+
+  // ── Load GLB ──────────────────────────────────────────────────────────────
+  async function _loadModel(ch) {
+    const THREE      = window.THREE;
+    const GLTFLoader = window.GLTFLoader;
+    if (!THREE || !GLTFLoader) { toast('3D engine not ready — try again in a moment'); return; }
+
+    let src = ch.glbData || ch.glbUrl;
+    if (!src) {
+      // No 3D model — use animated GIF / photo as a billboard sprite instead
+      _buildBillboard(ch);
       return;
     }
 
-    _removeQlOverlay();
-
-    // Build the overlay
-    const overlay = document.createElement('div');
-    overlay.id = 'ar-ql-overlay';
-    Object.assign(overlay.style, {
-      position: 'fixed', inset: '0', zIndex: '9999',
-      background: 'rgba(0,0,0,0.82)',
-      display: 'flex', flexDirection: 'column',
-      alignItems: 'center', justifyContent: 'center',
-      gap: '18px', fontFamily: 'inherit',
-    });
-
-    // Title
-    const title = document.createElement('div');
-    title.style.cssText = 'color:#fff;font-size:18px;font-weight:700;text-align:center;padding:0 24px;';
-    title.textContent = 'Tap below to view ' + character.name + ' in AR';
-
-    // The real Quick Look anchor — iOS needs a child <img> inside it
-    // The anchor href is the model URL; the rel="ar" attribute is the trigger.
-    const anchor = document.createElement('a');
-    anchor.rel  = 'ar';
-    anchor.href = href;
-    Object.assign(anchor.style, {
-      display: 'block', width: '200px', height: '200px',
-      borderRadius: '20px', overflow: 'hidden',
-      border: '3px solid #4f98a3',
-      background: '#111',
-    });
-
-    // The child img — Quick Look fires off the img tap, not the anchor tap
-    // Use a 1x1 transparent gif; the anchor background is the visual
-    const img = document.createElement('img');
-    img.src    = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
-    img.width  = 200;
-    img.height = 200;
-    img.alt    = 'View in AR';
-    Object.assign(img.style, { width: '100%', height: '100%', objectFit: 'cover', display: 'block' });
-
-    // Show character photo inside the box if available
-    if (character.photoData || character.animData) {
-      img.src    = character.animData || character.photoData;
-      img.style.objectFit = 'contain';
-    }
-
-    anchor.appendChild(img);
-
-    // Label beneath the box
-    const label = document.createElement('div');
-    label.style.cssText = 'color:#4f98a3;font-size:13px;font-weight:600;text-align:center;';
-    label.textContent = '\uD83D\uDCF7  View in AR';
-
-    // Cancel button
-    const cancel = document.createElement('button');
-    cancel.textContent = 'Cancel';
-    cancel.style.cssText = 'margin-top:12px;padding:10px 32px;border-radius:24px;background:transparent;color:#aaa;border:1px solid #555;font-size:14px;cursor:pointer;';
-    cancel.addEventListener('click', _removeQlOverlay);
-
-    // Dismiss overlay once Quick Look takes over (pageshow fires when
-    // user returns from Quick Look; visibilitychange fires immediately)
-    const _dismiss = () => { setTimeout(_removeQlOverlay, 400); };
-    document.addEventListener('visibilitychange', _dismiss, { once: true });
-
-    overlay.appendChild(title);
-    overlay.appendChild(anchor);
-    overlay.appendChild(label);
-    overlay.appendChild(cancel);
-    document.body.appendChild(overlay);
-    _qlOverlay = overlay;
-  }
-
-  // ── Resolve GLB source → usable URL for Three.js GLTFLoader ─────────────────
-  async function resolveGlbUrl(character) {
-    const src = character.glbData || character.glbUrl;
-    if (!src) return window.DEFAULT_GLB_URL || 'https://threejs.org/examples/models/gltf/Soldier.glb';
+    let url = src;
     if (src.startsWith('data:')) {
       const res  = await fetch(src);
       const blob = await res.blob();
-      return URL.createObjectURL(blob);
+      url = URL.createObjectURL(blob);
+      _blobUrl = url;
     }
-    return src;
-  }
-
-  function moodEmoji(character) {
-    const MOODS = window.MOODS || [];
-    const m = MOODS.find(x => x.label === character.mood);
-    return m ? m.emoji : '\u2728';
-  }
-
-  // ── WebXR markerless AR ───────────────────────────────────────────────────────
-  async function launchWebXR(character) {
-    const THREE      = window.THREE;
-    const GLTFLoader = window.GLTFLoader;
-    if (!THREE || !GLTFLoader) { showToastAR('3D engine not ready. Please wait a moment and try again.'); return; }
-
-    const overlay = ensureOverlay();
-    const canvas  = ensureCanvas();
-    syncCanvasSize(canvas);
-
-    const renderer = new THREE.WebGLRenderer({
-      canvas, alpha: true, antialias: !IS_IOS, powerPreference: 'high-performance',
-    });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, IS_IOS ? 2 : 3));
-    renderer.setSize(window.innerWidth, window.innerHeight, false);
-    renderer.xr.enabled = true;
-
-    const scene  = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 100);
-
-    scene.add(new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1.5));
-    const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
-    dirLight.position.set(1, 2, 1);
-    scene.add(dirLight);
-
-    const reticleGeo = new THREE.RingGeometry(0.08, 0.12, 32);
-    const reticleMat = new THREE.MeshBasicMaterial({ color: 0x00ffcc, side: THREE.DoubleSide, transparent: true, opacity: 0.72 });
-    const reticle    = new THREE.Mesh(reticleGeo, reticleMat);
-    reticle.rotation.x = -Math.PI / 2;
-    reticle.matrixAutoUpdate = false;
-    reticle.visible = false;
-    scene.add(reticle);
-
-    overlay.innerHTML = '';
-    const nameTag = document.createElement('div');
-    nameTag.style.cssText = 'background:rgba(10,15,30,.82);color:#eaeaea;font-family:inherit;font-size:15px;font-weight:700;padding:7px 18px;border-radius:20px;pointer-events:none;';
-    nameTag.textContent = `${moodEmoji(character)}  ${character.name}`;
-
-    const exitBtn = document.createElement('button');
-    exitBtn.textContent = '\u2715 Exit AR';
-    exitBtn.style.cssText = 'pointer-events:all;padding:10px 28px;border-radius:24px;background:#e94560;color:#fff;border:none;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer;';
-
-    const hint = document.createElement('div');
-    hint.style.cssText = 'background:rgba(10,15,30,.72);color:#a0a0b0;font-size:11px;padding:5px 14px;border-radius:10px;pointer-events:none;';
-    hint.textContent = 'Point at a flat surface, then tap to place';
-
-    overlay.appendChild(nameTag);
-    overlay.appendChild(hint);
-    overlay.appendChild(exitBtn);
-    overlay.style.display       = 'flex';
-    overlay.style.pointerEvents = 'none';
-    exitBtn.style.pointerEvents = 'all';
-
-    const sessionInit = {
-      requiredFeatures: ['hit-test'],
-      optionalFeatures: ['dom-overlay', 'light-estimation'],
-      domOverlay: { root: overlay },
-    };
-
-    let session;
-    try {
-      session = await navigator.xr.requestSession('immersive-ar', sessionInit);
-    } catch (err) {
-      console.error('[AR] session request failed:', err);
-      cleanUp();
-      if (err && (err.name === 'NotSupportedError' || err.name === 'SecurityError')) {
-        launchQuickLook(character); return;
-      }
-      showToastAR('Could not start AR. Grant camera access and use HTTPS.');
-      return;
-    }
-
-    try {
-      await renderer.xr.setSession(session, { framebufferScaleFactor: 1.0 });
-    } catch (_) { renderer.xr.setSession(session); }
-
-    canvas.style.display = 'block';
-
-    let hitTestSource = null, hitTestSourceRequested = false;
-    let characterPlaced = false, charModel = null, mixer = null;
-    const clock = new THREE.Clock();
-    let blobUrlToRevoke = null;
-
-    let glbUrl;
-    try {
-      glbUrl = await resolveGlbUrl(character);
-    } catch (err) {
-      console.error('[AR] could not resolve GLB URL:', err);
-      showToastAR('Could not load 3D model \u2014 try re-uploading the .glb file.');
-      cleanUp(); try { session.end(); } catch (_) {}
-      return;
-    }
-    if (glbUrl && glbUrl.startsWith('blob:')) blobUrlToRevoke = glbUrl;
 
     const loader = new GLTFLoader();
-    loader.load(glbUrl, (gltf) => {
-      charModel = gltf.scene;
-      const box = new THREE.Box3().setFromObject(charModel);
-      const height = box.max.y - box.min.y;
-      if (height > 0) charModel.scale.setScalar(1.5 / height);
-      charModel.visible = false;
-      scene.add(charModel);
+    loader.load(url, (gltf) => {
+      _model = gltf.scene;
+
+      // Auto-scale to ~1.6 m tall
+      const box    = new THREE.Box3().setFromObject(_model);
+      const height = box.max.y - box.min.y || 1;
+      const scale  = 1.6 / height;
+      _model.scale.setScalar(scale * (ch.arScale || 1));
+
+      // Sit on the ground
+      const box2 = new THREE.Box3().setFromObject(_model);
+      _model.position.y = -box2.min.y;
+
+      _scene.add(_model);
+
       if (gltf.animations && gltf.animations.length) {
-        mixer = new THREE.AnimationMixer(charModel);
-        mixer.clipAction(gltf.animations[0]).play();
+        _mixer = new THREE.AnimationMixer(_model);
+        _mixer.clipAction(gltf.animations[0]).play();
       }
     }, undefined, (err) => {
-      console.error('[AR] GLB load error:', err);
-      showToastAR('Could not load 3D model for AR.');
-    });
-
-    function cleanUp() {
-      renderer.setAnimationLoop(null);
-      try { renderer.dispose(); } catch (_) {}
-      canvas.style.display  = 'none';
-      overlay.style.display = 'none';
-      overlay.innerHTML     = '';
-      hitTestSource         = null;
-      if (blobUrlToRevoke) { URL.revokeObjectURL(blobUrlToRevoke); blobUrlToRevoke = null; }
-    }
-
-    exitBtn.addEventListener('click', () => { try { session.end(); } catch (_) {} });
-    session.addEventListener('end', cleanUp);
-
-    session.addEventListener('select', () => {
-      if (!reticle.visible || !charModel) return;
-      if (!characterPlaced) {
-        characterPlaced = true;
-        charModel.position.setFromMatrixPosition(reticle.matrix);
-        charModel.visible = true;
-        hint.textContent = `${character.name} placed! Use \u2715 to exit.`;
-      }
-    });
-
-    renderer.setAnimationLoop((timestamp, frame) => {
-      const delta = clock.getDelta();
-      if (mixer) mixer.update(delta);
-      if (frame) {
-        const refSpace  = renderer.xr.getReferenceSpace();
-        const xrSession = renderer.xr.getSession();
-        if (!hitTestSourceRequested) {
-          hitTestSourceRequested = true;
-          xrSession.requestReferenceSpace('viewer').then(viewerSpace => {
-            xrSession.requestHitTestSource({ space: viewerSpace }).then(src => { hitTestSource = src; })
-              .catch(e => { console.warn('[AR] hit-test source error:', e); });
-          }).catch(e => { console.warn('[AR] viewer ref space error:', e); });
-        }
-        if (hitTestSource && !characterPlaced) {
-          const results = frame.getHitTestResults(hitTestSource);
-          if (results.length) {
-            const pose = results[0].getPose(refSpace);
-            if (pose) { reticle.visible = true; reticle.matrix.fromArray(pose.transform.matrix); }
-          } else { reticle.visible = false; }
-        } else if (characterPlaced) { reticle.visible = false; }
-        if (charModel && charModel.visible) {
-          const camPos = new THREE.Vector3();
-          camera.getWorldPosition(camPos);
-          charModel.lookAt(camPos.x, charModel.position.y, camPos.z);
-        }
-      }
-      renderer.render(scene, camera);
+      console.error('[AR] GLB load error', err);
+      toast('Could not load 3D model — showing photo instead');
+      _buildBillboard(ch);
     });
   }
 
-  // ── Public API ────────────────────────────────────────────────────────────────
-  async function launchAR(character) {
-    if (!character) { showToastAR('No character selected.'); return; }
-    if (typeof character === 'string') {
-      const resolved = (window.characters || []).find(c => c.id === character);
-      if (!resolved) { showToastAR('Character not found.'); return; }
-      character = resolved;
+  // ── Billboard fallback (photo/GIF as a flat plane) ────────────────────────
+  function _buildBillboard(ch) {
+    const THREE = window.THREE;
+    const src   = ch.animData || ch.photoData;
+    if (!src) return;
+    const tex  = new THREE.TextureLoader().load(src);
+    const mat  = new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide });
+    const geo  = new THREE.PlaneGeometry(1.0, 1.6);
+    _model     = new THREE.Mesh(geo, mat);
+    _model.position.set(0, 0.8, 0);
+    _scene.add(_model);
+  }
+
+  // ── Hit-test: did the user tap the model? ─────────────────────────────────
+  function _hitModel(clientX, clientY) {
+    if (!_model || !_camera || !_raycaster) return false;
+    const THREE = window.THREE;
+    _mouse.x =  (clientX / window.innerWidth)  * 2 - 1;
+    _mouse.y = -(clientY / window.innerHeight) * 2 + 1;
+    _raycaster.setFromCamera(_mouse, _camera);
+    const hits = _raycaster.intersectObject(_model, true);
+    return hits.length > 0;
+  }
+
+  // ── Render loop ───────────────────────────────────────────────────────────
+  function _tick() {
+    _animId = requestAnimationFrame(_tick);
+    const THREE = window.THREE;
+    const delta = _clock ? _clock.getDelta() : 0.016;
+    if (_mixer) _mixer.update(delta);
+
+    // Gyro parallax — model drifts gently as device tilts
+    if (_baseAlpha !== null && _model) {
+      // deltaGamma: left/right tilt → model drifts on X axis
+      let dg = _orientGamma - _baseGamma;
+      // deltaBeta:  forward/back tilt → model drifts on Z axis
+      let db = _orientBeta  - _baseBeta;
+      // Clamp so model doesn't fly off screen
+      dg = Math.max(-30, Math.min(30, dg));
+      db = Math.max(-30, Math.min(30, db));
+      const targetX = (dg / 30) * -1.2;
+      const targetZ = (db / 30) *  0.6;
+      // Smooth lerp
+      _model.position.x += (targetX - _model.position.x) * 0.06;
+      _model.position.z += (targetZ - _model.position.z) * 0.06;
+      if (_haloMesh) {
+        _haloMesh.position.x = _model.position.x;
+        _haloMesh.position.z = _model.position.z;
+      }
+      // Gentle Y bob
+      _model.position.y += (Math.sin(Date.now() * 0.001) * 0.004);
+      // Always face camera
+      _model.lookAt(_camera.position);
     }
-    if (!character.glbData && !character.glbUrl) {
-      showToastAR('No 3D model attached. Open Edit and upload a .glb file.');
+
+    // Halo pulse
+    if (_haloMesh) {
+      const pulse = 0.5 + 0.5 * Math.sin(Date.now() * 0.002);
+      _haloMesh.material.opacity = 0.25 + pulse * 0.35;
+    }
+
+    if (_renderer && _scene && _camera) _renderer.render(_scene, _camera);
+  }
+
+  // ── Open ──────────────────────────────────────────────────────────────────
+  async function open(character) {
+    if (_active) close();
+    if (!character) { toast('No character selected'); return; }
+    _character = character;
+
+    // Check THREE is loaded
+    if (!window.THREE) { toast('3D engine not ready — please wait a moment'); return; }
+
+    // Build DOM
+    _showDOM();
+    const { vid, cv } = _buildDOM();
+
+    // Request camera
+    try {
+      _stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: false,
+      });
+      vid.srcObject = _stream;
+      await vid.play().catch(() => {});
+    } catch (err) {
+      console.warn('[AR] camera denied:', err);
+      // Still show the 3D scene on a dark background — no hard block
+      vid.style.background = '#0a0f1e';
+    }
+
+    // Build HUD
+    _buildHUD(character);
+
+    // Init Three.js
+    _initThree(cv);
+
+    // Orientation
+    _baseAlpha = _baseBeta = _baseGamma = null;
+    window.addEventListener('deviceorientation', _onOrient, true);
+
+    // Request permission on iOS 13+
+    if (typeof DeviceOrientationEvent !== 'undefined' &&
+        typeof DeviceOrientationEvent.requestPermission === 'function') {
+      DeviceOrientationEvent.requestPermission().then(s => {
+        if (s === 'granted') window.addEventListener('deviceorientation', _onOrient, true);
+      }).catch(() => {});
+    }
+
+    // Tap handler on canvas — hit-test model, open card if hit
+    cv.addEventListener('pointerup', _onCanvasTap);
+
+    _active = true;
+    _tick();
+
+    // Load model (async, model appears when ready)
+    _loadModel(character);
+  }
+
+  // ── Canvas tap ────────────────────────────────────────────────────────────
+  function _onCanvasTap(e) {
+    if (!_character) return;
+    const hit = _hitModel(e.clientX, e.clientY);
+    if (!hit) return;
+
+    // Dismiss the tap hint
+    const hint = getEl('ar-hint');
+    if (hint) hint.style.opacity = '0';
+
+    // Reuse card.js openCard if available (same as room mode)
+    if (typeof openCard === 'function') {
+      openCard(_character.id);
       return;
     }
-    if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
-      showToastAR('AR requires a secure connection (HTTPS).');
-      return;
-    }
-
-    const xr = navigator.xr;
-    if (!xr) { launchQuickLook(character); return; }
-
-    let supported = false;
-    try { supported = await xr.isSessionSupported('immersive-ar'); } catch (_) {}
-
-    if (supported) {
-      await launchWebXR(character);
-    } else {
-      launchQuickLook(character);
+    // Fallback: open talk panel directly
+    if (typeof openTalkPanel === 'function') {
+      openTalkPanel(_character);
     }
   }
 
-  window.lcAR    = { launchAR };
-  window.launchAR = launchAR;
+  // ── Close ─────────────────────────────────────────────────────────────────
+  function close() {
+    _active = false;
+
+    // Stop render loop
+    if (_animId) { cancelAnimationFrame(_animId); _animId = null; }
+
+    // Stop camera
+    if (_stream) { _stream.getTracks().forEach(t => t.stop()); _stream = null; }
+
+    // Remove orientation listener
+    window.removeEventListener('deviceorientation', _onOrient, true);
+
+    // Dispose Three.js
+    try { if (_renderer) _renderer.dispose(); } catch (_) {}
+    _renderer = _scene = _camera = _model = _haloMesh = _mixer = _clock = _raycaster = null;
+
+    // Revoke any blob URL
+    if (_blobUrl) { URL.revokeObjectURL(_blobUrl); _blobUrl = null; }
+
+    // Hide DOM
+    _hideDOM();
+
+    // Close card/talk panel if open
+    if (typeof closeCard === 'function') closeCard();
+
+    _baseAlpha = _baseBeta = _baseGamma = null;
+    _character = null;
+  }
+
+  // ── Public API ────────────────────────────────────────────────────────────
+  window.ARView = { open, close };
+  window.lcAR  = { open, close, launchAR: open };
+  window.launchAR = open;
 
 })();
