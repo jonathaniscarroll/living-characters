@@ -42,6 +42,10 @@
   let _animator    = null;
   let _texture     = null;
 
+  // ── saved z-indexes so we can restore on close ───────────────────────────
+  let _savedCardZ      = null;
+  let _savedTalkZ      = null;
+
   // ── helpers ────────────────────────────────────────────────────────────────
   function toast(msg) {
     if (typeof showToast === 'function') showToast(msg);
@@ -49,6 +53,28 @@
   }
 
   function getEl(id) { return document.getElementById(id); }
+
+  // ── Lift card + talk-panel above the AR canvas layer ──────────────────────
+  function _liftCardAboveAR() {
+    const card = getEl('card');
+    const talk = getEl('talk-panel');
+    // ar-canvas is z-index 2001; ar-hud is 2002 — put card at 2003
+    if (card) {
+      _savedCardZ = card.style.zIndex;
+      card.style.zIndex = '2003';
+    }
+    if (talk) {
+      _savedTalkZ = talk.style.zIndex;
+      talk.style.zIndex = '2003';
+    }
+  }
+
+  function _restoreCardZIndex() {
+    const card = getEl('card');
+    const talk = getEl('talk-panel');
+    if (card && _savedCardZ !== null) { card.style.zIndex = _savedCardZ; _savedCardZ = null; }
+    if (talk && _savedTalkZ !== null) { talk.style.zIndex = _savedTalkZ; _savedTalkZ = null; }
+  }
 
   // ── safe texture disposal ───────────────────────────────────────────────
   function _disposeTexture(tex) {
@@ -66,7 +92,6 @@
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.onload = () => {
-      // Guard: if the module-level _texture has been replaced or nulled, bail.
       if (_texture !== texture) return;
       texture.image = img;
       texture.needsUpdate = true;
@@ -249,7 +274,6 @@
     const hasAnimator = window.SpriteAnimator && (ch.sprites || fallbackSrc);
 
     if (!hasAnimator && !fallbackSrc) {
-      // Colour-block fallback — no image at all
       const geo = new THREE.PlaneGeometry(1.0, 1.6);
       const mat = new THREE.MeshBasicMaterial({ color: 0x4f98a3, side: THREE.DoubleSide });
       _model = new THREE.Mesh(geo, mat);
@@ -272,9 +296,8 @@
 
     _animator = new window.SpriteAnimator(ch.sprites || null, fallbackSrc);
 
-    // Create texture — store in a local const so the onload closure is stable.
     const texture = new THREE.Texture();
-    _texture = texture;  // expose to module scope for _tickSprite + close()
+    _texture = texture;
 
     const geo = new THREE.PlaneGeometry(1.0, 1.6);
     const mat = new THREE.MeshBasicMaterial({
@@ -287,7 +310,6 @@
     _model.position.set(0, 0.8, 0);
     _scene.add(_model);
 
-    // Load first frame using the safe helper (crossOrigin set inside)
     const firstFrame = _animator.currentFrame();
     if (firstFrame) _loadTextureFrame(texture, mat, firstFrame);
   }
@@ -297,7 +319,6 @@
     if (!_animator || !_model) return;
     const frame = _animator.tick(deltaMs);
     if (frame !== null && _texture) {
-      // Use safe helper — the onload checks _texture is still this texture
       const mat = _model.material;
       _loadTextureFrame(_texture, mat, frame);
     }
@@ -381,6 +402,10 @@
       }).catch(() => {});
     }
 
+    // Raise card and talk-panel above the AR canvas NOW so they are ready
+    // the moment the user taps the sprite.
+    _liftCardAboveAR();
+
     cv.addEventListener('pointerup', _onCanvasTap);
 
     _active = true;
@@ -399,11 +424,17 @@
 
     if (_animator) _animator.setState('talk');
 
-    if (typeof openCard === 'function') {
+    // Try openCard first (looks up character in global `characters` array).
+    // If the character exists in the array, openCard handles both the card
+    // panel and the dialogue list. If not (e.g. loaded from Twee without
+    // being in the live array), fall back to openTalkPanel with the full
+    // character object so dialogue still appears.
+    const inArray = Array.isArray(window.characters) &&
+      window.characters.some(c => c.id === _character.id);
+
+    if (inArray && typeof openCard === 'function') {
       openCard(_character.id);
-      return;
-    }
-    if (typeof openTalkPanel === 'function') {
+    } else if (typeof openTalkPanel === 'function') {
       openTalkPanel(_character);
     }
   }
@@ -424,8 +455,6 @@
     try { if (_renderer) _renderer.dispose(); } catch (_) {}
     _renderer = _scene = _camera = _model = _haloMesh = _mixer = _clock = _raycaster = null;
 
-    // Null _texture BEFORE disposing so any in-flight onload callbacks
-    // see _texture !== their captured local and bail cleanly.
     const texToDispose = _texture;
     _texture = null;
     _disposeTexture(texToDispose);
@@ -436,6 +465,10 @@
     if (label) label.remove();
 
     _hideDOM();
+
+    // Restore card / talk-panel z-indexes before (or after) closeCard so
+    // the card can still animate out at its normal layer.
+    _restoreCardZIndex();
 
     if (typeof closeCard === 'function') closeCard();
 
