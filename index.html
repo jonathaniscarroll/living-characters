@@ -5,6 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Living Characters — Virtual World</title>
 
+  <!-- globals.js MUST be first: declares shared mutable state (rooms, characters,
+       objects, map, MOODS, save, load, showToast) as window-scoped vars so every
+       module script below can read/write the same live arrays. -->
+  <script src="./scripts/globals.js"></script>
+
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script type="importmap">
@@ -465,15 +470,13 @@
 <!--
   Global proxy shim
   =================
-  All scripts use type="module" (own scope). Inline onclick="..." attributes
-  can only call window.* globals. This non-module script runs synchronously
-  and proxies every function called from HTML through its module namespace
-  object (window.lcMap, window.lcModals, window.lcStore, window.lcCard,
-  window.lcRoom). The proxy functions lazy-resolve at call time so it does
-  not matter that the modules finish loading after this block executes.
+  globals.js (non-module, loaded first in <head>) owns all mutable state.
+  This shim proxies every inline onclick="..." call through the module
+  namespace objects (window.lcMap, window.lcModals, etc.) that each
+  module registers on window.* when it loads.
 -->
 <script>
-  // ── Mode management ───────────────────────────────────────────────────────
+  // ── Mode management (needed immediately, before modules load) ─────────────
   window._lcCurrentMode = 'facilitator';
   window.lcMode    = function()     { return window._lcCurrentMode; };
   window.lcSetMode = function(mode) {
