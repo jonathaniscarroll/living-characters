@@ -151,7 +151,9 @@ function spawnTalkCloseUp(ch) {
   _talkCloseUpMixers = [];
 
   if (glbUrl.startsWith('data:image') || glbUrl.match(/\.(gif|png|jpe?g)$/i)) {
-    const tex = new THREE.TextureLoader().load(glbUrl);
+    const loader = new THREE.TextureLoader();
+    loader.setCrossOrigin('anonymous');
+    const tex = loader.load(glbUrl);
     const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true }));
     sprite.scale.set(1.6, 2.4, 1);
     sprite.position.set(0, 1.2, 0);
@@ -394,7 +396,9 @@ function _buildCharSprite(ch, cx, cz, scene) {
   if (hasAnimator) {
     const animator = new window.SpriteAnimator(ch.sprites || null, fallbackSrc);
     const texture  = new THREE.Texture();
-    texture.image  = new Image();
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    texture.image = img;
     texture.image.onload = () => { texture.needsUpdate = true; };
     const firstFrame = animator.currentFrame();
     if (firstFrame) texture.image.src = firstFrame;
