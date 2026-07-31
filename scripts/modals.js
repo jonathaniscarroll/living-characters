@@ -233,6 +233,7 @@ function uploadRoomBackdrop() {
 // ---------------------------------------------------------------------------
 
 let pendingSprites = { idle: [null, null], walk: [null, null], talk: [null, null], listen: [null, null] };
+let _uploadedFrames = [];
 
 const SPRITE_STATES = ['idle', 'walk', 'talk', 'listen'];
 const SPRITE_STATE_LABELS = { idle: 'Idle', walk: 'Walk', talk: 'Talk', listen: 'Listen' };
@@ -248,6 +249,72 @@ const CHECKERBOARD_STYLE = [
   'background-color:#fff;'
 ].join('');
 
+// ---------------------------------------------------------------------------
+// Sprite ORDER mapping (shared by auto-assign and seed)
+// ---------------------------------------------------------------------------
+const SPRITE_ORDER = ['idle-0','idle-1','walk-0','walk-1','talk-0','talk-1','listen-0','listen-1'];
+
+/** Auto-assign _uploadedFrames into pendingSprites in ORDER sequence */
+function _autoAssignFrames() {
+  SPRITE_ORDER.forEach((key, i) => {
+    if (i >= _uploadedFrames.length) return;
+    const [state, idx] = key.split('-');
+    pendingSprites[state][+idx] = _uploadedFrames[i];
+  });
+}
+
+/** Render the thumbnail strip from _uploadedFrames */
+function _renderStrip() {
+  const strip = document.getElementById('sprite-strip');
+  if (!strip) return;
+  strip.innerHTML = '';
+  _uploadedFrames.forEach((url, i) => {
+    const thumb = document.createElement('div');
+    thumb.draggable = true;
+    thumb.title = `Frame ${i + 1} \u2014 drag to a slot`;
+    thumb.style.cssText = [
+      'position:relative;width:52px;height:58px;border-radius:6px;overflow:hidden;flex-shrink:0;',
+      'background:rgba(255,255,255,0.08);border:1.5px solid rgba(255,255,255,0.18);cursor:grab;',
+      CHECKERBOARD_STYLE,
+    ].join('');
+    const img = document.createElement('img');
+    img.src = url;
+    img.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:contain;';
+    thumb.appendChild(img);
+    const lbl = document.createElement('span');
+    lbl.textContent = i + 1;
+    lbl.style.cssText = 'position:absolute;bottom:2px;left:0;right:0;text-align:center;font-size:9px;color:rgba(255,255,255,0.5);pointer-events:none;';
+    thumb.appendChild(lbl);
+    thumb.addEventListener('dragstart', e => {
+      e.dataTransfer.setData('text/plain', url);
+      e.dataTransfer.effectAllowed = 'copy';
+    });
+    strip.appendChild(thumb);
+  });
+}
+
+/** Process files array (from input or drop) \u2014 up to 8 total */
+function _ingestFiles(files) {
+  const remaining = 8 - _uploadedFrames.length;
+  if (remaining <= 0) return;
+  const toRead = Array.from(files).slice(0, remaining);
+  let loaded = 0;
+  toRead.forEach(file => {
+    if (!file.type.startsWith('image/')) { loaded++; return; }
+    const reader = new FileReader();
+    reader.onload = e => {
+      _uploadedFrames.push(e.target.result);
+      loaded++;
+      if (loaded === toRead.length) {
+        _autoAssignFrames();
+        _renderStrip();
+        _renderAssignmentGrid();
+      }
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 /** Build and inject the Sprite Frames section into the char modal */
 function buildSpriteSection(ch) {
   const existing = document.getElementById('sprite-frames-section');
@@ -255,12 +322,17 @@ function buildSpriteSection(ch) {
 
   // Reset state
   pendingSprites = { idle: [null, null], walk: [null, null], talk: [null, null], listen: [null, null] };
+  _uploadedFrames = [];
 
-  // Seed existing sprites if editing a character
-  if (ch && ch.sprites) {
-    SPRITE_STATES.forEach(state => {
-      if (ch.sprites[state]) {
-        pendingSprites[state] = [ch.sprites[state][0] || null, ch.sprites[state][1] || null];
+  // Seed from existing character sprites
+  if (ch && (ch.sprites || ch.spriteUrls)) {
+    const src = ch.sprites || ch.spriteUrls;
+    SPRITE_ORDER.forEach(key => {
+      const [state, idx] = key.split('-');
+      const url = (src[state] && src[state][+idx]) || null;
+      if (url) {
+        pendingSprites[state][+idx] = url;
+        if (!_uploadedFrames.includes(url)) _uploadedFrames.push(url);
       }
     });
   }
@@ -269,7 +341,6 @@ function buildSpriteSection(ch) {
   section.id = 'sprite-frames-section';
   section.style.cssText = 'margin-top:16px;border-top:1px solid rgba(255,255,255,0.1);padding-top:12px;';
 
-  // Collapsible header
   section.innerHTML = `
     <button id="sprite-section-toggle" onclick="lcModals.toggleSpriteSection()" style="
       background:none;border:none;color:var(--text,#e0e0e0);font-size:13px;font-weight:600;
@@ -280,12 +351,31 @@ function buildSpriteSection(ch) {
     </button>
     <div id="sprite-section-body" style="display:none;margin-top:10px;">
 
-      <!-- Sprite upload grid -->
-      <div id="sprite-grid" style="display:flex;flex-direction:column;gap:8px;"></div>
+      <!-- Step 1: Drop zone -->
+      <div id="sprite-dropzone" style="
+        border:2px dashed rgba(255,255,255,0.2);border-radius:8px;
+        padding:20px;text-align:center;cursor:pointer;
+        background:rgba(255,255,255,0.04);margin-bottom:12px;
+        transition:border-color 0.2s;
+      ">
+        <div style="font-size:24px;margin-bottom:6px;">\uD83D\uDCC1</div>
+        <div style="font-size:13px;color:var(--text-muted,#999);">
+          Drop images here or tap to browse<br>
+          <span style="font-size:11px;">Up to 8 \u00B7 PNG / JPG / WebP \u00B7 no background needed</span>
+        </div>
+        <input type="file" id="sprite-bulk-input" multiple accept="image/*" style="display:none">
+      </div>
+
+      <!-- Uploaded thumbnail strip -->
+      <div id="sprite-strip" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;min-height:0;"></div>
+
+      <!-- Step 2: Assignment grid (2\u00D74) -->
+      <div id="sprite-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;"></div>
+
     </div>
   `;
 
-  // Insert before the first <hr> or at the bottom of the form
+  // Insert before modal actions or at bottom of modal body
   const form = document.getElementById('char-modal-overlay');
   const target = form ? form.querySelector('.modal-actions, .char-save-btn, #char-modal-save') : null;
   if (target) {
@@ -296,103 +386,117 @@ function buildSpriteSection(ch) {
     else document.getElementById('char-modal-overlay').appendChild(section);
   }
 
-  // Build grid rows
-  buildSpriteGrid();
+  // Wire drop zone after injection
+  const dropzone = document.getElementById('sprite-dropzone');
+  const bulkInput = document.getElementById('sprite-bulk-input');
+  if (dropzone && bulkInput) {
+    dropzone.onclick = () => bulkInput.click();
+    bulkInput.addEventListener('change', () => {
+      if (bulkInput.files && bulkInput.files.length) {
+        _ingestFiles(bulkInput.files);
+        bulkInput.value = '';
+      }
+    });
+    dropzone.addEventListener('dragover', e => {
+      e.preventDefault();
+      dropzone.style.borderColor = 'var(--accent,#a855f7)';
+    });
+    dropzone.addEventListener('dragleave', () => {
+      dropzone.style.borderColor = 'rgba(255,255,255,0.2)';
+    });
+    dropzone.addEventListener('drop', e => {
+      e.preventDefault();
+      dropzone.style.borderColor = 'rgba(255,255,255,0.2)';
+      if (e.dataTransfer.files && e.dataTransfer.files.length) {
+        _ingestFiles(e.dataTransfer.files);
+      }
+    });
+  }
+
+  // Render initial strip + grid (will show seeded frames if editing)
+  _renderStrip();
+  _renderAssignmentGrid();
 }
 
-function buildSpriteGrid() {
+function _renderAssignmentGrid() {
   const grid = document.getElementById('sprite-grid');
   if (!grid) return;
   grid.innerHTML = '';
 
-  SPRITE_STATES.forEach(state => {
-    const row = document.createElement('div');
-    row.style.cssText = 'display:flex;align-items:center;gap:8px;';
+  // 2\u00D74: row 0 = Idle1,Idle2,Walk1,Walk2 | row 1 = Talk1,Talk2,Listen1,Listen2
+  SPRITE_ORDER.forEach(key => {
+    const [state, idx] = key.split('-');
+    const frameIdx = +idx;
+    const dataUrl = pendingSprites[state][frameIdx];
+    const label = SPRITE_STATE_LABELS[state] + '\u00A0' + (frameIdx + 1);
 
-    const stateLabel = document.createElement('span');
-    stateLabel.textContent = SPRITE_STATE_LABELS[state];
-    stateLabel.style.cssText = 'font-size:11px;color:var(--text-muted,#999);width:36px;flex-shrink:0;text-transform:uppercase;letter-spacing:.5px;';
-    row.appendChild(stateLabel);
+    const slot = document.createElement('div');
+    slot.id = `sprite-slot-${state}-${frameIdx}`;
+    slot.style.cssText = [
+      'position:relative;border-radius:6px;overflow:hidden;cursor:pointer;',
+      'aspect-ratio:1/1.2;display:flex;flex-direction:column;align-items:center;justify-content:center;',
+      dataUrl
+        ? 'border:2px solid var(--accent,#a855f7);background:rgba(255,255,255,0.08);'
+        : 'border:1.5px dashed rgba(255,255,255,0.2);background:rgba(255,255,255,0.05);',
+      CHECKERBOARD_STYLE,
+    ].join('');
 
-    [0, 1].forEach(frameIdx => {
-      const slot = buildSpriteSlot(state, frameIdx);
-      row.appendChild(slot);
+    if (dataUrl) {
+      const img = document.createElement('img');
+      img.src = dataUrl;
+      img.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:contain;';
+      slot.appendChild(img);
+
+      const clearBtn = document.createElement('button');
+      clearBtn.textContent = '\u00D7';
+      clearBtn.title = 'Remove frame';
+      clearBtn.style.cssText = 'position:absolute;top:2px;right:2px;width:16px;height:16px;border-radius:50%;background:rgba(0,0,0,.7);border:none;color:#fff;font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;line-height:1;z-index:2;';
+      clearBtn.onclick = e => { e.stopPropagation(); clearSpriteSlot(state, frameIdx); };
+      slot.appendChild(clearBtn);
+    } else {
+      const plus = document.createElement('span');
+      plus.textContent = '+';
+      plus.style.cssText = 'font-size:18px;color:rgba(255,255,255,0.25);pointer-events:none;';
+      slot.appendChild(plus);
+    }
+
+    // State label at bottom
+    const lbl = document.createElement('span');
+    lbl.textContent = label;
+    lbl.style.cssText = [
+      'position:absolute;bottom:0;left:0;right:0;text-align:center;',
+      'font-size:9px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;',
+      'padding:2px 0;color:rgba(255,255,255,0.55);',
+      dataUrl ? 'background:rgba(0,0,0,0.45);' : '',
+    ].join('');
+    slot.appendChild(lbl);
+
+    // Drag-over: accept URLs from strip thumbs
+    slot.addEventListener('dragover', e => {
+      e.preventDefault();
+      slot.style.borderColor = 'var(--accent,#a855f7)';
+    });
+    slot.addEventListener('dragleave', () => {
+      slot.style.borderColor = dataUrl
+        ? 'var(--accent,#a855f7)'
+        : 'rgba(255,255,255,0.2)';
+    });
+    slot.addEventListener('drop', e => {
+      e.preventDefault();
+      const url = e.dataTransfer.getData('text/plain');
+      if (url) {
+        pendingSprites[state][frameIdx] = url;
+        _renderAssignmentGrid();
+      }
     });
 
-    grid.appendChild(row);
+    grid.appendChild(slot);
   });
-}
-
-function buildSpriteSlot(state, frameIdx) {
-  const dataUrl = pendingSprites[state][frameIdx];
-  const slot = document.createElement('div');
-  slot.id = `sprite-slot-${state}-${frameIdx}`;
-  slot.style.cssText = `position:relative;width:64px;height:72px;border-radius:6px;border:1.5px dashed rgba(255,255,255,0.2);overflow:hidden;flex-shrink:0;cursor:pointer;${CHECKERBOARD_STYLE}`;
-
-  if (dataUrl) {
-    const img = document.createElement('img');
-    img.src = dataUrl;
-    img.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:contain;';
-    slot.appendChild(img);
-
-    const clearBtn = document.createElement('button');
-    clearBtn.textContent = '\u00D7';
-    clearBtn.title = 'Remove frame';
-    clearBtn.style.cssText = 'position:absolute;top:2px;right:2px;width:16px;height:16px;border-radius:50%;background:rgba(0,0,0,.6);border:none;color:#fff;font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;line-height:1;';
-    clearBtn.onclick = (e) => { e.stopPropagation(); clearSpriteSlot(state, frameIdx); };
-    slot.appendChild(clearBtn);
-  } else {
-    const plus = document.createElement('span');
-    plus.textContent = '+';
-    plus.style.cssText = 'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:20px;color:rgba(255,255,255,0.3);pointer-events:none;';
-    slot.appendChild(plus);
-
-    const frameLabel = document.createElement('span');
-    frameLabel.textContent = frameIdx === 0 ? 'A' : 'B';
-    frameLabel.style.cssText = 'position:absolute;bottom:3px;left:0;right:0;text-align:center;font-size:9px;color:rgba(255,255,255,0.3);pointer-events:none;';
-    slot.appendChild(frameLabel);
-  }
-
-  // Hidden file input
-  const fileInput = document.createElement('input');
-  fileInput.type = 'file';
-  fileInput.accept = 'image/*';
-  fileInput.style.display = 'none';
-  fileInput.id = `sprite-input-${state}-${frameIdx}`;
-  fileInput.addEventListener('change', () => onSpriteFileChange(fileInput, state, frameIdx));
-  slot.appendChild(fileInput);
-
-  slot.addEventListener('click', (e) => {
-    if (e.target === slot || e.target.tagName === 'SPAN') {
-      fileInput.click();
-    }
-  });
-
-  return slot;
-}
-
-function onSpriteFileChange(input, state, frameIdx) {
-  const file = input.files && input.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = e => {
-    pendingSprites[state][frameIdx] = e.target.result;
-    refreshSpriteSlot(state, frameIdx);
-  };
-  reader.readAsDataURL(file);
-  input.value = '';
-}
-
-function refreshSpriteSlot(state, frameIdx) {
-  const slot = document.getElementById(`sprite-slot-${state}-${frameIdx}`);
-  if (!slot) return;
-  const newSlot = buildSpriteSlot(state, frameIdx);
-  slot.parentNode.replaceChild(newSlot, slot);
 }
 
 function clearSpriteSlot(state, frameIdx) {
   pendingSprites[state][frameIdx] = null;
-  refreshSpriteSlot(state, frameIdx);
+  _renderAssignmentGrid();
 }
 
 function toggleSpriteSection() {
@@ -518,6 +622,7 @@ function closeCharModal() {
   tempAnimData  = null;
   // Reset sprite state
   pendingSprites = { idle: [null, null], walk: [null, null], talk: [null, null], listen: [null, null] };
+  _uploadedFrames = [];
   delete window._pendingCharLat;
   delete window._pendingCharLng;
 }
@@ -575,7 +680,7 @@ function saveCharacter() {
     if (text) passages.push({ type: row.dataset.key, text });
   });
 
-  // Build sprites object — only include states that have at least one frame
+  // Build sprites object \u2014 only include states that have at least one frame
   const sprites = {};
   let hasAnySprite = false;
   SPRITE_STATES.forEach(state => {
@@ -627,7 +732,7 @@ function saveCharacter() {
   closeCharModal();
   renderMapPins();
 
-  // Always save locally first — this never fails and requires no token.
+  // Always save locally first \u2014 this never fails and requires no token.
   save();
 
   if (savedId) {
