@@ -4,8 +4,10 @@ let _selectedCharId = null;
 
 function openCard(charId) {
   _selectedCharId = charId;
-  selectedChar = charId;
+  // AR (and anything else reading window.selectedChar) needs the full object,
+  // not just the id string. Keep the id assignment as a fallback for legacy callers.
   const ch = characters.find(c => c.id === charId);
+  selectedChar = ch || charId;
   if (!ch) return;
   const mood = MOODS.find(m => m.label === ch.mood) || MOODS[0];
   const animEl = document.getElementById('card-anim');
