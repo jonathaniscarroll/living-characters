@@ -3,15 +3,9 @@ Welcome to the Living Characters world.
 
 Choose a room to explore:
 
-<<if rooms.length > 0>>
-  <<for _i to 0; _i lt rooms.length; _i++>>
-    [[<<= rooms[_i].name >>]]
-  <</for>>
-<<else>>
-  //No rooms have been added yet. Use the authoring tool to create your world.//
-  
-  [[Open authoring tool->AuthoringTool]]
-<</if>>
+[[The Garden]]
+[[The Library]]
+[[The Kitchen]]
 
 :: AuthoringTool
 The authoring tool is available at:
