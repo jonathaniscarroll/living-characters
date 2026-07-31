@@ -462,22 +462,84 @@
 
 <div id="toast"></div>
 
-<!-- Mode management: must be a regular (non-module) script so window.lcMode
-     and window.lcSetMode are available synchronously to inline onclick handlers. -->
+<!--
+  Global proxy shim
+  =================
+  All scripts use type="module" (own scope). Inline onclick="..." attributes
+  can only call window.* globals. This non-module script runs synchronously
+  and proxies every function called from HTML through its module namespace
+  object (window.lcMap, window.lcModals, window.lcStore, window.lcCard,
+  window.lcRoom). The proxy functions lazy-resolve at call time so it does
+  not matter that the modules finish loading after this block executes.
+-->
 <script>
+  // ── Mode management ───────────────────────────────────────────────────────
   window._lcCurrentMode = 'facilitator';
-
-  window.lcMode = function() {
-    return window._lcCurrentMode;
-  };
-
+  window.lcMode    = function()     { return window._lcCurrentMode; };
   window.lcSetMode = function(mode) {
     window._lcCurrentMode = mode;
     document.body.classList.toggle('facilitator-mode', mode === 'facilitator');
   };
-
-  // Apply initial mode on load
   window.lcSetMode(window._lcCurrentMode);
+
+  // ── map.js proxies ────────────────────────────────────────────────────────
+  window.startGPS        = function()    { window.lcMap && window.lcMap.startGPS(); };
+  window.startSim        = function()    { window.lcMap && window.lcMap.startSim(); };
+  window.setDaySegment   = function(seg) { window.lcMap && window.lcMap.setDaySegment(seg); };
+  window.spawnTestRoom   = function()    { window.lcMap && window.lcMap.spawnTestRoom(); };
+  window.renderMapPins   = function()    { window.lcMap && window.lcMap.renderMapPins(); };
+  window.updateCompass   = function()    { window.lcMap && window.lcMap.updateCompass(); };
+
+  // ── modals.js proxies ─────────────────────────────────────────────────────
+  window.openRoomModal   = function(id)  { window.lcModals && window.lcModals.openRoomModal(id); };
+  window.closeRoomModal  = function()    { window.lcModals && window.lcModals.closeRoomModal(); };
+  window.saveRoom        = function()    { window.lcModals && window.lcModals.saveRoom(); };
+  window.openCharModal   = function(id)  { window.lcModals && window.lcModals.openCharModal(id); };
+  window.closeCharModal  = function()    { window.lcModals && window.lcModals.closeCharModal(); };
+  window.saveChar        = function()    { window.lcModals && window.lcModals.saveCharacter(); };
+  window.deleteChar      = function()    { window.lcModals && window.lcModals.deleteChar && window.lcModals.deleteChar(); };
+  window.openObjModal    = function(id)  { window.lcModals && window.lcModals.openObjModal(id); };
+  window.closeObjModal   = function()    { window.lcModals && window.lcModals.closeObjModal(); };
+  window.saveObj         = function()    { window.lcModals && window.lcModals.saveObject(); };
+  window.deleteObj       = function()    { window.lcModals && window.lcModals.deleteObject(); };
+  window.addPassage      = function()    { window.lcModals && window.lcModals.addPassage && window.lcModals.addPassage(); };
+  window.editActiveRoom  = function()    { window.lcModals && window.lcModals.openRoomModal(window.activeRoomId || null); };
+  window.enableRoomEdit  = function()    { window.lcRoom   && window.lcRoom.enableRoomEdit && window.lcRoom.enableRoomEdit(); };
+
+  // ── store.js proxies ──────────────────────────────────────────────────────
+  window.ghLoad          = function()    { window.lcStore && window.lcStore.ghLoad(); };
+  window.ghSave          = function()    { window.lcStore && window.lcStore.ghSave(); };
+  window.onTokenInput    = function()    {
+    const val = document.getElementById('gh-token-input').value.trim();
+    if (val) localStorage.setItem('lc_gh_token', val);
+    window.lcStore && window.lcStore.validateToken(val);
+  };
+  window.previewTwee     = function()    {
+    const src = window.lcStore && window.lcStore.buildTweeSource ? window.lcStore.buildTweeSource() : '';
+    const el = document.getElementById('twee-source');
+    if (el) el.textContent = src;
+    document.getElementById('twee-preview-overlay').classList.add('open');
+  };
+  window.closeTweePreview = function()   { document.getElementById('twee-preview-overlay').classList.remove('open'); };
+  window.downloadTwee    = function()    { window.lcStore && window.lcStore.exportTwee && window.lcStore.exportTwee(); };
+  window.triggerImport   = function()    { document.getElementById('twee-import-input').click(); };
+  window.handleImportFile = function(e)  {
+    const file = e.target.files[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => window.lcStore && window.lcStore.importTweeSource && window.lcStore.importTweeSource(ev.target.result);
+    reader.readAsText(file);
+  };
+
+  // ── card.js proxies ───────────────────────────────────────────────────────
+  window.closeCard       = function()    { window.lcCard && window.lcCard.closeCard(); };
+  window.openCard        = function(id)  { window.lcCard && window.lcCard.openCard(id); };
+  window.editCardChar    = function()    { window.lcCard && window.lcCard.editCardChar && window.lcCard.editCardChar(); };
+  window.deleteCardChar  = function()    { window.lcCard && window.lcCard.deleteCardChar && window.lcCard.deleteCardChar(); };
+  window.launchAR        = function()    { window.lcCard && window.lcCard.launchAR && window.lcCard.launchAR(); };
+
+  // ── room.js proxies ───────────────────────────────────────────────────────
+  window.openRoom        = function(id)  { window.lcRoom && window.lcRoom.openRoom(id); };
+  window.closeRoom       = function()    { window.lcRoom && window.lcRoom.closeRoom(); };
 </script>
 
 </body>
