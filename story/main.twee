@@ -1,2 +1,6 @@
+:: Room {"id":"room_1785472239533","lat":44.636154,"lng":-63.57213,"radius":30,"cameraX":0,"cameraY":4,"cameraZ":14}
+
 :: Hehr {"roomIds":[],"homeRoomId":null,"workRoomId":null,"schedule":{"morning":"home","midday":"work","afternoon":"work","evening":"home","night":"home"},"mood":"Happy","items":[],"glbUrl":"https://raw.githubusercontent.com/jonathaniscarroll/living-characters/main/media/models/2026-07-29.glb"}
+
+:: Bog {"roomIds":["room_1785472239533"],"homeRoomId":"room_1785472239533","workRoomId":"room_1785472239533","schedule":{"morning":"home","midday":"work","afternoon":"work","evening":"home","night":"home"},"mood":"Happy","items":[],"glbUrl":"https://raw.githubusercontent.com/jonathaniscarroll/living-characters/main/media/models/this.glb"}
 
