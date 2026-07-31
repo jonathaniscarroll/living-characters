@@ -1,0 +1,17 @@
+:: Tay {"roomIds":[],"homeRoomId":null,"workRoomId":null,"schedule":{"morning":"home","midday":"work","afternoon":"work","evening":"home","night":"home"},"mood":"Happy","items":["microphone"],"lat":44.653283655248565,"lng":-63.58357250690461,"photoUrl":"https://raw.githubusercontent.com/jonathaniscarroll/living-characters/main/story/assets/char_1785519533194-photo.png","spriteUrls":{"idle":["https://raw.githubusercontent.com/jonathaniscarroll/living-characters/main/story/assets/char_1785519533194-sprite-idle-0.png","https://raw.githubusercontent.com/jonathaniscarroll/living-characters/main/story/assets/char_1785519533194-sprite-idle-1.png"],"walk":["https://raw.githubusercontent.com/jonathaniscarroll/living-characters/main/story/assets/char_1785519533194-sprite-walk-0.png","https://raw.githubusercontent.com/jonathaniscarroll/living-characters/main/story/assets/char_1785519533194-sprite-walk-1.png"],"talk":["https://raw.githubusercontent.com/jonathaniscarroll/living-characters/main/story/assets/char_1785519533194-sprite-talk-0.png","https://raw.githubusercontent.com/jonathaniscarroll/living-characters/main/story/assets/char_1785519533194-sprite-talk-1.png"],"listen":["https://raw.githubusercontent.com/jonathaniscarroll/living-characters/main/story/assets/char_1785519533194-sprite-listen-0.png","https://raw.githubusercontent.com/jonathaniscarroll/living-characters/main/story/assets/char_1785519533194-sprite-listen-1.png"]},"chromaKey":{"h":120,"tolerance":0.1,"spill":0.15}}
+
+:: Tay-hello
+Hi! my name's Tay!
+
+:: Tay-question
+What is your favourite song to sing?
+
+:: Tay-secret
+I am afraid of public speaking!
+
+:: Tay-reaction
+I love to sing when I'm happy
+
+:: Tay-item
+My microphone makes my voice go loud!
+
