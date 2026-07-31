@@ -8,7 +8,7 @@
    2. Three.js <canvas> sits on top with alpha:true so the video
       shows through
    3. DeviceOrientation drives a gentle parallax/drift so the
-      sprite feels “anchored” in the room
+      sprite feels "anchored" in the room
    4. Tap the sprite → opens the same card + talk panel used in
       room mode (openCard / openTalkPanel from card.js)
    5. Exit button dismisses everything and stops the camera
@@ -64,6 +64,8 @@
   function _loadTextureFrame(texture, material, src) {
     if (!texture || !src) return;
     const img = new Image();
+    // Allow cross-origin hosted URLs (GitHub raw assets)
+    img.crossOrigin = 'anonymous';
     img.onload = () => {
       // Guard: if the module-level _texture has been replaced or nulled, bail.
       if (_texture !== texture) return;
@@ -241,13 +243,39 @@
     _raycaster = new THREE.Raycaster();
   }
 
+  // ── Resolve the best sprite/fallback source for a character ──────────────
+  //
+  // Priority:
+  //   1. ch.sprites   — in-memory frames (may be data: URLs or hosted URLs)
+  //   2. ch.spriteUrls — hosted-only frames written back from store after upload
+  //   3. ch.animUrl / ch.animData — single animated image (GIF etc.)
+  //   4. ch.photoUrl / ch.photoData — static photo
+  //
+  // Returns { sprites, fallbackSrc } for SpriteAnimator.
+  function _resolveCharacterMedia(ch) {
+    // Prefer sprites dict with at least one real (non-null) frame.
+    const spritesSource = ch.sprites || ch.spriteUrls || null;
+    let sprites = null;
+    if (spritesSource && typeof spritesSource === 'object') {
+      const hasAny = Object.values(spritesSource).some(
+        arr => Array.isArray(arr) && arr.some(Boolean)
+      );
+      if (hasAny) sprites = spritesSource;
+    }
+
+    // Fallback single-image source.
+    const fallbackSrc = ch.animUrl || ch.animData || ch.photoUrl || ch.photoData || null;
+
+    return { sprites, fallbackSrc };
+  }
+
   // ── Sprite billboard ─────────────────────────────────────────────────────────
   function _buildSpriteBillboard(ch) {
     const THREE = window.THREE;
-    const fallbackSrc = ch.animData || ch.photoData || null;
-    const hasAnimator = window.SpriteAnimator && (ch.sprites || fallbackSrc);
+    const { sprites, fallbackSrc } = _resolveCharacterMedia(ch);
+    const hasAnimator = window.SpriteAnimator && (sprites || fallbackSrc);
 
-    if (!hasAnimator && !fallbackSrc) {
+    if (!hasAnimator) {
       // Colour-block fallback — no image at all
       const geo = new THREE.PlaneGeometry(1.0, 1.6);
       const mat = new THREE.MeshBasicMaterial({ color: 0x4f98a3, side: THREE.DoubleSide });
@@ -269,7 +297,7 @@
       return;
     }
 
-    _animator = new window.SpriteAnimator(ch.sprites || null, fallbackSrc);
+    _animator = new window.SpriteAnimator(sprites, fallbackSrc);
 
     // Create texture — store in a local const so the onload closure is stable.
     const texture = new THREE.Texture();

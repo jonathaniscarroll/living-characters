@@ -42,7 +42,7 @@ class SpriteAnimator {
   /**
    * Advance the animation by deltaMs milliseconds.
    * @param {number} deltaMs
-   * @returns {string|null} current dataUrl if the frame changed this tick, else null
+   * @returns {string|null} current dataUrl/URL if the frame changed this tick, else null
    */
   tick(deltaMs) {
     const frames = this._activeFrames();
@@ -71,7 +71,7 @@ class SpriteAnimator {
   }
 
   /**
-   * Returns the current frame dataUrl regardless of whether it changed.
+   * Returns the current frame dataUrl/URL regardless of whether it changed.
    * @returns {string|null}
    */
   currentFrame() {
@@ -83,16 +83,26 @@ class SpriteAnimator {
   // -------------------------------------------------------------------------
 
   _resolveState(desired) {
-    if (this._sprites[desired] && this._sprites[desired].length > 0) return desired;
+    // A state is only usable if it has at least one non-null frame.
+    const hasFrames = s => {
+      const arr = this._sprites[s];
+      return Array.isArray(arr) && arr.some(Boolean);
+    };
+    if (hasFrames(desired)) return desired;
     for (const s of STATES) {
-      if (this._sprites[s] && this._sprites[s].length > 0) return s;
+      if (hasFrames(s)) return s;
     }
     return null;
   }
 
   _activeFrames() {
-    if (this._activeState && this._sprites[this._activeState]?.length > 0) {
-      return this._sprites[this._activeState];
+    if (this._activeState) {
+      const raw = this._sprites[this._activeState];
+      if (Array.isArray(raw)) {
+        // Filter out null/undefined/empty-string slots left by partial uploads.
+        const valid = raw.filter(Boolean);
+        if (valid.length > 0) return valid;
+      }
     }
     if (this._fallback) return [this._fallback];
     return null;
