@@ -32,3 +32,5 @@ Ghh
 :: taoir-hello
 hello
 
+:: Ggfh {"roomIds":[],"homeRoomId":null,"workRoomId":null,"schedule":{"morning":"home","midday":"work","afternoon":"work","evening":"home","night":"home"},"mood":"Happy","items":[],"lat":44.65325312643393,"lng":-63.58347058296204,"photoUrl":"https://raw.githubusercontent.com/jonathaniscarroll/living-characters/main/story/assets/char_1785515038680-photo.jpeg","spriteUrls":{"idle":["https://raw.githubusercontent.com/jonathaniscarroll/living-characters/main/story/assets/char_1785515038680-sprite-idle-0.png",null],"walk":["https://raw.githubusercontent.com/jonathaniscarroll/living-characters/main/story/assets/char_1785515038680-sprite-walk-0.png",null],"talk":["https://raw.githubusercontent.com/jonathaniscarroll/living-characters/main/story/assets/char_1785515038680-sprite-talk-0.png",null],"listen":["https://raw.githubusercontent.com/jonathaniscarroll/living-characters/main/story/assets/char_1785515038680-sprite-listen-0.png",null]},"chromaKey":{"h":120,"tolerance":0.35,"spill":0.15}}
+
