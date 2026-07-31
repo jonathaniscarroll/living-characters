@@ -25,3 +25,5 @@ Hiio
 :: Me-question
 Ghh
 
+:: Tai {"roomIds":["room_1785507625629","room_1785511396164"],"homeRoomId":"room_1785511396164","workRoomId":"room_1785511396164","schedule":{"morning":"home","midday":"work","afternoon":"work","evening":"home","night":"home"},"mood":"Happy","items":[],"spriteUrls":{"walk":["https://raw.githubusercontent.com/jonathaniscarroll/living-characters/main/story/assets/char_1785512147739-sprite-walk-0.png",null]},"chromaKey":{"h":120,"tolerance":0.35,"spill":0.15}}
+
