@@ -1,10 +1,9 @@
 /**
  * scripts/chroma.js
  * Pure-canvas chroma key removal. No external dependencies.
- * Exposed as window.lcChroma and as ES module exports.
+ * Exposed as window.lcChroma.
  *
  * Part of the living-characters sprite billboard system.
- * Phase 1 of the sprite/chroma refactor.
  */
 
 // ---------------------------------------------------------------------------
@@ -62,14 +61,13 @@ function processPixels(data, opts) {
       data[i + 3] = 0;
     } else if (dist <= outer) {
       // Soft fringe zone → lerp alpha + suppress spill
-      const t = (dist - tolerance) / spill; // 0 at inner edge, 1 at outer edge
+      const t = (dist - tolerance) / spill;
       data[i + 3] = Math.round(t * data[i + 3]);
 
       // Green spill suppression: shift green toward mid of red & blue
       const avg = (r + b) / 2;
       data[i + 1] = Math.round(g * t + avg * (1 - t));
     }
-    // else: outside key zone entirely → leave unchanged
   }
 }
 
@@ -79,9 +77,9 @@ function processPixels(data, opts) {
 
 /**
  * Apply chroma key to a dataURL image.
- * @param {string} imageDataUrl  – source image as data: URL
+ * @param {string} imageDataUrl
  * @param {{ h?: number, tolerance?: number, spill?: number }} [options]
- * @returns {Promise<string>}  – transparent-background PNG data URL
+ * @returns {Promise<string>} transparent-background PNG data URL
  */
 function chromaKey(imageDataUrl, options) {
   return new Promise((resolve, reject) => {
@@ -106,7 +104,7 @@ function chromaKey(imageDataUrl, options) {
  * Apply chroma key directly to an existing canvas.
  * @param {HTMLCanvasElement} sourceCanvas
  * @param {{ h?: number, tolerance?: number, spill?: number }} [options]
- * @returns {HTMLCanvasElement}  – new canvas with alpha applied
+ * @returns {HTMLCanvasElement} new canvas with alpha applied
  */
 function chromaKeyCanvas(sourceCanvas, options) {
   const out = document.createElement('canvas');
@@ -126,7 +124,7 @@ function chromaKeyCanvas(sourceCanvas, options) {
  * @param {string} imageDataUrl
  * @param {number} x
  * @param {number} y
- * @returns {Promise<number>}  – hue value 0–360
+ * @returns {Promise<number>} hue value 0–360
  */
 function sampleHue(imageDataUrl, x, y) {
   return new Promise((resolve, reject) => {
@@ -149,14 +147,7 @@ function sampleHue(imageDataUrl, x, y) {
 }
 
 // ---------------------------------------------------------------------------
-// Expose globally and as ES module exports
+// Expose globally
 // ---------------------------------------------------------------------------
 
-const lcChroma = { chromaKey, chromaKeyCanvas, sampleHue };
-
-if (typeof window !== 'undefined') {
-  window.lcChroma = lcChroma;
-}
-
-export { chromaKey, chromaKeyCanvas, sampleHue };
-export default lcChroma;
+window.lcChroma = { chromaKey, chromaKeyCanvas, sampleHue };

@@ -1,9 +1,7 @@
 /**
  * scripts/sprite.js
  * Sprite frame animator for living-characters billboard system.
- * No external dependencies. Exposed as window.SpriteAnimator and ES module export.
- *
- * Phase 2 of the sprite/chroma refactor.
+ * No external dependencies. Exposed as window.SpriteAnimator.
  */
 
 const FPS = { idle: 1, walk: 4, talk: 3, listen: 2 };
@@ -21,7 +19,6 @@ class SpriteAnimator {
     this._elapsed = 0;
     this._lastFrame = null;
 
-    // Resolve active state on construction
     this._activeState = this._resolveState('idle');
     this._lastFrame = this._frameAt(0);
   }
@@ -51,7 +48,6 @@ class SpriteAnimator {
     const frames = this._activeFrames();
     if (!frames || frames.length === 0) return null;
 
-    // Single-frame or fallback — no animation, never changes
     if (frames.length === 1) {
       const f = frames[0];
       if (f !== this._lastFrame) { this._lastFrame = f; return f; }
@@ -86,16 +82,14 @@ class SpriteAnimator {
   // Private helpers
   // -------------------------------------------------------------------------
 
-  /** Find the best available state to animate, falling back as needed. */
   _resolveState(desired) {
     if (this._sprites[desired] && this._sprites[desired].length > 0) return desired;
     for (const s of STATES) {
       if (this._sprites[s] && this._sprites[s].length > 0) return s;
     }
-    return null; // no sprite frames at all — will use fallback
+    return null;
   }
 
-  /** Return the frames array for the active resolved state (or wrap fallback). */
   _activeFrames() {
     if (this._activeState && this._sprites[this._activeState]?.length > 0) {
       return this._sprites[this._activeState];
@@ -104,7 +98,6 @@ class SpriteAnimator {
     return null;
   }
 
-  /** Frame at a specific index within active frames. */
   _frameAt(index) {
     const frames = this._activeFrames();
     if (!frames || frames.length === 0) return null;
@@ -113,12 +106,7 @@ class SpriteAnimator {
 }
 
 // ---------------------------------------------------------------------------
-// Expose globally and as ES module export
+// Expose globally
 // ---------------------------------------------------------------------------
 
-if (typeof window !== 'undefined') {
-  window.SpriteAnimator = SpriteAnimator;
-}
-
-export { SpriteAnimator };
-export default SpriteAnimator;
+window.SpriteAnimator = SpriteAnimator;
