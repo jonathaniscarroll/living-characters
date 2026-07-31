@@ -157,6 +157,47 @@
     .talk-opt:hover{background:#1a3050;}
     #talk-response{font-size:11px;color:var(--accent2);margin-top:6px;line-height:1.4;display:none;}
     #talk-close{background:none;border:none;color:var(--text-muted);font-size:13px;cursor:pointer;float:right;margin-top:-4px;}
+
+    /* ── Modal overlay (used by char, room, obj modals in modals.js) ── */
+    .modal-overlay{position:fixed;inset:0;z-index:1400;background:rgba(0,0,0,.65);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s;}
+    .modal-overlay.open{opacity:1;pointer-events:all;}
+    .modal-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px;width:500px;max-width:calc(100vw - 32px);max-height:calc(100vh - 64px);overflow-y:auto;display:flex;flex-direction:column;gap:14px;}
+    .modal-box h2{font-size:16px;font-weight:800;}
+    .modal-section-title{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--accent2);font-weight:700;border-bottom:1px solid var(--border);padding-bottom:6px;margin-top:4px;}
+    .field{display:flex;flex-direction:column;gap:5px;}
+    .field label{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);}
+    .field input,.field select,.field textarea{background:rgba(255,255,255,.06);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--text);font-size:13px;font-family:inherit;outline:none;}
+    .field input:focus,.field select:focus,.field textarea:focus{border-color:var(--accent);}
+    .field textarea{resize:vertical;min-height:52px;}
+    .modal-actions{display:flex;gap:10px;margin-top:4px;}
+    .mbtn{flex:1;padding:10px;border-radius:8px;border:none;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;}
+    .mbtn.save,.mbtn.primary{background:var(--accent);color:#fff;}
+    .mbtn.cancel,.mbtn.secondary{background:rgba(255,255,255,.08);color:var(--text);}
+    .mbtn.danger{background:rgba(233,69,96,.18);color:var(--accent);}
+    .file-row{display:flex;gap:8px;align-items:center;}
+    .file-preview{width:52px;height:52px;border-radius:8px;object-fit:cover;background:#0a0f1e;flex-shrink:0;}
+    .file-btn{flex:1;padding:8px 12px;border-radius:8px;background:rgba(255,255,255,.06);border:1px dashed #ffffff28;color:var(--text-muted);font-size:12px;font-family:inherit;cursor:pointer;text-align:center;}
+    .mood-picker{display:flex;gap:8px;flex-wrap:wrap;}
+    .mood-opt{padding:4px 12px;border-radius:20px;border:1px solid transparent;font-size:12px;cursor:pointer;background:rgba(255,255,255,.06);}
+    .mood-opt.active{border-color:var(--accent2);background:rgba(245,166,35,.15);}
+    .room-chips{display:flex;flex-wrap:wrap;gap:7px;}
+    .room-chip{padding:5px 12px;border-radius:20px;border:1.5px solid var(--border);font-size:12px;font-weight:600;cursor:pointer;background:rgba(255,255,255,.05);color:var(--text-muted);transition:background .12s,border-color .12s,color .12s;user-select:none;}
+    .room-chip:hover{border-color:#ffffff40;color:var(--text);}
+    .room-chip.active{background:rgba(245,166,35,.18);border-color:var(--accent2);color:var(--accent2);}
+    .room-chips-hint{font-size:10px;color:var(--text-muted);margin-top:2px;}
+    #dialogue-builder{display:flex;flex-direction:column;gap:10px;}
+    .prompt-row{display:flex;gap:6px;align-items:flex-start;}
+    .prompt-pill{flex-shrink:0;padding:5px 10px;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer;background:rgba(255,255,255,.08);border:1px solid var(--border);color:var(--text-muted);white-space:nowrap;}
+    .prompt-pill.active{background:rgba(245,166,35,.2);color:var(--accent2);border-color:var(--accent2);}
+    .prompt-input{flex:1;background:rgba(255,255,255,.06);border:1px solid var(--border);border-radius:8px;padding:7px 10px;color:var(--text);font-size:12px;font-family:inherit;outline:none;resize:none;min-height:36px;}
+    .prompt-input:focus{border-color:var(--accent);}
+    .prompt-hint{font-size:10px;color:var(--text-muted);margin-top:-6px;margin-left:2px;}
+    .schedule-segment{display:flex;align-items:center;gap:6px;font-size:12px;}
+    .sch-label{width:72px;font-size:11px;color:var(--text-muted);}
+    .sch-pill{padding:3px 10px;border-radius:20px;border:1px solid var(--border);font-size:11px;cursor:pointer;background:rgba(255,255,255,.06);color:var(--text-muted);}
+    .sch-pill.active{background:rgba(245,166,35,.18);border-color:var(--accent2);color:var(--accent2);}
+    #room-latlng-map{width:100%;height:200px;border-radius:8px;border:1px solid var(--border);z-index:0;}
+
     .overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:2000;display:none;align-items:center;justify-content:center;padding:16px;}
     .overlay.open{display:flex;}
     .modal{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;display:flex;flex-direction:column;gap:12px;}
@@ -167,23 +208,6 @@
     .modal textarea{resize:vertical;min-height:70px;}
     .modal-row{display:flex;gap:8px;}
     .modal-row>*{flex:1;}
-    .modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:4px;}
-    .mbtn{padding:8px 16px;border-radius:8px;border:none;cursor:pointer;font-family:inherit;font-size:12px;font-weight:600;}
-    .mbtn.primary{background:var(--accent);color:#fff;}
-    .mbtn.secondary{background:var(--surface2);color:var(--text);border:1px solid var(--border);}
-    .mbtn.danger{background:#5a1a2a;color:var(--accent);border:1px solid var(--accent);}
-    .photo-upload-area{border:2px dashed var(--border);border-radius:10px;padding:16px;text-align:center;cursor:pointer;transition:border-color .2s;position:relative;}
-    .photo-upload-area:hover{border-color:var(--accent2);}
-    .photo-upload-area input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;}
-    .photo-preview{width:80px;height:80px;border-radius:50%;object-fit:cover;border:2px solid var(--border);display:block;margin:0 auto 6px;}
-    .photo-hint{font-size:10px;color:var(--text-muted);}
-    #mini-map-wrap{position:relative;width:100%;height:160px;border-radius:8px;overflow:hidden;border:1px solid var(--border);}
-    #mini-map{width:100%;height:100%;}
-    .passage-list{display:flex;flex-direction:column;gap:6px;}
-    .passage-item{display:flex;gap:6px;align-items:flex-start;}
-    .passage-item select{flex:0 0 110px;}
-    .passage-item textarea{flex:1;min-height:48px;}
-    .passage-item .del-pass{background:none;border:none;color:var(--accent);font-size:18px;cursor:pointer;padding:4px 6px;line-height:1;}
     #twee-preview-overlay{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:3000;display:none;flex-direction:column;}
     #twee-preview-overlay.open{display:flex;}
     #twee-preview-header{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid var(--border);background:var(--surface);}
@@ -202,20 +226,11 @@
     .room-pin-wrap{display:flex;flex-direction:column;align-items:center;cursor:pointer;}
     .room-pin-dot{width:22px;height:22px;border-radius:50%;background:var(--surface2);border:3px solid var(--accent2);box-shadow:0 2px 8px #0008;display:flex;align-items:center;justify-content:center;font-size:12px;}
     .room-pin-label{font-size:9px;font-weight:700;color:#fff;text-shadow:0 1px 3px #000;margin-top:2px;white-space:nowrap;}
-    .sprite-editor{display:flex;flex-direction:column;gap:8px;padding:8px 0;}
-    .sprite-state-row{display:flex;align-items:center;gap:8px;}
-    .sprite-state-label{font-size:11px;font-weight:600;width:64px;text-transform:capitalize;}
-    .sprite-frame-slot{width:48px;height:48px;border:1px dashed var(--border);border-radius:6px;overflow:hidden;background:var(--surface2);cursor:pointer;position:relative;display:flex;align-items:center;justify-content:center;font-size:9px;color:var(--text-muted);}
-    .sprite-frame-slot img{width:100%;height:100%;object-fit:cover;image-rendering:pixelated;}
-    .sprite-frame-slot input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;}
-    .sprite-chroma-row{display:flex;align-items:center;gap:8px;margin-top:4px;}
-    .ar-btn-wrap{margin-top:6px;}
-    #ar-btn{display:none;width:100%;padding:9px;border-radius:9px;border:none;background:linear-gradient(135deg,#0f3460,var(--surface2));color:var(--accent2);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;}
-    #ar-status{font-size:10px;color:var(--text-muted);margin-top:4px;text-align:center;}
-    .room-obj-draggable{cursor:grab;position:absolute;user-select:none;}
-    .room-obj-draggable.dragging{cursor:grabbing;opacity:.8;z-index:100;}
+    #mini-map-wrap{position:relative;width:100%;height:160px;border-radius:8px;overflow:hidden;border:1px solid var(--border);}
+    #mini-map{width:100%;height:100%;}
     .room-edit-overlay{position:absolute;inset:0;z-index:50;background:rgba(245,166,35,.05);border:2px dashed var(--accent2);display:none;pointer-events:none;}
     .room-edit-overlay.active{display:block;}
+    ::-webkit-scrollbar{width:6px;} ::-webkit-scrollbar-track{background:transparent;} ::-webkit-scrollbar-thumb{background:#ffffff20;border-radius:3px;}
   </style>
 </head>
 <body>
@@ -318,140 +333,167 @@
   <div class="card-actions">
     <button class="card-act-btn" data-facilitator-only id="card-edit-btn" onclick="editCardChar()">✏️ Edit</button>
     <button class="card-act-btn" data-facilitator-only id="card-delete-btn" onclick="deleteCardChar()">🗑 Delete</button>
-    <button class="card-act-btn" id="card-ar-btn" style="display:none" onclick="launchAR()">AR View</button>
-  </div>
-  <div class="ar-btn-wrap">
-    <button id="ar-btn" onclick="launchAR()">👁 View in AR</button>
-    <div id="ar-status"></div>
   </div>
 </div>
 
-<!-- Character Modal -->
-<div class="overlay" id="char-modal">
-  <div class="modal">
-    <h2 id="char-modal-title">Add Character</h2>
-    <div>
-      <label>Name</label>
-      <input id="char-name-input" type="text" placeholder="Character name" />
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     CHARACTER MODAL  — IDs must match modals.js exactly
+     ═══════════════════════════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="char-modal-overlay">
+  <div class="modal-box">
+    <h2 id="char-modal-title">Add a Character</h2>
+
+    <div class="modal-section-title">👤 Who are they?</div>
+    <div class="field"><label>Character name</label><input id="cf-name" type="text" placeholder="e.g. Mop, Gravel, Biscuit…" /></div>
+
+    <div class="field">
+      <label>Which room(s)? <span style="font-weight:400;text-transform:none;letter-spacing:0">(tap to toggle)</span></label>
+      <div class="room-chips" id="cf-room-chips"></div>
+      <div class="room-chips-hint" id="cf-room-chips-hint"></div>
     </div>
-    <div>
-      <label>Mood</label>
-      <select id="char-mood-input">
-        <option>Happy</option><option>Sad</option><option>Angry</option>
-        <option>Scared</option><option>Excited</option><option>Curious</option>
-        <option>Mysterious</option><option>Friendly</option>
-      </select>
+
+    <div class="field">
+      <label>Home room</label>
+      <select id="cf-home-room"><option value="">— choose —</option></select>
     </div>
-    <div>
-      <label>Items (comma separated)</label>
-      <input id="char-items-input" type="text" placeholder="key, map, lantern" />
+    <div class="field">
+      <label>Work room</label>
+      <select id="cf-work-room"><option value="">— choose —</option></select>
     </div>
-    <div>
-      <label>Photo / Avatar</label>
-      <div class="photo-upload-area" id="char-photo-drop">
-        <img id="char-photo-preview" class="photo-preview" style="display:none" />
-        <div class="photo-hint">Click or drag a photo here</div>
-        <input type="file" accept="image/*" onchange="handleCharPhotoUpload(event)" />
+
+    <div class="field">
+      <label>Daily schedule</label>
+      <div style="display:flex;flex-direction:column;gap:6px;margin-top:2px;">
+        <div class="schedule-segment" data-seg="morning">  <span class="sch-label">🌅 Morning</span>  <button class="sch-pill active" data-val="home">Home</button><button class="sch-pill" data-val="work">Work</button><button class="sch-pill" data-val="roam">Roam</button></div>
+        <div class="schedule-segment" data-seg="midday">   <span class="sch-label">☀️ Midday</span>   <button class="sch-pill" data-val="home">Home</button><button class="sch-pill active" data-val="work">Work</button><button class="sch-pill" data-val="roam">Roam</button></div>
+        <div class="schedule-segment" data-seg="afternoon"><span class="sch-label">🌤 Afternoon</span><button class="sch-pill" data-val="home">Home</button><button class="sch-pill active" data-val="work">Work</button><button class="sch-pill" data-val="roam">Roam</button></div>
+        <div class="schedule-segment" data-seg="evening">  <span class="sch-label">🌇 Evening</span>  <button class="sch-pill active" data-val="home">Home</button><button class="sch-pill" data-val="work">Work</button><button class="sch-pill" data-val="roam">Roam</button></div>
+        <div class="schedule-segment" data-seg="night">    <span class="sch-label">🌙 Night</span>    <button class="sch-pill active" data-val="home">Home</button><button class="sch-pill" data-val="work">Work</button><button class="sch-pill" data-val="roam">Roam</button></div>
       </div>
     </div>
-    <div>
-      <label>Animated GIF / Video (optional)</label>
-      <div class="photo-upload-area">
-        <div class="photo-hint" id="char-anim-hint">Click to add an animation</div>
-        <input type="file" accept="image/gif,video/*" onchange="handleCharAnimUpload(event)" />
+    <!-- wire up sch-pill clicks -->
+    <script>
+      document.addEventListener('click', function(e) {
+        const pill = e.target.closest('.sch-pill');
+        if (!pill) return;
+        const seg = pill.closest('.schedule-segment');
+        if (!seg) return;
+        seg.querySelectorAll('.sch-pill').forEach(p => p.classList.remove('active'));
+        pill.classList.add('active');
+      });
+    </script>
+
+    <div class="field"><label>Photo (felt / clay)</label>
+      <div class="file-row">
+        <img id="cf-photo-preview" class="file-preview" src="" style="display:none" />
+        <label class="file-btn" for="cf-photo-input">Upload photo</label>
+        <input id="cf-photo-input" type="file" accept="image/*" style="display:none" onchange="previewFile('cf-photo-input','cf-photo-preview','photoData')" />
       </div>
     </div>
-    <div>
-      <label>Sprite Sheets (2-frame flipbook per state)</label>
-      <div class="sprite-editor" id="sprite-editor"></div>
-      <div class="sprite-chroma-row">
-        <label style="margin:0;flex-shrink:0">Chroma colour</label>
-        <input type="color" id="sprite-chroma-color" value="#00ff00" style="width:40px;padding:2px;" />
-        <input type="range" id="sprite-chroma-thresh" min="0" max="1" step="0.01" value="0.35" style="flex:1" />
-        <span id="sprite-chroma-val" style="font-size:10px;color:var(--text-muted);width:28px">0.35</span>
+
+    <div class="field"><label>Mixamo animation (GIF)</label>
+      <div class="file-row">
+        <img id="cf-anim-preview" class="file-preview" src="" style="display:none" />
+        <label class="file-btn" for="cf-anim-input">Upload GIF</label>
+        <input id="cf-anim-input" type="file" accept="image/gif,image/png,image/jpeg" style="display:none" onchange="previewFile('cf-anim-input','cf-anim-preview','animData')" />
       </div>
     </div>
-    <div>
-      <label>Dialogue</label>
-      <div class="passage-list" id="passage-list"></div>
-      <button class="mbtn secondary" onclick="addPassage()" style="margin-top:6px;width:100%">+ Add dialogue line</button>
+
+    <div class="field"><label>Mood</label><div class="mood-picker" id="mood-picker"></div></div>
+    <div class="field"><label>Items (comma-separated)</label><input id="cf-items" type="text" placeholder="small hat, acorn, lucky pebble" /></div>
+
+    <div class="modal-section-title">💬 What do they say?</div>
+    <div id="dialogue-builder"></div>
+
+    <div class="modal-section-title">🏠 Object interactions</div>
+    <div id="cf-object-usage"></div>
+
+    <div class="modal-actions">
+      <button class="mbtn cancel" onclick="closeCharModal()">Cancel</button>
+      <button class="mbtn save"   onclick="saveChar()">Save</button>
     </div>
-    <div>
-      <label>Place on map</label>
-      <div id="mini-map-wrap"><div id="mini-map"></div></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     ROOM MODAL  — IDs must match modals.js exactly
+     ═══════════════════════════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="room-modal-overlay">
+  <div class="modal-box">
+    <h2 id="room-modal-title">Add a Room</h2>
+    <div class="modal-section-title">🗺️ Where is it?</div>
+    <div class="field"><label>Room name</label><input id="rf-name" type="text" placeholder="e.g. The Library, The Garden…" /></div>
+    <div class="field"><label>Description / lede</label><textarea id="rf-lede" rows="2" placeholder="A short description shown when players enter."></textarea></div>
+    <div class="field"><label>Click map to place — or type lat, lng</label>
+      <div style="display:flex;gap:8px">
+        <input id="rf-lat" type="number" step="any" placeholder="Lat" style="flex:1" />
+        <input id="rf-lng" type="number" step="any" placeholder="Lng" style="flex:1" />
+      </div>
+      <div id="room-latlng-map"></div>
+    </div>
+    <div class="field"><label>Trigger radius (metres)</label><input id="rf-radius" type="number" value="30" min="5" max="500" /></div>
+
+    <div class="modal-section-title">📷 Backdrop image</div>
+    <div class="field">
+      <img id="rf-backdrop-preview" src="" style="max-height:100px;border-radius:8px;display:none;margin-bottom:4px;" />
+      <label class="file-btn" for="rf-backdrop-input" style="display:block;text-align:center;padding:10px;">Upload backdrop image</label>
+      <input id="rf-backdrop-input" type="file" accept="image/*" style="display:none" onchange="window.lcModals && window.lcModals.uploadRoomBackdrop()" />
+      <div id="rf-backdrop-status" style="font-size:10px;color:var(--text-muted);margin-top:4px;"></div>
+    </div>
+
+    <div class="modal-section-title">📷 Camera position</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;">
+      <div class="field" style="flex:1;min-width:80px"><label>Cam X</label><input id="rf-cam-x" type="number" step="0.5" value="9" /></div>
+      <div class="field" style="flex:1;min-width:80px"><label>Cam Y</label><input id="rf-cam-y" type="number" step="0.5" value="9" /></div>
+      <div class="field" style="flex:1;min-width:80px"><label>Cam Z</label><input id="rf-cam-z" type="number" step="0.5" value="9" /></div>
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;">
+      <div class="field" style="flex:1;min-width:80px"><label>Target X</label><input id="rf-cam-tx" type="number" step="0.5" value="0" /></div>
+      <div class="field" style="flex:1;min-width:80px"><label>Target Y</label><input id="rf-cam-ty" type="number" step="0.5" value="0" /></div>
+      <div class="field" style="flex:1;min-width:80px"><label>Target Z</label><input id="rf-cam-tz" type="number" step="0.5" value="0" /></div>
+    </div>
+    <div class="field"><label>Zoom (0.5–5)</label><input id="rf-cam-zoom" type="number" step="0.1" value="2" min="0.5" max="5" /></div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:2px;">
+      <button class="mbtn cancel" style="flex:0;font-size:10px;padding:5px 8px;" onclick="window.lcModals && window.lcModals.setCamPreset(9,9,9)">Isometric</button>
+      <button class="mbtn cancel" style="flex:0;font-size:10px;padding:5px 8px;" onclick="window.lcModals && window.lcModals.setCamPreset(0,4,14)">Front</button>
+      <button class="mbtn cancel" style="flex:0;font-size:10px;padding:5px 8px;" onclick="window.lcModals && window.lcModals.setCamPreset(14,4,0)">Side</button>
+      <button class="mbtn cancel" style="flex:0;font-size:10px;padding:5px 8px;" onclick="window.lcModals && window.lcModals.setCamPreset(0,18,0.01)">Top</button>
+      <button class="mbtn cancel" style="flex:0;font-size:10px;padding:5px 8px;" onclick="window.lcModals && window.lcModals.setCamPreset(6,2,10)">Low</button>
+    </div>
+
+    <div class="modal-actions">
+      <button class="mbtn cancel" onclick="closeRoomModal()">Cancel</button>
+      <button class="mbtn save"   onclick="saveRoom()">Save Room</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     OBJECT MODAL  — IDs must match modals.js exactly
+     ═══════════════════════════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="obj-modal-overlay">
+  <div class="modal-box">
+    <h2 id="obj-modal-title">Add an Object</h2>
+    <div class="modal-section-title">📦 What is it?</div>
+    <div class="field"><label>Object name</label><input id="of-name" type="text" placeholder="e.g. Mossy log, Giant mushroom…" /></div>
+    <div class="field"><label>Description (shows on hover)</label><textarea id="of-desc" rows="2" placeholder="An old log covered in soft moss."></textarea></div>
+    <div class="field">
+      <label>Position (X, Z) and Scale</label>
+      <div style="display:flex;gap:8px">
+        <input id="of-px" type="number" step="0.1" placeholder="X" style="flex:1" />
+        <input id="of-pz" type="number" step="0.1" placeholder="Z" style="flex:1" />
+        <input id="of-scale" type="number" step="0.1" placeholder="Scale (1.0)" style="flex:1" value="1" />
+      </div>
     </div>
     <div class="modal-actions">
-      <button class="mbtn danger" id="char-delete-btn" onclick="deleteChar()" style="display:none">Delete</button>
-      <button class="mbtn secondary" onclick="closeCharModal()">Cancel</button>
-      <button class="mbtn primary" onclick="saveChar()">Save</button>
+      <button class="mbtn cancel"  onclick="closeObjModal()">Cancel</button>
+      <button class="mbtn save"    onclick="saveObj()">Save Object</button>
+      <button class="mbtn danger"  id="of-delete" onclick="deleteObj()" style="display:none">Remove</button>
     </div>
   </div>
 </div>
 
-<!-- Room Modal -->
-<div class="overlay" id="room-modal">
-  <div class="modal">
-    <h2 id="room-modal-title">Add Room</h2>
-    <div>
-      <label>Room name</label>
-      <input id="room-name-input" type="text" placeholder="e.g. The Forest Clearing" />
-    </div>
-    <div>
-      <label>Description / lede</label>
-      <textarea id="room-lede-input" placeholder="A mossy clearing where light filters through the canopy…"></textarea>
-    </div>
-    <div>
-      <label>Backdrop image (optional)</label>
-      <div class="photo-upload-area">
-        <img id="room-backdrop-preview" style="max-height:80px;display:none;margin:0 auto;" />
-        <div class="photo-hint" id="room-backdrop-hint">Click or drag an image</div>
-        <input type="file" accept="image/*" onchange="handleRoomBackdropUpload(event)" />
-      </div>
-    </div>
-    <div>
-      <label>Place on map</label>
-      <div id="mini-map-wrap-room"><div id="mini-map-room"></div></div>
-    </div>
-    <div class="modal-actions">
-      <button class="mbtn danger" id="room-delete-btn" onclick="deleteRoom()" style="display:none">Delete</button>
-      <button class="mbtn secondary" onclick="closeRoomModal()">Cancel</button>
-      <button class="mbtn primary" onclick="saveRoom()">Save</button>
-    </div>
-  </div>
-</div>
-
-<!-- Object Modal -->
-<div class="overlay" id="obj-modal">
-  <div class="modal">
-    <h2 id="obj-modal-title">Add Object</h2>
-    <div>
-      <label>Object name</label>
-      <input id="obj-name-input" type="text" placeholder="e.g. Ancient Chest" />
-    </div>
-    <div>
-      <label>Description</label>
-      <textarea id="obj-desc-input" placeholder="A weathered chest bound with iron…"></textarea>
-    </div>
-    <div>
-      <label>3D Model URL (.glb)</label>
-      <input id="obj-glb-input" type="url" placeholder="https://…/model.glb" />
-    </div>
-    <div class="modal-row">
-      <div><label>Scale</label><input id="obj-scale-input" type="number" value="1" min="0.1" step="0.1" /></div>
-    </div>
-    <div>
-      <label>Context / usage hint</label>
-      <input id="obj-context-input" type="text" placeholder="e.g. Needs a key to open" />
-    </div>
-    <div class="modal-actions">
-      <button class="mbtn danger" id="obj-delete-btn" onclick="deleteObj()" style="display:none">Delete</button>
-      <button class="mbtn secondary" onclick="closeObjModal()">Cancel</button>
-      <button class="mbtn primary" onclick="saveObj()">Save</button>
-    </div>
-  </div>
-</div>
-
-<!-- Twee Preview Overlay -->
+<!-- Twee Preview -->
 <div id="twee-preview-overlay">
   <div id="twee-preview-header">
     <span style="font-size:13px;font-weight:700">📄 Twee Export</span>
@@ -467,16 +509,8 @@
 
 <div id="toast"></div>
 
-<!--
-  Global proxy shim
-  =================
-  globals.js (non-module, loaded first in <head>) owns all mutable state.
-  This shim proxies every inline onclick="..." call through the module
-  namespace objects (window.lcMap, window.lcModals, etc.) that each
-  module registers on window.* when it loads.
--->
 <script>
-  // ── Mode management (needed immediately, before modules load) ─────────────
+  // ── Mode management ────────────────────────────────────────────────────────
   window._lcCurrentMode = 'facilitator';
   window.lcMode    = function()     { return window._lcCurrentMode; };
   window.lcSetMode = function(mode) {
@@ -485,7 +519,7 @@
   };
   window.lcSetMode(window._lcCurrentMode);
 
-  // ── map.js proxies ────────────────────────────────────────────────────────
+  // ── map.js proxies ─────────────────────────────────────────────────────────
   window.startGPS        = function()    { window.lcMap && window.lcMap.startGPS(); };
   window.startSim        = function()    { window.lcMap && window.lcMap.startSim(); };
   window.setDaySegment   = function(seg) { window.lcMap && window.lcMap.setDaySegment(seg); };
@@ -493,7 +527,7 @@
   window.renderMapPins   = function()    { window.lcMap && window.lcMap.renderMapPins(); };
   window.updateCompass   = function()    { window.lcMap && window.lcMap.updateCompass(); };
 
-  // ── modals.js proxies ─────────────────────────────────────────────────────
+  // ── modals.js proxies ──────────────────────────────────────────────────────
   window.openRoomModal   = function(id)  { window.lcModals && window.lcModals.openRoomModal(id); };
   window.closeRoomModal  = function()    { window.lcModals && window.lcModals.closeRoomModal(); };
   window.saveRoom        = function()    { window.lcModals && window.lcModals.saveRoom(); };
@@ -508,8 +542,10 @@
   window.addPassage      = function()    { window.lcModals && window.lcModals.addPassage && window.lcModals.addPassage(); };
   window.editActiveRoom  = function()    { window.lcModals && window.lcModals.openRoomModal(window.activeRoomId || null); };
   window.enableRoomEdit  = function()    { window.lcRoom   && window.lcRoom.enableRoomEdit && window.lcRoom.enableRoomEdit(); };
+  window.previewFile     = function(a,b,c){ window.lcModals && window.lcModals.previewFile(a,b,c); };
+  window.togglePromptPill = function(btn){ window.lcModals && window.lcModals.togglePromptPill(btn); };
 
-  // ── store.js proxies ──────────────────────────────────────────────────────
+  // ── store.js proxies ───────────────────────────────────────────────────────
   window.ghLoad          = function()    { window.lcStore && window.lcStore.ghLoad(); };
   window.ghSave          = function()    { window.lcStore && window.lcStore.ghSave(); };
   window.onTokenInput    = function()    {
@@ -533,14 +569,13 @@
     reader.readAsText(file);
   };
 
-  // ── card.js proxies ───────────────────────────────────────────────────────
+  // ── card.js proxies ────────────────────────────────────────────────────────
   window.closeCard       = function()    { window.lcCard && window.lcCard.closeCard(); };
   window.openCard        = function(id)  { window.lcCard && window.lcCard.openCard(id); };
   window.editCardChar    = function()    { window.lcCard && window.lcCard.editCardChar && window.lcCard.editCardChar(); };
   window.deleteCardChar  = function()    { window.lcCard && window.lcCard.deleteCardChar && window.lcCard.deleteCardChar(); };
-  window.launchAR        = function()    { window.lcCard && window.lcCard.launchAR && window.lcCard.launchAR(); };
 
-  // ── room.js proxies ───────────────────────────────────────────────────────
+  // ── room.js proxies ────────────────────────────────────────────────────────
   window.openRoom        = function(id)  { window.lcRoom && window.lcRoom.openRoom(id); };
   window.closeRoom       = function()    { window.lcRoom && window.lcRoom.closeRoom(); };
 </script>
