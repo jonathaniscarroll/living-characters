@@ -1,23 +1,52 @@
 // card.js — character cards and talk panel
 
 let _selectedCharId = null;
+let _spriteInterval = null;
+let _spriteAnimator  = null;
 
 function openCard(charId) {
   _selectedCharId = charId;
-  // AR (and anything else reading window.selectedChar) needs the full object,
-  // not just the id string. Keep the id assignment as a fallback for legacy callers.
   const ch = characters.find(c => c.id === charId);
   selectedChar = ch || charId;
   if (!ch) return;
   const mood = MOODS.find(m => m.label === ch.mood) || MOODS[0];
   const animEl = document.getElementById('card-anim');
-  if (ch.animData) {
+
+  // Clear any previous sprite interval
+  if (_spriteInterval) { clearInterval(_spriteInterval); _spriteInterval = null; }
+  _spriteAnimator = null;
+
+  if (ch.sprites) {
+    // Sprite sheet animation in 'talk' state
+    const SpriteAnimator = window.lcSprite && window.lcSprite.SpriteAnimator;
+    if (SpriteAnimator) {
+      _spriteAnimator = new SpriteAnimator(ch.sprites, ch.animData || ch.photoData);
+      _spriteAnimator.setState('talk');
+      // Seed the first frame immediately
+      const firstSrc = _spriteAnimator.currentSrc();
+      animEl.innerHTML = `<img id="card-sprite-img" src="${firstSrc}" alt="${ch.name}" style="max-width:100%;max-height:100%;object-fit:contain;">`;
+      _spriteInterval = setInterval(() => {
+        const newSrc = _spriteAnimator.tick(250);
+        if (newSrc) {
+          const img = document.getElementById('card-sprite-img');
+          if (img) img.src = newSrc;
+        }
+      }, 250);
+    } else {
+      // SpriteAnimator not loaded yet — fall back to static image
+      const src = ch.animData || ch.photoData || null;
+      animEl.innerHTML = src
+        ? `<img src="${src}" alt="${ch.name}" style="max-width:100%;max-height:100%;object-fit:contain;">`
+        : '<div class="placeholder">🧸</div>';
+    }
+  } else if (ch.animData) {
     animEl.innerHTML = `<img src="${ch.animData}" alt="${ch.name} animation" style="max-width:100%;max-height:100%;object-fit:contain;">`;
   } else if (ch.photoData) {
     animEl.innerHTML = `<img src="${ch.photoData}" alt="${ch.name}" style="max-width:100%;max-height:100%;object-fit:contain;">`;
   } else {
     animEl.innerHTML = '<div class="placeholder">🧸</div>';
   }
+
   document.getElementById('card-name').textContent = ch.name;
 
   // Show scheduled location
@@ -39,7 +68,6 @@ function openCard(charId) {
   const contextType = isHome ? 'home' : isWork ? 'work' : null;
   const orderedPassages = [...(ch.passages || [])];
   if (contextType) {
-    // Bubble the context passage to the top
     const ctxIdx = orderedPassages.findIndex(p => p.type === contextType);
     if (ctxIdx > 0) {
       const [ctx] = orderedPassages.splice(ctxIdx, 1);
@@ -58,6 +86,15 @@ function openCard(charId) {
 }
 
 function closeCard() {
+  // Stop sprite animation
+  if (_spriteInterval) { clearInterval(_spriteInterval); _spriteInterval = null; }
+  _spriteAnimator = null;
+
+  // Tell AR view to go idle
+  if (window.ARView && typeof window.ARView.setCharacterState === 'function') {
+    window.ARView.setCharacterState('idle');
+  }
+
   document.getElementById('card').classList.remove('open');
   _selectedCharId = null;
   selectedChar = null;
@@ -93,7 +130,6 @@ function openTalkPanel(ch) {
   const btns = document.getElementById('talk-btns');
   btns.innerHTML = '';
 
-  // Determine context for this character right now
   const activeRoomId = window.lcMap ? window.lcMap.getActiveRoomId(ch) : ((ch.roomIds && ch.roomIds[0]) || ch.roomId);
   const isHome = activeRoomId === ch.homeRoomId;
   const isWork = activeRoomId === ch.workRoomId;
@@ -113,7 +149,6 @@ function openTalkPanel(ch) {
     btns.appendChild(btn);
   });
 
-  // If there's a context-appropriate passage, auto-show it
   if (contextType) {
     const ctxPassage = passages.find(p => p.type === contextType);
     if (ctxPassage) {

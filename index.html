@@ -17,16 +17,13 @@
   </script>
   <script type="module">
     import * as THREE from 'three';
-    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
     window.THREE = THREE;
-    window.GLTFLoader = GLTFLoader;
   </script>
   <script type="module" src="./scripts/store.js"></script>
   <script type="module" src="./scripts/map.js"></script>
   <script type="module" src="./scripts/room.js"></script>
   <script type="module" src="./scripts/card.js"></script>
   <script type="module" src="./scripts/modals.js"></script>
-  <script type="module" src="./scripts/fbx-to-glb.js"></script>
   <script type="module" src="./scripts/upload-helpers.js"></script>
 
   <style>
@@ -166,13 +163,11 @@
     .room-chip:hover{border-color:#ffffff40;color:var(--text);}
     .room-chip.active{background:rgba(245,166,35,.18);border-color:var(--accent2);color:var(--accent2);}
     .room-chips-hint{font-size:10px;color:var(--text-muted);margin-top:2px;}
-    /* Schedule editor */
     .schedule-editor{display:flex;flex-direction:column;gap:6px;}
     .schedule-segment{display:flex;align-items:center;gap:8px;}
     .schedule-segment .seg-label{font-size:11px;color:var(--text-muted);width:72px;flex-shrink:0;}
     .sch-pill{padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;background:rgba(255,255,255,.06);border:1px solid var(--border);color:var(--text-muted);}
     .sch-pill.active{background:rgba(245,166,35,.2);border-color:var(--accent2);color:var(--accent2);}
-    /* Home/work selects row */
     .hw-row{display:flex;gap:8px;}
     .hw-row .field{flex:1;}
     #dialogue-builder{display:flex;flex-direction:column;gap:10px;}
@@ -204,20 +199,17 @@
     .obj-list-row .obj-list-name{flex:1;color:var(--text);font-weight:600;}
     .obj-list-edit{background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:12px;padding:1px 4px;border-radius:4px;}
     .obj-list-edit:hover{color:var(--accent2);}
-    .fbx-progress{height:3px;border-radius:2px;background:rgba(255,255,255,.1);margin-top:4px;overflow:hidden;display:none;}
-    .fbx-progress-bar{height:100%;background:var(--accent2);width:0%;transition:width .15s;}
     #drop-overlay{position:fixed;inset:0;z-index:2000;background:rgba(0,0,80,.75);backdrop-filter:blur(6px);display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;opacity:0;transition:opacity .2s;color:#fff;font-size:22px;gap:12px;}
     #drop-overlay.active{opacity:1;pointer-events:all;}
     #drop-overlay .drop-sub{font-size:13px;color:#a0c8ff;}
     ::-webkit-scrollbar{width:6px;} ::-webkit-scrollbar-track{background:transparent;} ::-webkit-scrollbar-thumb{background:#ffffff20;border-radius:3px;}
   </style>
   <link rel="stylesheet" href="mobile-zoom-fix.css" />
-  <!-- Polyfill for browsers with no navigator.xr -->
-<script>
-  if (!navigator.xr) {
-    navigator.xr = { isSessionSupported: () => Promise.resolve(false) };
-  }
-</script>
+  <script>
+    if (!navigator.xr) {
+      navigator.xr = { isSessionSupported: () => Promise.resolve(false) };
+    }
+  </script>
 
 </head>
 
@@ -229,7 +221,6 @@
     <span id="gps-status">GPS: off</span>
     <button class="hbtn gps-btn"   onclick="startGPS()">📍 GPS</button>
     <button class="hbtn sim-btn"   onclick="startSim()">🚶 Simulate</button>
-    <!-- Day segment strip -->
     <button class="hbtn day-seg active" data-seg="morning"   onclick="setDaySegment('morning')">🌅</button>
     <button class="hbtn day-seg"        data-seg="midday"    onclick="setDaySegment('midday')">☀️</button>
     <button class="hbtn day-seg"        data-seg="afternoon" onclick="setDaySegment('afternoon')">🌤</button>
@@ -350,7 +341,7 @@
         <input id="rf-backdrop-input" type="file" accept="image/*" style="display:none" onchange="uploadRoomBackdrop()" />
       </div>
       <div id="rf-backdrop-status" style="font-size:11px;color:var(--accent2);margin-top:5px"></div>
-      <p style="font-size:10px;color:var(--text-muted);margin-top:4px">Each room uses the image you upload here as its backdrop. If you skip this, the room uses a simple colour + walls.</p>
+      <p style="font-size:10px;color:var(--text-muted);margin-top:4px">Each room uses the image you upload here as its backdrop.</p>
     </div>
     <div class="modal-section-title">📷 Camera Position (X, Y, Z)</div>
     <div class="field" style="display:flex;gap:6px">
@@ -373,12 +364,10 @@
         <input id="rf-cam-ty" type="number" step="0.5" placeholder="Focus Y" style="flex:1" value="0" />
         <input id="rf-cam-tz" type="number" step="0.5" placeholder="Focus Z" style="flex:1" value="0" />
       </div>
-      <p style="font-size:10px;color:var(--text-muted);margin-top:3px">Default 0 / 0 / 0 centres the view on the floor. Raise Focus Y to tilt the camera up toward taller characters.</p>
     </div>
     <div class="field">
       <label>Camera zoom (0.5 = wide · 2 = normal · 5 = close-up)</label>
       <input id="rf-cam-zoom" type="number" step="0.1" min="0.5" max="5" placeholder="2" value="2" style="max-width:120px" />
-      <p style="font-size:10px;color:var(--text-muted);margin-top:3px">Clamped between 0.5 and 5. The talk close-up inherits a scaled version of this value automatically.</p>
     </div>
     <div class="modal-actions">
       <button class="mbtn cancel" onclick="closeRoomModal()">Cancel</button>
@@ -401,7 +390,6 @@
       <div class="room-chips-hint" id="cf-room-chips-hint">No rooms added yet — create a room first.</div>
     </div>
 
-    <!-- Home / Work selects -->
     <div class="hw-row">
       <div class="field">
         <label>🏠 Home room</label>
@@ -413,7 +401,6 @@
       </div>
     </div>
 
-    <!-- Schedule editor -->
     <div class="modal-section-title">🕐 Daily schedule</div>
     <div class="schedule-editor">
       <div class="schedule-segment" data-seg="morning">
@@ -459,18 +446,6 @@
       </div>
     </div>
 
-    <div class="field">
-      <label>3D character model (.glb or .fbx)</label>
-      <div class="file-row">
-        <label class="file-btn" for="cf-glb-input">✨ Upload .glb or .fbx</label>
-        <input id="cf-glb-input" type="file" accept=".glb,.fbx,application/octet-stream" style="display:none" onchange="uploadCharacterGlb()" />
-      </div>
-      <div style="font-size:11px;color:var(--text-muted);margin-top:4px">.glb files load instantly · .fbx files are auto-converted to GLB in your browser</div>
-      <div class="fbx-progress" id="cf-fbx-progress"><div class="fbx-progress-bar" id="cf-fbx-progress-bar"></div></div>
-      <div id="cf-glb-status" style="font-size:11px;color:var(--accent2);margin-top:4px"></div>
-      <input id="cf-glb-url" type="text" placeholder="…or paste a .glb URL" style="margin-top:6px" />
-    </div>
-
     <div class="field"><label>Mood</label><div class="mood-picker" id="mood-picker"></div></div>
     <div class="field"><label>Items (comma-separated)</label><input id="cf-items" type="text" placeholder="small hat, acorn, lucky pebble" /></div>
 
@@ -495,17 +470,6 @@
     <div class="modal-section-title">📦 What is it?</div>
     <div class="field"><label>Object name</label><input id="of-name" type="text" placeholder="e.g. Mossy log, Giant mushroom..." /></div>
     <div class="field"><label>Description (shows on tap)</label><textarea id="of-desc" rows="2" placeholder="An old log covered in soft moss."></textarea></div>
-    <div class="field">
-      <label>3D model (.glb or .fbx)</label>
-      <div class="file-row">
-        <label class="file-btn" for="of-glb-input">✨ Upload .glb or .fbx</label>
-        <input id="of-glb-input" type="file" accept=".glb,.fbx,application/octet-stream" style="display:none" onchange="uploadObjectGlb()" />
-      </div>
-      <div style="font-size:11px;color:var(--text-muted);margin-top:4px">.glb files load instantly · .fbx files are auto-converted to GLB in your browser</div>
-      <div class="fbx-progress" id="of-fbx-progress"><div class="fbx-progress-bar" id="of-fbx-progress-bar"></div></div>
-      <div id="of-glb-status" style="font-size:11px;color:var(--accent2);margin-top:4px"></div>
-      <input id="of-glb" type="text" placeholder="…or paste a .glb URL" style="margin-top:6px" />
-    </div>
     <div class="field">
       <label>Position (X, Z) and Scale</label>
       <div style="display:flex;gap:8px">
@@ -574,14 +538,12 @@ var simActive=false, simInterval=null, facilitatorMode=true, activeRoomId=null;
 var threeScene=null, threeRenderer=null, threeCamera=null, threeAnimFrameId=null;
 var glbMixers=[];
 
-// ── Schedule pill helper (inline onclick) ────────────────────────────────────
 function pickSegment(btn) {
   const seg = btn.closest('.schedule-segment');
   seg.querySelectorAll('.sch-pill').forEach(p => p.classList.remove('active'));
   btn.classList.add('active');
 }
 
-// ── Toast ────────────────────────────────────────────────────────────────────
 let toastTimeout = null;
 function showToast(msg, type) {
   const el = document.getElementById('toast');
@@ -593,7 +555,6 @@ function showToast(msg, type) {
   toastTimeout = setTimeout(() => el.classList.remove('show'), 3000);
 }
 
-// ── Obj inspect bubble ───────────────────────────────────────────────────────
 let objInspectTimeout = null;
 function showObjInspect(name, desc) {
   const el = document.getElementById('obj-inspect');
@@ -608,7 +569,6 @@ function hideObjInspect() {
   document.getElementById('obj-inspect').classList.remove('show');
 }
 
-// ── Module wrappers (inline onclick → module fns) ────────────────────────────
 function ghLoad(){ return window.lcStore.ghLoad(); }
 function ghSave(){ return window.lcStore.ghSave(); }
 function onTokenInput(){ return window.lcStore.onTokenInput(); }
@@ -682,8 +642,8 @@ window.addEventListener('DOMContentLoaded', () => {
 </script>
 
 <script src="mobile-zoom-fix.js"></script>
-<!-- Just before </body> -->
+<script src="scripts/chroma.js"></script>
+<script src="scripts/sprite.js"></script>
 <script src="scripts/ar.js"></script>
-<script src="scripts/ar-patch.js"></script>
 </body>
 </html>
