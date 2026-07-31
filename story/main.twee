@@ -2,6 +2,8 @@
 
 :: library {"id":"room_1785511396164","lat":44.649422,"lng":-63.585176,"radius":30,"cameraX":0,"cameraY":4,"cameraZ":14,"backdropUrl":"https://raw.githubusercontent.com/jonathaniscarroll/living-characters/main/media/room-backdrops/room_1785511387855.png"}
 
+:: new eroom {"id":"room_1785512355809","lat":44.652353,"lng":-63.585091,"radius":30,"cameraX":0,"cameraY":4,"cameraZ":14,"backdropUrl":"https://raw.githubusercontent.com/jonathaniscarroll/living-characters/main/media/room-backdrops/room_1785512343108.png"}
+
 :: mop {"roomIds":["room_1785507625629"],"homeRoomId":"room_1785507625629","workRoomId":"room_1785507625629","schedule":{"morning":"home","midday":"work","afternoon":"work","evening":"home","night":"home"},"mood":"Happy","items":[]}
 
 :: mop-hello
@@ -25,5 +27,8 @@ Hiio
 :: Me-question
 Ghh
 
-:: Tai {"roomIds":["room_1785507625629","room_1785511396164"],"homeRoomId":"room_1785511396164","workRoomId":"room_1785511396164","schedule":{"morning":"home","midday":"work","afternoon":"work","evening":"home","night":"home"},"mood":"Happy","items":[],"spriteUrls":{"walk":["https://raw.githubusercontent.com/jonathaniscarroll/living-characters/main/story/assets/char_1785512147739-sprite-walk-0.png",null]},"chromaKey":{"h":120,"tolerance":0.35,"spill":0.15}}
+:: taoir {"roomIds":["room_1785512355809"],"homeRoomId":"room_1785512355809","workRoomId":"room_1785512355809","schedule":{"morning":"home","midday":"work","afternoon":"work","evening":"home","night":"home"},"mood":"Happy","items":["hat"],"photoUrl":"https://raw.githubusercontent.com/jonathaniscarroll/living-characters/main/story/assets/char_1785512433974-photo.png","spriteUrls":{"idle":["https://raw.githubusercontent.com/jonathaniscarroll/living-characters/main/story/assets/char_1785512433974-sprite-idle-0.png","https://raw.githubusercontent.com/jonathaniscarroll/living-characters/main/story/assets/char_1785512433974-sprite-idle-1.png"],"walk":["https://raw.githubusercontent.com/jonathaniscarroll/living-characters/main/story/assets/char_1785512433974-sprite-walk-0.png","https://raw.githubusercontent.com/jonathaniscarroll/living-characters/main/story/assets/char_1785512433974-sprite-walk-1.png"],"talk":["https://raw.githubusercontent.com/jonathaniscarroll/living-characters/main/story/assets/char_1785512433974-sprite-talk-0.png","https://raw.githubusercontent.com/jonathaniscarroll/living-characters/main/story/assets/char_1785512433974-sprite-talk-1.png"],"listen":["https://raw.githubusercontent.com/jonathaniscarroll/living-characters/main/story/assets/char_1785512433974-sprite-listen-0.png","https://raw.githubusercontent.com/jonathaniscarroll/living-characters/main/story/assets/char_1785512433974-sprite-listen-1.png"]},"chromaKey":{"h":120,"tolerance":0.35,"spill":0.15}}
+
+:: taoir-hello
+hello
 
