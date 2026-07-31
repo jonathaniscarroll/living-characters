@@ -348,9 +348,10 @@
     if (_animator) _animator.setState('talk');
 
     if (typeof openTalkPanel === 'function') {
-      openTalkPanel(_character);
-    }
-  }
+  const liveChar = (window.characters || []).find(c => c.id === _character.id) || _character;
+  openTalkPanel(liveChar);
+}
+
 
   // ── Set character animation state ─────────────────────────
   function setCharacterState(state) {

@@ -1,0 +1,473 @@
+Here's the phased version -- each chunk is a self-contained prompt you paste in sequence:
+
+***
+
+## Phase 1 -- Chroma Key Engine
+
+> Read `jonathaniscarroll/living-characters/readme.md`. Then create `scripts/chroma.js` as a standalone module with no external dependencies.
+>
+> It must export three functions:
+>
+> **`chromaKey(imageDataUrl, options) → Promise<dataUrl>`**
+> Draws the image onto an offscreen canvas, iterates every pixel, converts RGB → HSL, and for each pixel:
+> - If hue is within `options.tolerance` of `options.h` (0–360) AND saturation > 0.2 → set alpha to 0
+> - If hue is within `options.tolerance + options.spill` of `options.h` → lerp alpha from 0→255 (soft fringe) and suppress green spill by shifting the green channel toward the average of red and blue
+> - Otherwise leave pixel unchanged
+> Returns a transparent-background PNG dataURL.
+> Default options: `{ h: 120, tolerance: 0.35, spill: 0.15 }`
+>
+> **`chromaKeyCanvas(sourceCanvas, options) → HTMLCanvasElement`**
+> Same algorithm but accepts an already-drawn canvas and returns a new canvas.
+>
+> **`sampleHue(imageDataUrl, x, y) → Promise<number>`**
+> Draws the image, reads the pixel at (x, y), converts to HSL, returns the hue (0–360).
+>
+> Include the RGB→HSL conversion inline (no imports). Expose all three on `window.lcChroma` and as ES module exports.
+>
+> Push as a single commit: `feat: chroma key engine (scripts/chroma.js)`
+
+***
+
+## Phase 2 -- Sprite Animator
+
+> Read `jonathaniscarroll/living-characters/readme.md`. Then create `scripts/sprite.js` as a standalone module with no external dependencies.
+>
+> It must define and expose a `SpriteAnimator` class:
+>
+> ```js
+> class SpriteAnimator {
+>   constructor(sprites, fallbackSrc)
+>   // sprites = { idle:[urlA,urlB], walk:[urlA,urlB], talk:[urlA,urlB], listen:[urlA,urlB] }
+>   // fallbackSrc = single image url/dataUrl used if no sprites exist
+>
+>   setState(state)     // 'idle'|'walk'|'talk'|'listen' -- resets elapsed time for the new state
+>   tick(deltaMs)       // advances internal elapsed timer, returns current dataUrl if frame changed, else null
+>   currentFrame()      // returns current dataUrl regardless of change
+> }
+> ```
+>
+> FPS per state: idle=1, walk=4, talk=3, listen=2.
+> Frame index = `Math.floor(elapsed / (1000/fps)) % frames.length`.
+> If a state has no frames, fall back to the first state that does, then to `fallbackSrc`, then to `null`.
+>
+> Expose as `window.SpriteAnimator` and as an ES module export.
+>
+> Push as a single commit: `feat: sprite animator class (scripts/sprite.js)`
+
+***
+
+## Phase 3 -- Store serialisation
+
+> Read `jonathaniscarroll/living-characters/scripts/store.js`.
+>
+> Make exactly two changes:
+>
+> **In `buildTweeSource`**, inside the character metadata object (`meta = { ... }`), add:
+> ```js
+> if (ch.sprites)   meta.sprites   = ch.sprites;
+> if (ch.chromaKey) meta.chromaKey = ch.chromaKey;
+> ```
+>
+> **In `importTweeSource`**, after the character object is constructed, add:
+> ```js
+> if (meta.sprites)   ch.sprites   = meta.sprites;
+> if (meta.chromaKey) ch.chromaKey = meta.chromaKey;
+> ```
+>
+> Do not change anything else in `store.js`.
+>
+> Push as a single commit: `fix: serialise sprites and chromaKey in twee store`
+
+***
+
+## Phase 4 -- Sprite upload grid + chroma key controls in Edit modal
+
+> Read `jonathaniscarroll/living-characters/scripts/modals.js` and the existing Edit Character modal HTML in `index.html`.
+>
+> Add a collapsible **"Sprite Frames"** section to the Edit Character modal, below the existing photo upload area. It must contain:
+>
+> **Chroma key controls** (shown at the top of the section):
+> - A colour swatch showing the current key colour (default green `#00ff00`)
+> - An eyedropper button -- when active, the next click on any preview image samples that pixel's hue via `window.lcChroma.sampleHue()` and updates the key colour swatch and the `h` value
+> - A **Tolerance** range slider (0–1, step 0.01, label "Amount removed", default 0.35)
+> - A **Spill** range slider (0–1, step 0.01, label "Edge softness", default 0.15)
+> - An **"Apply to all frames"** button that reruns `window.lcChroma.chromaKey()` on every already-uploaded sprite frame with the current settings and replaces the stored dataURLs + thumbnails
+>
+> **Sprite upload grid** -- four rows (Idle · Walk · Talk · Listen), each with two upload slots (Frame A, Frame B):
+> - Tap slot → hidden `<input type="file" accept="image/*">` click
+> - On file pick → read as dataURL → immediately run `window.lcChroma.chromaKey()` with current settings → store result on a local `pendingSprites` object → show thumbnail
+> - Thumbnails use a CSS checkerboard background so transparency is visible
+> - × button per slot clears that frame
+>
+> When `saveCharacter()` is called, copy `pendingSprites` onto `ch.sprites` and the current chroma settings onto `ch.chromaKey`.
+>
+> Do not remove any existing upload UI yet -- that happens in Phase 7.
+>
+> Push as a single commit: `feat: sprite upload grid + chroma key controls in edit modal`
+
+***
+
+## Phase 5 -- AR sprite billboard
+
+> Read `jonathaniscarroll/living-characters/scripts/ar.js`.
+>
+> Replace the GLB loader and `_buildBillboard` function with a unified sprite billboard. Keep everything else (camera feed, gyro drift, halo ring, tap-to-talk, open/close API) exactly as-is.
+>
+> Changes:
+> - Remove the `resolveGlbUrl`, `_loadModel`, and GLTFLoader references entirely
+> - In `open(character)`, after `_initThree(cv)`, call a new `_buildSpriteBillboard(character)` function
+> - `_buildSpriteBillboard(ch)`:
+>   - Creates a `SpriteAnimator` instance: `new window.SpriteAnimator(ch.sprites, ch.animData || ch.photoData)`
+>   - Creates `PlaneGeometry(1.0, 1.6)` + `MeshBasicMaterial({ transparent: true, alphaTest: 0.05, side: THREE.DoubleSide })`
+>   - Creates a `THREE.Texture()`, sets `texture.image = new Image()`, loads `animator.currentFrame()` into it
+>   - Creates the mesh, positions it at `(0, 0.8, 0)`, adds to scene
+>   - Stores animator and texture on module-level variables `_animator` and `_texture`
+> - In `_tick()`, after mixer update, call `_tickSprite(delta * 1000)`
+> - `_tickSprite(deltaMs)`:
+>   - Call `_animator.tick(deltaMs)`; if result is non-null (frame changed), update `_texture.image.src = result; _texture.needsUpdate = true`
+>   - Billboard faces camera: `_model.lookAt(_camera.position)`
+> - State transitions: when `openCard` is called from the canvas tap → set `_animator.setState('talk')`; expose a `window.ARView.setCharacterState(state)` so `card.js` can call it on close → `setState('idle')`
+> - In `close()`, null out `_animator` and `_texture`
+>
+> If character has no sprites and no fallback image, create a `PlaneGeometry` with `MeshBasicMaterial({ color: 0x4f98a3 })` and add a CSS label as a fallback -- don't crash.
+>
+> Push as a single commit: `feat: sprite billboard in AR view (remove GLB loader)`
+
+***
+
+## Phase 6 -- Room scene sprite billboard
+
+> Read `jonathaniscarroll/living-characters/scripts/room.js`.
+>
+> Find where character meshes/planes are built in the room Three.js scene. Replace the existing character rendering with a sprite billboard using `window.SpriteAnimator`, following the same pattern as Phase 5:
+> - One `SpriteAnimator` per character, stored in a map keyed by `ch.id`
+> - `PlaneGeometry(1.0, 1.6)` + `MeshBasicMaterial({ transparent: true, alphaTest: 0.05 })`
+> - Each frame of the room render loop: tick all animators, update textures where frame changed
+> - Billboard always faces the camera
+> - State: `'idle'` by default; `'talk'` when that character is the active/selected one; `'listen'` when a dialogue bubble is open and this character is active
+> - On room teardown, clean up all animators
+>
+> Push as a single commit: `feat: sprite billboard in room scene`
+
+***
+
+## Phase 7 -- Card animation + cleanup
+
+> This phase has two parts.
+>
+> **Part A -- `scripts/card.js`:**
+> Read the file. In `openCard(charId)`:
+> - If `ch.sprites` exists, create a `SpriteAnimator(ch.sprites, ch.animData || ch.photoData)` in `'talk'` state
+> - Start a `setInterval` at 250ms that calls `animator.tick(250)` and if a new frame is returned, updates the card image element's `src`
+> - Store the interval ID in a module-level variable
+> In `closeCard()`:
+> - Clear the interval, null the animator
+> - Call `window.ARView && window.ARView.setCharacterState('idle')` so the AR view responds too
+>
+> **Part B -- Cleanup:**
+> - Delete `scripts/ar-patch.js`, `scripts/fbx-to-glb.js`, `scripts/obj-to-glb.js`, `scripts/glb-picker.js`
+> - In `modals.js`: remove the GLB/FBX/OBJ upload UI blocks (the ones that reference `glb-picker.js`, `fbx-to-glb.js`, etc.)
+> - In `index.html`: remove the GLTFLoader `<script>` CDN tag; add `<script src="scripts/chroma.js">` and `<script src="scripts/sprite.js">` before `scripts/ar.js`
+>
+> Push everything in a single commit: `feat: card sprite animation + remove GLB upload pipeline`
+
+***
+
+## Phase 8 -- README update
+
+> Read `jonathaniscarroll/living-characters/readme.md`.
+>
+> Update it to reflect:
+> - The sprite billboard system has replaced 3D GLB models
+> - Characters use up to 8 images (2 frames × idle/walk/talk/listen states)
+> - Images are shot against any solid-colour background; chroma key is applied at upload time via the browser canvas pipeline
+> - The chroma key UI: eyedropper, tolerance slider, spill/edge slider, apply-to-all button
+> - `SpriteAnimator` class and `lcChroma` module are the two new core scripts
+> - The AR view uses a camera feed background + gyro-drifting billboard (no WebXR, works on all devices)
+> - Deleted files: ar-patch.js, fbx-to-glb.js, obj-to-glb.js, glb-picker.js
+>
+> Push as a single commit: `docs: update readme for sprite billboard + chroma key system`
+
+***
+
+Each phase is independently testable before moving to the next. Run them in order -- want me to start executing Phase 1 now?
+
+Sources
+
+Here's a precise prompt you can paste directly into a coding session or use as a GitHub issue:
+
+***
+
+**Bug: `photoData` and `animData` not persisted through Twee round-trip**
+
+In `scripts/store.js`, character photo and animation images are stored as base64 data URIs in `ch.photoData` and `ch.animData`. These fields are saved to `localStorage` by `save()`, but they are **never written into the Twee source** by `buildTweeSource()`, and `importTweeSource()` hardcodes `photoData: null, animData: null` on every character it reconstructs.
+
+Because `autoLoadFromGitHub()` calls `importTweeSource()` on every page load and then calls `save()` at the end, the localStorage copies are **overwritten with nulls** -- so images vanish after every reload even though they appeared to save.
+
+***
+
+**What needs to change in `store.js`:**
+
+**1. In `buildTweeSource` -- add to the character `meta` block:**
+```js
+if (ch.photoData && !ch.photoData.startsWith('http')) meta.photoData = ch.photoData;
+if (ch.animData  && !ch.animData.startsWith('http'))  meta.animData  = ch.animData;
+```
+Place these alongside the existing `glbUrl`, `sprites`, and `chromaKey` lines.
+
+**2. In `importTweeSource` -- restore on character reconstruction:**
+```js
+ch.photoData = meta.photoData || null;
+ch.animData  = meta.animData  || null;
+```
+Place these alongside the existing `sprites` and `chromaKey` restore lines.
+
+***
+
+**Constraints:**
+- Only embed if the value is a `data:` URI (not an `http` URL -- those don't need embedding)
+- No other files need changing; the fix is entirely within `buildTweeSource` and `importTweeSource` in `store.js`
+- After the fix, a full save → reload cycle should restore character icons exactly as they appeared before
+
+Sources
+
+
+Now I have everything. Here's the verified and corrected prompt with all issues resolved.
+
+***
+
+## Corrections found during repo review
+
+Before the clean prompt, here's what the draft got wrong or missed:
+
+| Issue | Draft said | Reality / Fix |
+|---|---|---|
+| `localStorage` blocked | "persist mode to `localStorage`" | `store.js` uses `localStorage` throughout already and it works fine -- the "no localStorage" constraint is sandbox-only (Perplexity's iframe); this repo serves from GitHub Pages, so `localStorage` is safe  |
+| `save()` silently swallows quota errors | Suggested "check if there's a try/catch" | It already has `try {} catch (e) {}` with no handler  -- the fix needs to actually strip dataUrls before saving, not just check |
+| `chromaKey` still written to `.twee` | Phase 2 said remove from `saveCharacter` only | `buildTweeSource` in `store.js` also writes `if (ch.chromaKey) meta.chromaKey = ch.chromaKey`  -- that line must also be removed |
+| Phase 4 data model code had a typo | `[_slots, _slots]` written literally | Should be `[_slots[0], _slots[1]]` etc. |
+| Phase 5a guard comment | `!input.files` written twice | Should be `!input.files[0]` |
+| `spriteUrls` loaded back as `sprites` on import | Overlooked | `importTweeSource` does `ch.sprites = meta.spriteUrls`  -- so on reload, sprite frames are GitHub URLs not dataUrls; Phase 3's texture cache must handle both `data:` and `https://` URLs |
+| No `room.js` sprite tick actually checked | Draft was speculative | Must read `room.js` -- but based on `sprite.js` structure  the animator is a class with `.tick()` that must be wired into the render loop |
+
+***
+
+## Verified implementation prompt
+
+***
+
+> ### Phase 1 -- Visitor/Facilitator mode + menu bar
+>
+> **Files:** `index.html`, `scripts/store.js`
+>
+> 1. At the **bottom of `store.js`**, before the `window.lcStore = {}` block, add:
+>    ```js
+>    let _lcMode = localStorage.getItem('lc_mode') || 'visitor';
+>    function lcSetMode(m) {
+>      _lcMode = m;
+>      localStorage.setItem('lc_mode', m);
+>      document.body.classList.toggle('facilitator-mode', m === 'facilitator');
+>    }
+>    window.lcMode = () => _lcMode;
+>    window.lcSetMode = lcSetMode;
+>    ```
+>    Add `lcSetMode` to both `window.lcStore` and `export {}`.
+>
+> 2. In the `DOMContentLoaded` listener at the bottom of `store.js`, after the token restore block, add:
+>    ```js
+>    lcSetMode(_lcMode); // apply persisted mode on load
+>    ```
+>
+> 3. In `index.html`, add `data-facilitator-only` to every top-bar element except the mode toggle button itself: Add Character, Add Room, the GitHub panel/drawer, the commit input, the Save/Load buttons, the Twee export/import buttons.
+>
+> 4. Add this CSS (inline `<style>` in `index.html` or existing stylesheet):
+>    ```css
+>    [data-facilitator-only] { display: none !important; }
+>    .facilitator-mode [data-facilitator-only] { display: revert !important; }
+>    ```
+>    **Use `display: revert` not `display: ''`** -- `''` does nothing as a CSS value.
+>
+> 5. The toggle button (keep it always visible, no `data-facilitator-only`):
+>    ```html
+>    <button onclick="window.lcSetMode(window.lcMode()==='visitor'?'facilitator':'visitor'); this.textContent = window.lcMode()==='facilitator'?'👥 Visitor':'🔧 Facilitator'">
+>      🔧 Facilitator
+>    </button>
+>    ```
+>    On `DOMContentLoaded`, set the button label to reflect persisted mode:
+>    ```js
+>    const modeBtn = document.querySelector('[data-mode-toggle]');
+>    if (modeBtn) modeBtn.textContent = _lcMode === 'facilitator' ? '👥 Visitor' : '🔧 Facilitator';
+>    ```
+>
+> 6. No password. One tap. Camp tool.
+
+***
+
+> ### Phase 2 -- Remove chroma UI, assume pre-cut images
+>
+> **Files:** `scripts/modals.js`, `scripts/store.js`
+>
+> **In `modals.js`:**
+> 1. In `buildSpriteSection()`, delete the entire `<!-- Chroma key controls -->` div block (the `<div>` containing `label "🔧 Chroma Key"` through the `"Apply to all frames"` button).
+> 2. Remove the module-level `chromaSettings` and `eyedropperActive` variables.
+> 3. In `onSpriteFileChange()`, remove the `lcChroma.chromaKey()` call. Replace the entire `reader.onload` body with:
+>    ```js
+>    reader.onload = e => {
+>      pendingSprites[state][frameIdx] = e.target.result;
+>      refreshSpriteSlot(state, frameIdx);
+>    };
+>    ```
+> 4. Delete these functions entirely: `applyChromaToAll`, `rerunChromaOnSlot`, `onChromaTolerance`, `onChromaSpill`, `toggleEyedropper`, `deactivateEyedropper`, `updateChromaSwatch`, `hueToHex`, `onSpriteImgClick` (the eyedropper sampling handler).
+> 5. Remove deleted functions from `window.lcModals = {}` and from `export {}`.
+>
+> **In `store.js`:**
+> 6. In `buildTweeSource()`, remove the line `if (ch.chromaKey) meta.chromaKey = ch.chromaKey;`
+> 7. In `importTweeSource()`, remove the line `if (meta.chromaKey) ch.chromaKey = meta.chromaKey;`
+> 8. In `saveCharacter()` in `modals.js`, remove `data.chromaKey = { ...chromaSettings }` and all reads of `ch.chromaKey`.
+
+***
+
+> ### Phase 3 -- Fix sprite animation not playing
+>
+> **Files:** `scripts/room.js`
+>
+> **3a. Pre-load a texture cache when a character's card opens.** Find where `SpriteAnimator` is instantiated (search for `new SpriteAnimator`). Immediately after instantiation, build a texture cache from all frame URLs -- both `data:` dataUrls and `https://` GitHub URLs are valid sources:
+> ```js
+> const _textureCache = new Map();
+> const allFrameUrls = Object.values(ch.sprites || ch.spriteUrls || {}).flat().filter(Boolean);
+> allFrameUrls.forEach(url => {
+>   if (!_textureCache.has(url)) {
+>     _textureCache.set(url, new THREE.TextureLoader().load(url));
+>   }
+> });
+> // Set initial frame immediately -- tick() returns null on first call for single-frame states
+> const initFrame = spriteAnimator.currentFrame();
+> if (initFrame && _textureCache.has(initFrame)) {
+>   billboard.material.map = _textureCache.get(initFrame);
+>   billboard.material.needsUpdate = true;
+> }
+> ```
+>
+> **3b. Wire `.tick()` into the render loop.** Find the render loop (search for `setAnimationLoop` or `requestAnimationFrame` in `room.js`). Add delta tracking and the texture-swap:
+> ```js
+> let _lastTime = performance.now();
+> // inside the render loop:
+> const now = performance.now();
+> const delta = now - _lastTime;
+> _lastTime = now;
+>
+> if (spriteAnimator && billboard) {
+>   const newFrame = spriteAnimator.tick(delta);
+>   if (newFrame && _textureCache.has(newFrame)) {
+>     billboard.material.map = _textureCache.get(newFrame);
+>     billboard.material.needsUpdate = true;
+>   }
+> }
+> ```
+>
+> **3c. On card close/character switch**, call `spriteAnimator = null` and clear `_textureCache` (call `.dispose()` on each cached texture to free GPU memory):
+> ```js
+> _textureCache.forEach(t => t.dispose());
+> _textureCache.clear();
+> ```
+
+***
+
+> ### Phase 4 -- Multi-image upload + drag-to-assign sprite UI
+>
+> **Files:** `scripts/modals.js`
+>
+> Replace `buildSpriteGrid()` with a two-step bulk-upload flow. Add a module-level `let _uploadedFrames = [];` alongside `pendingSprites`.
+>
+> **Step 1 -- Drop zone (replaces the old per-slot grid):**
+> ```html
+> <div id="sprite-dropzone" style="
+>   border: 2px dashed rgba(255,255,255,0.2); border-radius: 8px;
+>   padding: 20px; text-align: center; cursor: pointer;
+>   background: rgba(255,255,255,0.04); margin-bottom: 12px;
+>   transition: border-color 0.2s;
+> ">
+>   <div style="font-size:24px;margin-bottom:6px;">📁</div>
+>   <div style="font-size:13px;color:var(--text-muted,#999);">
+>     Drop images here or tap to browse<br>
+>     <span style="font-size:11px;">Up to 8 · PNG / JPG / WebP · no background needed</span>
+>   </div>
+>   <input type="file" id="sprite-bulk-input" multiple accept="image/*" style="display:none">
+> </div>
+> <!-- Uploaded thumbnail strip -->
+> <div id="sprite-strip" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;min-height:0;"></div>
+> ```
+>
+> Wire the drop zone: `dropzone.onclick = () => input.click()`. On `input.change` and `dropzone.drop`, read files with `FileReader` (up to 8 total), push dataUrls into `_uploadedFrames`, render thumbnails in `#sprite-strip`, and call `_autoAssignFrames()`.
+>
+> **Step 2 -- Assignment slots (2×4 grid):**
+> ```
+> [ Idle 1 ] [ Idle 2 ] [ Walk 1 ] [ Walk 2 ]
+> [ Talk 1 ] [ Talk 2 ] [Listen 1] [Listen 2]
+> ```
+> Render as `<div draggable="true">` slots. Thumbnails in the strip are also `draggable`. On `dragstart` store the frame URL in `event.dataTransfer.setData('text/plain', url)`. On slot `dragover` + `drop`, read the URL and assign it to that slot's position in `pendingSprites`.
+>
+> **Auto-assignment** `_autoAssignFrames()`:
+> ```js
+> const ORDER = ['idle-0','idle-1','walk-0','walk-1','talk-0','talk-1','listen-0','listen-1'];
+> _uploadedFrames.forEach((url, i) => {
+>   if (i >= 8) return;
+>   const [state, idx] = ORDER[i].split('-');
+>   pendingSprites[state][+idx] = url;
+> });
+> ```
+>
+> **Seed existing frames** when editing a character: at the top of `buildSpriteSection(ch)`, populate `_uploadedFrames` from `ch.sprites` / `ch.spriteUrls` in the same ORDER sequence, then render the strip and slots. This ensures the facilitator sees previously uploaded frames when re-opening a character's modal.
+>
+> **Style:** dark `rgba(255,255,255,0.08)` slot backgrounds, `var(--accent)` border when a frame is assigned, same 6px border-radius and 11px uppercase label style as the existing mood picker and prompt pills.
+
+***
+
+> ### Phase 5 -- Character photo persistence fix
+>
+> **Files:** `scripts/modals.js`, `scripts/store.js`
+>
+> **5a. Hydrate `tempPhotoData` from both `photoData` and `photoUrl`** in `openCharModal`:
+> ```js
+> // Replace the existing photo block:
+> if (ch && ch.photoData) {
+>   pp.src = ch.photoData; pp.style.display = 'block'; tempPhotoData = ch.photoData;
+> } else if (ch && ch.photoUrl) {
+>   pp.src = ch.photoUrl; pp.style.display = 'block'; tempPhotoData = ch.photoUrl;
+> } else {
+>   pp.src = ''; pp.style.display = 'none'; tempPhotoData = null;
+> }
+> ```
+>
+> **5b. Fix `save()` silently dropping data on localStorage quota errors.** The current `save()` in `store.js` has a bare `catch (e) {}` -- if `characters` contains large `photoData` / `animData` / `sprites` base64 blobs the write silently fails. Replace with a slim-save strategy:
+> ```js
+> function save() {
+>   try {
+>     localStorage.setItem('lc_rooms', JSON.stringify(rooms));
+>     // Strip binary blobs before writing chars to localStorage.
+>     // Large assets are already uploaded to GitHub as URLs by uploadAllPendingAssets().
+>     const slimChars = characters.map(ch => {
+>       const { photoData, animData, sprites, ...rest } = ch;
+>       // Keep spriteUrls (GitHub URLs, small) but not sprites (may contain data: blobs)
+>       return rest;
+>     });
+>     localStorage.setItem('lc_chars', JSON.stringify(slimChars));
+>     localStorage.setItem('lc_objects', JSON.stringify(objects));
+>   } catch (e) {
+>     console.warn('lc: localStorage save failed', e);
+>   }
+> }
+> ```
+>
+> **5c. In `saveCharacter()`, always write `photoData` explicitly:**
+> ```js
+> data.photoData = tempPhotoData || null;
+> data.animData  = tempAnimData  || null;
+> ```
+> These fields are already present in `data` -- confirm they are not conditionally omitted anywhere between `data = { ... }` and `Object.assign(ch, data)`.
+>
+> **5d. On `importTweeSource` load**, `ch.photoData = null` is already set [store.js line ~180] and `ch.photoUrl` is restored. The `openCharModal` fix in 5a handles the display. No further import change needed.
+
+Sources
+
+
