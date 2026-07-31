@@ -34,28 +34,18 @@ function loadGlbUrl(url, onLoad, onError) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// Backdrop image map — keys must match the <option value="..."> 
-// entries in the room modal. Only list keys that have a real
-// file in media/. Everything else gets a solid floor colour.
-// Paths are relative to index.html (served from repo root).
+// Backdrop image map
 // ─────────────────────────────────────────────────────────────
 const ROOM_BACKDROP_FILES = {
   grass:  './media/garden.png',
   forest: './media/garden.png',
   wood:   './media/room2.png',
   stone:  './media/room2.png',
-  // water and dark have no image — they use FLOOR_COLORS only
 };
 
-// ─────────────────────────────────────────────────────────────
-// Apply backdrop CSS to #room-stage consistently.
-// Priority: uploaded data URL > GitHub-committed URL > named key
-// ─────────────────────────────────────────────────────────────
 function applyRoomBackdrop(room) {
   const stage = document.getElementById('room-stage');
   if (!stage) return;
-
-  // Uploaded or GitHub-saved image takes top priority
   const uploadedSrc = room.backdropData || room.backdropUrl || null;
   if (uploadedSrc) {
     stage.style.cssText += [
@@ -65,8 +55,6 @@ function applyRoomBackdrop(room) {
     ].join(';');
     return;
   }
-
-  // Named backdrop key → relative media path
   const bgFile = ROOM_BACKDROP_FILES[room.backdrop];
   if (bgFile) {
     stage.style.backgroundImage    = `url('${bgFile}')`;
@@ -75,8 +63,6 @@ function applyRoomBackdrop(room) {
     stage.style.backgroundColor    = '';
     return;
   }
-
-  // Solid colour fallback
   stage.style.backgroundImage = '';
   stage.style.background = FLOOR_COLORS[room.backdrop] || '#1a1a2e';
 }
@@ -117,13 +103,8 @@ function spawnTalkCloseUp(ch) {
   const glbUrl = ch.glbUrl || ch.animData || ch.photoData || null;
   if (!glbUrl) return;
 
-  // Inherit zoom from the active room so the close-up feels consistent.
-  // The close-up camera is fixed at a portrait aspect (200×300), so we
-  // derive a slightly-boosted version of the room zoom rather than using
-  // it verbatim (keeps the character nicely framed in the small canvas).
   const activeRoom = rooms.find(r => r.id === activeRoomId);
   const roomZoom   = activeRoom?.cameraZoom ?? 2;
-  // Scale so the close-up sits between 1.5× and 3.5× — centred on roomZoom
   const closeUpZoom = Math.min(3.5, Math.max(1.5, roomZoom));
 
   const overlay = document.createElement('div');
@@ -213,7 +194,7 @@ function enableRoomEdit() {
   const btn = document.querySelector('.room-tbtn.move-obj');
   if (btn) {
     btn.style.background = _roomEditMode ? '#7a3090' : '';
-    btn.textContent = _roomEditMode ? '✅ Done Moving' : 'Move Objects';
+    btn.textContent = _roomEditMode ? '\u2705 Done Moving' : 'Move Objects';
   }
   if (!_roomEditMode) {
     if (_dragTarget) _commitDrag(_dragTarget);
@@ -386,6 +367,85 @@ function _tickWander(agent, dt) {
 }
 
 // ─────────────────────────────────────────────────────────────
+// SPRITE BILLBOARD STATE
+// Map<charId, { animator, texture, mesh }>
+// ─────────────────────────────────────────────────────────────
+const _spriteMap = new Map(); // chId → { animator, texture, mesh }
+
+/** Build a sprite billboard for one character and add it to the scene. */
+function _buildCharSprite(ch, cx, cz, scene) {
+  const THREE = window.THREE;
+  const fallbackSrc = ch.animData || ch.photoData || null;
+  const hasAnimator  = window.SpriteAnimator && (ch.sprites || fallbackSrc);
+
+  let mesh;
+
+  if (hasAnimator) {
+    const animator = new window.SpriteAnimator(ch.sprites || null, fallbackSrc);
+    const texture  = new THREE.Texture();
+    texture.image  = new Image();
+    texture.image.onload = () => { texture.needsUpdate = true; };
+    const firstFrame = animator.currentFrame();
+    if (firstFrame) texture.image.src = firstFrame;
+
+    const geo = new THREE.PlaneGeometry(1.0, 1.6);
+    const mat = new THREE.MeshBasicMaterial({
+      map: texture,
+      transparent: true,
+      alphaTest: 0.05,
+      side: THREE.DoubleSide,
+    });
+    mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(cx, 0.8, cz);
+    mesh._charId = ch.id;
+    scene.add(mesh);
+
+    _spriteMap.set(ch.id, { animator, texture, mesh });
+  } else {
+    // Colour-block fallback — no image
+    const mood = MOODS.find(m => m.label === ch.mood) || MOODS[0];
+    const geo  = new THREE.PlaneGeometry(1.0, 1.6);
+    const mat  = new THREE.MeshBasicMaterial({ color: mood.color, side: THREE.DoubleSide });
+    mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(cx, 0.8, cz);
+    mesh._charId = ch.id;
+    scene.add(mesh);
+    // No animator entry — mesh still participates in billboard facing
+    _spriteMap.set(ch.id, { animator: null, texture: null, mesh });
+  }
+
+  return mesh;
+}
+
+/** Tick all sprite animators and keep billboards facing the camera. */
+function _tickAllSprites(deltaMs, camera) {
+  _spriteMap.forEach(({ animator, texture, mesh }) => {
+    if (animator && texture) {
+      const frame = animator.tick(deltaMs);
+      if (frame !== null) {
+        texture.image.src = frame;
+        // needsUpdate set by image.onload
+      }
+    }
+    if (mesh && camera) mesh.lookAt(camera.position);
+  });
+}
+
+/** Set the animation state for a specific character. */
+function setRoomCharacterState(chId, state) {
+  const entry = _spriteMap.get(chId);
+  if (entry && entry.animator) entry.animator.setState(state);
+}
+
+/** Clean up all sprite animators and textures. */
+function _destroyAllSprites() {
+  _spriteMap.forEach(({ texture }) => {
+    if (texture) { try { texture.dispose(); } catch (_) {} }
+  });
+  _spriteMap.clear();
+}
+
+// ─────────────────────────────────────────────────────────────
 // BUILD ROOM SCENE
 // ─────────────────────────────────────────────────────────────
 function buildRoomScene(room) {
@@ -411,18 +471,12 @@ function buildRoomScene(room) {
   const camY = room.cameraY ?? 9;
   const camZ = room.cameraZ ?? 9;
   camera.position.set(camX, camY, camZ);
-
-  // Per-room zoom (clamped 0.5–5; default 2 matches old hard-coded value)
   camera.zoom = Math.min(5, Math.max(0.5, room.cameraZoom ?? 2));
-
-  // Per-room look-at target (default 0,0,0)
   camera.lookAt(
     room.cameraTargetX ?? 0,
     room.cameraTargetY ?? 0,
     room.cameraTargetZ ?? 0
   );
-
-  // After setting zoom we must update the projection matrix
   camera.updateProjectionMatrix();
 
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
@@ -484,7 +538,7 @@ function buildRoomScene(room) {
       model.traverse(c => { if (c.isMesh) c._objId = obj.id; });
       const lbl = document.createElement('div');
       lbl.className = 'obj-label';
-      lbl.textContent = '📦 ' + obj.name;
+      lbl.textContent = '\uD83D\uDCE6 ' + obj.name;
       stage.appendChild(lbl);
       const bbox3 = new THREE.Box3().setFromObject(model);
       labels.push({ label: lbl, obj: model, headY: bbox3.max.y + 0.2 });
@@ -516,7 +570,7 @@ function buildRoomScene(room) {
       mesh.traverse(c => { if (c.isMesh) c._objId = obj.id; });
       const lbl = document.createElement('div');
       lbl.className = 'obj-label';
-      lbl.textContent = '📦 ' + obj.name;
+      lbl.textContent = '\uD83D\uDCE6 ' + obj.name;
       stage.appendChild(lbl);
       labels.push({ label: lbl, obj: mesh, headY: 0.6 + 0.2 });
     }
@@ -532,19 +586,20 @@ function buildRoomScene(room) {
     objsInRoom.forEach(o => {
       const row = document.createElement('div');
       row.className = 'obj-list-row';
-      row.innerHTML = `<div class="obj-list-name">${o.name}</div><button class="obj-list-edit" onclick="openObjModal('${o.id}')">✏️</button>`;
+      row.innerHTML = `<div class="obj-list-name">${o.name}</div><button class="obj-list-edit" onclick="openObjModal('${o.id}')">\u270F\uFE0F</button>`;
       listC.appendChild(row);
     });
   }
 
-  // ── Characters ──
+  // ── Characters (sprite billboard) ──
   const charsInRoom = characters.filter(c => (c.roomIds || [c.roomId]).includes(room.id));
-  charsInRoom.forEach((ch, i) => {
+  charsInRoom.forEach((ch) => {
     const hasStoredPos = ch.sceneX != null && ch.sceneZ != null;
     const cx = hasStoredPos ? ch.sceneX : 0;
     const cz = hasStoredPos ? ch.sceneZ : 0;
     const mood = MOODS.find(m => m.label === ch.mood) || MOODS[0];
 
+    // Mood ring on the ground
     const ring = new THREE.Mesh(
       new THREE.RingGeometry(0.5, 0.7, 32),
       new THREE.MeshBasicMaterial({ color: mood.color, side: THREE.DoubleSide })
@@ -554,61 +609,20 @@ function buildRoomScene(room) {
     ring._moodRingCharId = ch.id;
     scene.add(ring);
 
-    if (ch.glbUrl) {
-      loadGlbUrl(ch.glbUrl, gltf => {
-        const model = gltf.scene;
-        const box = new THREE.Box3().setFromObject(model);
-        const size = new THREE.Vector3(); box.getSize(size);
-        const scale = 2 / Math.max(size.x, size.y, size.z);
-        model.scale.setScalar(scale);
-        const box2 = new THREE.Box3().setFromObject(model);
-        const floorOffset = -box2.min.y;
-        model.position.set(cx, floorOffset, cz);
-        model.rotation.y = Math.PI;
-        model.castShadow = true;
-        model._charId = ch.id;
-        scene.add(model);
-        model.traverse(c => { if (c.isMesh) c._charId = ch.id; });
-        charObjects.push({ obj: model, chId: ch.id, cx, cz });
-        const mixer = new THREE.AnimationMixer(model);
-        glbMixers.push(mixer);
-        _initWanderAgent(ch.id, model, ring, cx, cz, mixer, gltf.animations);
-        const box3 = new THREE.Box3().setFromObject(model);
-        const lbl = document.createElement('div');
-        lbl.className = 'char-label'; lbl.textContent = ch.name;
-        stage.appendChild(lbl);
-        labels.push({ label: lbl, obj: model, headY: box3.max.y + 0.3 });
-      }, () => fallbackChar());
-    } else if (ch.photoData || ch.animData) {
-      const tex = new THREE.TextureLoader().load(ch.animData || ch.photoData);
-      const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true }));
-      sprite.scale.set(1.8, 1.8, 1);
-      sprite.position.set(cx, 0.9, cz);
-      sprite._charId = ch.id;
-      scene.add(sprite);
-      charObjects.push({ obj: sprite, chId: ch.id, cx, cz });
-      _initWanderAgent(ch.id, sprite, ring, cx, cz, null, null);
-      const lbl = document.createElement('div');
-      lbl.className = 'char-label'; lbl.textContent = ch.name;
-      stage.appendChild(lbl);
-      labels.push({ label: lbl, obj: sprite, headY: 1.8 + 0.1 });
-    } else { fallbackChar(); }
+    // Build sprite billboard (handles fallback internally)
+    const mesh = _buildCharSprite(ch, cx, cz, scene);
 
-    function fallbackChar() {
-      const box = new THREE.Mesh(
-        new THREE.BoxGeometry(0.8, 1.4, 0.3),
-        new THREE.MeshLambertMaterial({ color: mood.color })
-      );
-      box.position.set(cx, 0.7, cz);
-      box.castShadow = true; box._charId = ch.id;
-      scene.add(box);
-      charObjects.push({ obj: box, chId: ch.id, cx, cz });
-      _initWanderAgent(ch.id, box, ring, cx, cz, null, null);
-      const lbl = document.createElement('div');
-      lbl.className = 'char-label'; lbl.textContent = ch.name;
-      stage.appendChild(lbl);
-      labels.push({ label: lbl, obj: box, headY: 1.4 + 0.1 });
-    }
+    charObjects.push({ obj: mesh, chId: ch.id, cx, cz });
+
+    // Wander AI — no GLB mixer for sprites; pass null
+    _initWanderAgent(ch.id, mesh, ring, cx, cz, null, null);
+
+    // Name label
+    const lbl = document.createElement('div');
+    lbl.className = 'char-label';
+    lbl.textContent = ch.name;
+    stage.appendChild(lbl);
+    labels.push({ label: lbl, obj: mesh, headY: 1.6 + 0.1 });
   });
 
   threeScene    = scene;
@@ -630,6 +644,8 @@ function buildRoomScene(room) {
     const dt = clock.getDelta();
     glbMixers.forEach(m => m.update(dt));
     _wanderAgents.forEach(agent => _tickWander(agent, dt));
+    // Tick sprite animators and face billboards toward camera
+    _tickAllSprites(dt * 1000, camera);
     if (_roomEditMode && _dragTarget && _lastRoomPointer) {
       const point = _screenToFloor(_lastRoomPointer, renderer, camera);
       if (point) {
@@ -693,7 +709,13 @@ function handleRoomTap(e, renderer, camera, charObjects) {
     });
     if (closest && minD < 3) {
       const ch = characters.find(c => c.id === closest);
-      if (ch) { openTalkPanel(ch); spawnTalkCloseUp(ch); }
+      if (ch) {
+        // Set talk state on the tapped character; idle on others
+        charsInRoom.forEach(c => setRoomCharacterState(c.id, 'idle'));
+        setRoomCharacterState(closest, 'talk');
+        openTalkPanel(ch);
+        spawnTalkCloseUp(ch);
+      }
     }
   }
 }
@@ -713,6 +735,8 @@ function destroyRoomScene() {
   _roomEditMode = false;
   threeScene = null;
   threeCamera = null;
+  // Clean up sprite animators and textures
+  _destroyAllSprites();
 }
 
 function editActiveRoom() {
@@ -788,12 +812,12 @@ window.lcRoom = {
   openRoom, closeRoom, buildRoomScene, destroyRoomScene, applyRoomBackdrop,
   editActiveRoom, openObjModal, closeObjModal, saveObject, deleteObject,
   showObjInspect, hideObjInspect, enableRoomEdit, onRoomObjectClick,
-  spawnTalkCloseUp, dismissTalkCloseUp
+  spawnTalkCloseUp, dismissTalkCloseUp, setRoomCharacterState,
 };
 
 export {
   openRoom, closeRoom, buildRoomScene, destroyRoomScene, applyRoomBackdrop,
   editActiveRoom, openObjModal, closeObjModal, saveObject, deleteObject,
   showObjInspect, hideObjInspect, enableRoomEdit, onRoomObjectClick,
-  spawnTalkCloseUp, dismissTalkCloseUp
+  spawnTalkCloseUp, dismissTalkCloseUp, setRoomCharacterState,
 };
