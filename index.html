@@ -235,8 +235,8 @@
     <button class="hbtn export-btn" onclick="previewTwee()">⬇ .twee</button>
     <button class="hbtn gh-load"   onclick="ghLoad()">☁ Load</button>
     <button class="hbtn gh-save"   onclick="ghSave()">☁ Save</button>
-    <button class="hbtn toggle-mode" onclick="toggleMode()">Projector</button>
-    <span id="mode-label">Facilitator</span>
+    <button class="hbtn toggle-mode" onclick="toggleMode()">Facilitator</button>
+    <span id="mode-label">Visitor</span>
   </div>
 </div>
 
@@ -536,7 +536,7 @@ var rooms=[], characters=[], objects=[], selectedChar=null, editingRoomId=null, 
 var tempPhotoData=null, tempAnimData=null, tempGlbData=null, tempBackdropData=null, tempObjectGlbData=null, tempBackdropUrl=null;
 var map, roomPickerMap, roomPickerMarker;
 var gpsWatchId=null, userLat=null, userLng=null;
-var simActive=false, simInterval=null, facilitatorMode=true, activeRoomId=null;
+var simActive=false, simInterval=null, facilitatorMode=false, activeRoomId=null;
 var threeScene=null, threeRenderer=null, threeCamera=null, threeAnimFrameId=null;
 var glbMixers=[];
 
