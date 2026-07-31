@@ -92,4 +92,375 @@
     .heading-needle{position:absolute;left:50%;top:50%;width:3px;height:52px;margin-left:-1.5px;margin-top:-52px;background:var(--accent);transform-origin:50% 100%;}
     .heading-needle::before{content:'';position:absolute;left:-5px;top:-8px;border-left:6.5px solid transparent;border-right:6.5px solid transparent;border-bottom:10px solid var(--accent);}
     .compass-list{font-size:11px;display:flex;flex-direction:column;gap:5px;}
-    .compass
+    .compass-item{display:flex;align-items:center;gap:6px;cursor:pointer;padding:3px 5px;border-radius:6px;transition:background .15s;}
+    .compass-item:hover{background:rgba(255,255,255,.08);}
+    .compass-arrow{font-size:16px;line-height:1;transition:transform .3s;}
+    .compass-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    .compass-dist{font-size:9px;color:var(--text-muted);}
+    #card-panel{position:fixed;top:var(--map-top);right:0;bottom:0;width:var(--card-w);z-index:1050;background:var(--surface);border-left:1px solid var(--border);overflow-y:auto;transform:translateX(100%);transition:transform .3s;display:flex;flex-direction:column;}
+    #card-panel.open{transform:translateX(0);}
+    .card-header{display:flex;align-items:center;gap:10px;padding:14px 14px 10px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface);z-index:2;}
+    .card-photo-wrap{width:56px;height:56px;border-radius:50%;overflow:hidden;background:var(--surface2);flex-shrink:0;border:2px solid var(--border);}
+    .card-photo-wrap img{width:100%;height:100%;object-fit:cover;}
+    .card-info{flex:1;min-width:0;}
+    .card-name{font-size:15px;font-weight:700;margin-bottom:2px;}
+    .card-mood{font-size:11px;color:var(--text-muted);}
+    #card-close{background:none;border:none;color:var(--text-muted);font-size:20px;cursor:pointer;padding:4px;}
+    .card-anim-wrap{width:100%;aspect-ratio:1;background:#000;overflow:hidden;position:relative;}
+    .card-anim-wrap img,.card-anim-wrap video{width:100%;height:100%;object-fit:contain;}
+    #card-sprite-stage{width:100%;aspect-ratio:1;background:#111;display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative;}
+    #card-sprite-canvas{image-rendering:pixelated;}
+    .card-items{padding:10px 14px;border-top:1px solid var(--border);}
+    .card-items h4{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);margin-bottom:8px;}
+    .items-list{display:flex;flex-wrap:wrap;gap:6px;}
+    .item-chip{font-size:11px;background:var(--surface2);padding:3px 9px;border-radius:20px;border:1px solid var(--border);}
+    .card-dialogue{padding:10px 14px;border-top:1px solid var(--border);}
+    .card-dialogue h4{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);margin-bottom:8px;}
+    .dialogue-option{display:block;width:100%;text-align:left;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;margin-bottom:6px;color:var(--text);cursor:pointer;font-size:12px;font-family:inherit;transition:background .15s;}
+    .dialogue-option:hover{background:#1a3050;}
+    .dialogue-response{background:rgba(255,255,255,.04);border-radius:8px;padding:10px 12px;font-size:12px;line-height:1.5;margin-top:4px;border:1px solid var(--border);}
+    .card-edit-btn{display:block;width:calc(100% - 28px);margin:10px 14px;padding:8px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text-muted);font-size:11px;cursor:pointer;font-family:inherit;}
+    .card-edit-btn:hover{color:var(--text);border-color:#ffffff40;}
+    .card-actions{padding:8px 14px;display:flex;gap:6px;border-top:1px solid var(--border);}
+    .card-act-btn{flex:1;padding:7px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:11px;cursor:pointer;font-family:inherit;}
+    .card-act-btn:hover{background:#1a3050;}
+    #room-view{position:fixed;top:var(--map-top);left:0;right:0;bottom:0;z-index:1040;background:var(--bg);display:none;flex-direction:column;}
+    #room-view.open{display:flex;}
+    #room-header{padding:10px 14px;border-bottom:1px solid var(--border);background:var(--surface);display:flex;flex-direction:column;gap:6px;}
+    #room-back{background:none;border:1px solid var(--border);color:var(--text-muted);padding:5px 10px;border-radius:6px;cursor:pointer;font-size:11px;align-self:flex-start;}
+    #room-title{font-size:16px;font-weight:700;}
+    #room-lede{font-size:12px;color:var(--text-muted);line-height:1.4;}
+    .room-toolbar{display:flex;gap:6px;flex-wrap:wrap;}
+    .room-tbtn{font-size:11px;padding:5px 10px;border-radius:6px;border:1px solid var(--border);background:var(--surface2);color:var(--text);cursor:pointer;font-family:inherit;}
+    .room-tbtn:hover{background:#1a3050;}
+    #room-stage{flex:1;position:relative;overflow:hidden;}
+    #obj-inspect{position:absolute;bottom:10px;left:10px;right:10px;background:rgba(10,15,30,.92);border:1px solid var(--border);border-radius:10px;padding:10px 14px;display:none;z-index:10;}
+    #obj-inspect.show{display:block;}
+    .oi-name{font-size:13px;font-weight:700;margin-bottom:4px;}
+    .oi-desc{font-size:11px;color:var(--text-muted);line-height:1.4;}
+    #obj-list-panel{position:absolute;top:10px;right:10px;background:rgba(10,15,30,.92);border:1px solid var(--border);border-radius:10px;padding:10px;width:180px;z-index:10;display:none;}
+    #obj-list-panel.show{display:block;}
+    #obj-list-panel h5{font-size:9px;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;}
+    #obj-list-container{display:flex;flex-direction:column;gap:4px;}
+    .obj-list-item{font-size:11px;padding:5px 8px;background:var(--surface2);border-radius:6px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;}
+    .obj-list-item:hover{background:#1a3050;}
+    .obj-list-item .obj-del{background:none;border:none;color:var(--accent);font-size:14px;cursor:pointer;padding:0 2px;}
+    #talk-panel{position:absolute;top:10px;left:10px;background:rgba(10,15,30,.95);border:1px solid var(--border);border-radius:10px;padding:12px;width:240px;z-index:12;display:none;}
+    #talk-panel.show{display:block;}
+    #talk-panel h5{font-size:11px;font-weight:700;margin-bottom:8px;}
+    .talk-opt{display:block;width:100%;text-align:left;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:6px 10px;margin-bottom:5px;color:var(--text);cursor:pointer;font-size:11px;font-family:inherit;}
+    .talk-opt:hover{background:#1a3050;}
+    #talk-response{font-size:11px;color:var(--accent2);margin-top:6px;line-height:1.4;display:none;}
+    #talk-close{background:none;border:none;color:var(--text-muted);font-size:13px;cursor:pointer;float:right;margin-top:-4px;}
+    .overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:2000;display:none;align-items:center;justify-content:center;padding:16px;}
+    .overlay.open{display:flex;}
+    .modal{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;display:flex;flex-direction:column;gap:12px;}
+    .modal h2{font-size:15px;font-weight:700;}
+    .modal label{font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px;}
+    .modal input,.modal textarea,.modal select{width:100%;background:rgba(255,255,255,.06);border:1px solid var(--border);border-radius:7px;padding:7px 10px;color:var(--text);font-size:12px;font-family:inherit;outline:none;}
+    .modal input:focus,.modal textarea:focus,.modal select:focus{border-color:var(--accent2);}
+    .modal textarea{resize:vertical;min-height:70px;}
+    .modal-row{display:flex;gap:8px;}
+    .modal-row>*{flex:1;}
+    .modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:4px;}
+    .mbtn{padding:8px 16px;border-radius:8px;border:none;cursor:pointer;font-family:inherit;font-size:12px;font-weight:600;}
+    .mbtn.primary{background:var(--accent);color:#fff;}
+    .mbtn.secondary{background:var(--surface2);color:var(--text);border:1px solid var(--border);}
+    .mbtn.danger{background:#5a1a2a;color:var(--accent);border:1px solid var(--accent);}
+    .photo-upload-area{border:2px dashed var(--border);border-radius:10px;padding:16px;text-align:center;cursor:pointer;transition:border-color .2s;position:relative;}
+    .photo-upload-area:hover{border-color:var(--accent2);}
+    .photo-upload-area input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;}
+    .photo-preview{width:80px;height:80px;border-radius:50%;object-fit:cover;border:2px solid var(--border);display:block;margin:0 auto 6px;}
+    .photo-hint{font-size:10px;color:var(--text-muted);}
+    #mini-map-wrap{position:relative;width:100%;height:160px;border-radius:8px;overflow:hidden;border:1px solid var(--border);}
+    #mini-map{width:100%;height:100%;}
+    .passage-list{display:flex;flex-direction:column;gap:6px;}
+    .passage-item{display:flex;gap:6px;align-items:flex-start;}
+    .passage-item select{flex:0 0 110px;}
+    .passage-item textarea{flex:1;min-height:48px;}
+    .passage-item .del-pass{background:none;border:none;color:var(--accent);font-size:18px;cursor:pointer;padding:4px 6px;line-height:1;}
+    #twee-preview-overlay{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:3000;display:none;flex-direction:column;}
+    #twee-preview-overlay.open{display:flex;}
+    #twee-preview-header{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid var(--border);background:var(--surface);}
+    #twee-source{flex:1;overflow:auto;padding:16px;font-family:monospace;font-size:11px;white-space:pre;color:var(--text);background:var(--bg);}
+    #toast{position:fixed;bottom:24px;right:24px;z-index:5000;background:var(--surface);border:1px solid var(--accent2);border-radius:10px;padding:10px 18px;font-size:12px;color:var(--accent2);pointer-events:none;opacity:0;transition:opacity .3s;max-width:260px;}
+    #toast.show{opacity:1;}
+    .mood-ring{width:14px;height:14px;border-radius:50%;display:inline-block;margin-right:4px;vertical-align:middle;animation:pulse 2s infinite;}
+    @keyframes pulse{0%,100%{transform:scale(1);opacity:1;}50%{transform:scale(1.3);opacity:.7;}}
+    .pin-label{font-size:10px;font-weight:700;color:#fff;text-shadow:0 1px 3px #000;text-align:center;margin-top:2px;pointer-events:none;}
+    .leaflet-marker-icon{background:none!important;border:none!important;}
+    .char-pin-wrap{display:flex;flex-direction:column;align-items:center;}
+    .char-pin-img{width:var(--pin-size);height:var(--pin-size);border-radius:50%;object-fit:cover;border:3px solid #fff;box-shadow:0 2px 8px #0008;background:#222;}
+    .char-pin-ring{width:calc(var(--pin-size) + 10px);height:calc(var(--pin-size) + 10px);border-radius:50%;position:absolute;top:-5px;left:-5px;animation:pulse 2s infinite;pointer-events:none;}
+    .sprite-pin-wrap{display:flex;flex-direction:column;align-items:center;}
+    .sprite-pin-canvas{width:var(--pin-size);height:var(--pin-size);image-rendering:pixelated;border-radius:50%;border:3px solid #fff;box-shadow:0 2px 8px #0008;}
+    .room-pin-wrap{display:flex;flex-direction:column;align-items:center;cursor:pointer;}
+    .room-pin-dot{width:22px;height:22px;border-radius:50%;background:var(--surface2);border:3px solid var(--accent2);box-shadow:0 2px 8px #0008;display:flex;align-items:center;justify-content:center;font-size:12px;}
+    .room-pin-label{font-size:9px;font-weight:700;color:#fff;text-shadow:0 1px 3px #000;margin-top:2px;white-space:nowrap;}
+    .sprite-editor{display:flex;flex-direction:column;gap:8px;padding:8px 0;}
+    .sprite-state-row{display:flex;align-items:center;gap:8px;}
+    .sprite-state-label{font-size:11px;font-weight:600;width:64px;text-transform:capitalize;}
+    .sprite-frame-slot{width:48px;height:48px;border:1px dashed var(--border);border-radius:6px;overflow:hidden;background:var(--surface2);cursor:pointer;position:relative;display:flex;align-items:center;justify-content:center;font-size:9px;color:var(--text-muted);}
+    .sprite-frame-slot img{width:100%;height:100%;object-fit:cover;image-rendering:pixelated;}
+    .sprite-frame-slot input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;}
+    .sprite-chroma-row{display:flex;align-items:center;gap:8px;margin-top:4px;}
+    .ar-btn-wrap{margin-top:6px;}
+    #ar-btn{display:none;width:100%;padding:9px;border-radius:9px;border:none;background:linear-gradient(135deg,#0f3460,var(--surface2));color:var(--accent2);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;}
+    #ar-status{font-size:10px;color:var(--text-muted);margin-top:4px;text-align:center;}
+    .room-obj-draggable{cursor:grab;position:absolute;user-select:none;}
+    .room-obj-draggable.dragging{cursor:grabbing;opacity:.8;z-index:100;}
+    .room-edit-overlay{position:absolute;inset:0;z-index:50;background:rgba(245,166,35,.05);border:2px dashed var(--accent2);display:none;pointer-events:none;}
+    .room-edit-overlay.active{display:block;}
+  </style>
+</head>
+<body>
+
+<div id="header">
+  <h1>🏠 Living Characters</h1>
+  <div class="btns">
+    <span id="gps-status">GPS: off</span>
+    <button class="hbtn gps-btn"   onclick="startGPS()">📍 GPS</button>
+    <button class="hbtn sim-btn"   onclick="startSim()">🚶 Simulate</button>
+    <button class="hbtn day-seg active" data-seg="morning"   onclick="setDaySegment('morning')">🌅</button>
+    <button class="hbtn day-seg"        data-seg="midday"    onclick="setDaySegment('midday')">☀️</button>
+    <button class="hbtn day-seg"        data-seg="afternoon" onclick="setDaySegment('afternoon')">🌤</button>
+    <button class="hbtn day-seg"        data-seg="evening"   onclick="setDaySegment('evening')">🌇</button>
+    <button class="hbtn day-seg"        data-seg="night"     onclick="setDaySegment('night')">🌙</button>
+    <button class="hbtn test-room" data-facilitator-only onclick="spawnTestRoom()">🧪 Test Room</button>
+    <button class="hbtn add-room"  data-facilitator-only onclick="openRoomModal(null)">+ Room</button>
+    <button class="hbtn add-char"  data-facilitator-only onclick="openCharModal(null)">+ Character</button>
+    <button class="hbtn import-btn" data-facilitator-only onclick="triggerImport()">⬆ .twee</button>
+    <button class="hbtn export-btn" data-facilitator-only onclick="previewTwee()">⬇ .twee</button>
+    <button class="hbtn gh-load"   data-facilitator-only onclick="ghLoad()">☁ Load</button>
+    <button class="hbtn gh-save"   data-facilitator-only onclick="ghSave()">☁ Save</button>
+    <button class="hbtn mode-toggle" data-mode-toggle onclick="window.lcSetMode(window.lcMode()==='visitor'?'facilitator':'visitor'); this.textContent = window.lcMode()==='facilitator'?'👥 Visitor':'🔧 Facilitator'">🔧 Facilitator</button>
+  </div>
+</div>
+
+<div id="gh-bar" data-facilitator-only>
+  <label for="gh-token-input">🔑 GitHub token:</label>
+  <input id="gh-token-input" type="password" placeholder="ghp_… (saved locally once entered)"
+         autocomplete="current-password" spellcheck="false" oninput="onTokenInput()" />
+  <input id="gh-commit-input" type="text" placeholder="Commit message (optional)" />
+  <span id="gh-status">not connected</span>
+</div>
+
+<div id="map"></div>
+
+<div id="compass-panel">
+  <h4>🧭 Rooms from here</h4>
+  <div class="compass-rose" id="compass-rose">
+    <div class="north">N</div>
+    <div class="heading-needle" id="heading-needle"></div>
+    <div class="center-dot"></div>
+  </div>
+  <div class="compass-list" id="compass-list"></div>
+</div>
+
+<div id="room-view">
+  <div id="room-header">
+    <button id="room-back" onclick="closeRoom()">← Map</button>
+    <div id="room-title">Room</div>
+    <div id="room-lede"></div>
+    <div class="room-toolbar">
+      <button class="room-tbtn edit-room" data-facilitator-only onclick="editActiveRoom()">✏️ Edit</button>
+      <button class="room-tbtn add-obj"   data-facilitator-only onclick="openObjModal(null)">📦 + Object</button>
+      <button class="room-tbtn move-obj"  data-facilitator-only onclick="enableRoomEdit()">Move Objects</button>
+    </div>
+  </div>
+  <div id="room-stage">
+    <div id="obj-inspect">
+      <div class="oi-name" id="oi-name"></div>
+      <div class="oi-desc" id="oi-desc"></div>
+    </div>
+    <div id="obj-list-panel">
+      <h5>Objects in room</h5>
+      <div id="obj-list-container"></div>
+    </div>
+    <div id="talk-panel">
+      <button id="talk-close" onclick="document.getElementById('talk-panel').classList.remove('show')">✕</button>
+      <h5 id="talk-char-name">Character</h5>
+      <div id="talk-options"></div>
+      <div id="talk-response"></div>
+    </div>
+    <div class="room-edit-overlay" id="room-edit-overlay"></div>
+  </div>
+</div>
+
+<div id="card-panel">
+  <div class="card-header">
+    <div class="card-photo-wrap"><img id="card-photo" src="" alt="" /></div>
+    <div class="card-info">
+      <div class="card-name" id="card-name"></div>
+      <div class="card-mood" id="card-mood"></div>
+    </div>
+    <button id="card-close" onclick="closeCard()">✕</button>
+  </div>
+  <div id="card-sprite-stage" style="display:none"><canvas id="card-sprite-canvas"></canvas></div>
+  <div class="card-anim-wrap" id="card-anim-wrap" style="display:none">
+    <img id="card-anim-gif" src="" alt="" style="display:none" />
+    <video id="card-anim-video" autoplay loop muted playsinline style="display:none"></video>
+  </div>
+  <div class="card-items">
+    <h4>Items</h4>
+    <div class="items-list" id="card-items-list"></div>
+  </div>
+  <div class="card-dialogue">
+    <h4>Talk</h4>
+    <div id="card-dialogue-options"></div>
+    <div class="dialogue-response" id="card-dialogue-response" style="display:none"></div>
+  </div>
+  <div class="card-actions">
+    <button class="card-act-btn" data-facilitator-only id="card-edit-btn" onclick="editCardChar()">✏️ Edit</button>
+    <button class="card-act-btn" data-facilitator-only id="card-delete-btn" onclick="deleteCardChar()">🗑 Delete</button>
+    <button class="card-act-btn" id="card-ar-btn" style="display:none" onclick="launchAR()">AR View</button>
+  </div>
+  <div class="ar-btn-wrap">
+    <button id="ar-btn" onclick="launchAR()">👁 View in AR</button>
+    <div id="ar-status"></div>
+  </div>
+</div>
+
+<!-- Character Modal -->
+<div class="overlay" id="char-modal">
+  <div class="modal">
+    <h2 id="char-modal-title">Add Character</h2>
+    <div>
+      <label>Name</label>
+      <input id="char-name-input" type="text" placeholder="Character name" />
+    </div>
+    <div>
+      <label>Mood</label>
+      <select id="char-mood-input">
+        <option>Happy</option><option>Sad</option><option>Angry</option>
+        <option>Scared</option><option>Excited</option><option>Curious</option>
+        <option>Mysterious</option><option>Friendly</option>
+      </select>
+    </div>
+    <div>
+      <label>Items (comma separated)</label>
+      <input id="char-items-input" type="text" placeholder="key, map, lantern" />
+    </div>
+    <div>
+      <label>Photo / Avatar</label>
+      <div class="photo-upload-area" id="char-photo-drop">
+        <img id="char-photo-preview" class="photo-preview" style="display:none" />
+        <div class="photo-hint">Click or drag a photo here</div>
+        <input type="file" accept="image/*" onchange="handleCharPhotoUpload(event)" />
+      </div>
+    </div>
+    <div>
+      <label>Animated GIF / Video (optional)</label>
+      <div class="photo-upload-area">
+        <div class="photo-hint" id="char-anim-hint">Click to add an animation</div>
+        <input type="file" accept="image/gif,video/*" onchange="handleCharAnimUpload(event)" />
+      </div>
+    </div>
+    <div>
+      <label>Sprite Sheets (2-frame flipbook per state)</label>
+      <div class="sprite-editor" id="sprite-editor"></div>
+      <div class="sprite-chroma-row">
+        <label style="margin:0;flex-shrink:0">Chroma colour</label>
+        <input type="color" id="sprite-chroma-color" value="#00ff00" style="width:40px;padding:2px;" />
+        <input type="range" id="sprite-chroma-thresh" min="0" max="1" step="0.01" value="0.35" style="flex:1" />
+        <span id="sprite-chroma-val" style="font-size:10px;color:var(--text-muted);width:28px">0.35</span>
+      </div>
+    </div>
+    <div>
+      <label>Dialogue</label>
+      <div class="passage-list" id="passage-list"></div>
+      <button class="mbtn secondary" onclick="addPassage()" style="margin-top:6px;width:100%">+ Add dialogue line</button>
+    </div>
+    <div>
+      <label>Place on map</label>
+      <div id="mini-map-wrap"><div id="mini-map"></div></div>
+    </div>
+    <div class="modal-actions">
+      <button class="mbtn danger" id="char-delete-btn" onclick="deleteChar()" style="display:none">Delete</button>
+      <button class="mbtn secondary" onclick="closeCharModal()">Cancel</button>
+      <button class="mbtn primary" onclick="saveChar()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Room Modal -->
+<div class="overlay" id="room-modal">
+  <div class="modal">
+    <h2 id="room-modal-title">Add Room</h2>
+    <div>
+      <label>Room name</label>
+      <input id="room-name-input" type="text" placeholder="e.g. The Forest Clearing" />
+    </div>
+    <div>
+      <label>Description / lede</label>
+      <textarea id="room-lede-input" placeholder="A mossy clearing where light filters through the canopy…"></textarea>
+    </div>
+    <div>
+      <label>Backdrop image (optional)</label>
+      <div class="photo-upload-area">
+        <img id="room-backdrop-preview" style="max-height:80px;display:none;margin:0 auto;" />
+        <div class="photo-hint" id="room-backdrop-hint">Click or drag an image</div>
+        <input type="file" accept="image/*" onchange="handleRoomBackdropUpload(event)" />
+      </div>
+    </div>
+    <div>
+      <label>Place on map</label>
+      <div id="mini-map-wrap-room"><div id="mini-map-room"></div></div>
+    </div>
+    <div class="modal-actions">
+      <button class="mbtn danger" id="room-delete-btn" onclick="deleteRoom()" style="display:none">Delete</button>
+      <button class="mbtn secondary" onclick="closeRoomModal()">Cancel</button>
+      <button class="mbtn primary" onclick="saveRoom()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Object Modal -->
+<div class="overlay" id="obj-modal">
+  <div class="modal">
+    <h2 id="obj-modal-title">Add Object</h2>
+    <div>
+      <label>Object name</label>
+      <input id="obj-name-input" type="text" placeholder="e.g. Ancient Chest" />
+    </div>
+    <div>
+      <label>Description</label>
+      <textarea id="obj-desc-input" placeholder="A weathered chest bound with iron…"></textarea>
+    </div>
+    <div>
+      <label>3D Model URL (.glb)</label>
+      <input id="obj-glb-input" type="url" placeholder="https://…/model.glb" />
+    </div>
+    <div class="modal-row">
+      <div><label>Scale</label><input id="obj-scale-input" type="number" value="1" min="0.1" step="0.1" /></div>
+    </div>
+    <div>
+      <label>Context / usage hint</label>
+      <input id="obj-context-input" type="text" placeholder="e.g. Needs a key to open" />
+    </div>
+    <div class="modal-actions">
+      <button class="mbtn danger" id="obj-delete-btn" onclick="deleteObj()" style="display:none">Delete</button>
+      <button class="mbtn secondary" onclick="closeObjModal()">Cancel</button>
+      <button class="mbtn primary" onclick="saveObj()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Twee Preview Overlay -->
+<div id="twee-preview-overlay">
+  <div id="twee-preview-header">
+    <span style="font-size:13px;font-weight:700">📄 Twee Export</span>
+    <div style="display:flex;gap:8px;">
+      <button class="mbtn secondary" onclick="downloadTwee()">⬇ Download .twee</button>
+      <button class="mbtn secondary" onclick="closeTweePreview()">✕ Close</button>
+    </div>
+  </div>
+  <pre id="twee-source"></pre>
+</div>
+
+<input type="file" id="twee-import-input" accept=".twee,.txt" style="display:none" onchange="handleImportFile(event)" />
+
+<div id="toast"></div>
+
+</body>
+</html>
