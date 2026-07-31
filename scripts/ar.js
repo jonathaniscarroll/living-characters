@@ -7,8 +7,9 @@
    1. getUserMedia (rear camera) → <video> fills the screen
    2. Three.js <canvas> sits on top with alpha:true so the video
       shows through
-   3. DeviceOrientation drives a gentle parallax/drift so the
-      sprite feels "anchored" in the room
+   3. DeviceOrientation drives a parallax so the sprite feels
+      "anchored" in the room — alpha (yaw/turning) drives X,
+      gamma (physical tilt) adds secondary X, beta drives Y.
    4. Tap the sprite → opens the same card + talk panel used in
       room mode (openCard / openTalkPanel from card.js)
    5. Exit button dismisses everything and stops the camera
@@ -50,6 +51,16 @@
 
   function getEl(id) { return document.getElementById(id); }
 
+  // Returns the shortest signed angle between two compass headings (degrees).
+  // Result is in the range -180..180.
+  function shortestAngle(a, b) {
+    return ((a - b + 540) % 360) - 180;
+  }
+
+  function clamp(v, lo, hi) {
+    return Math.max(lo, Math.min(hi, v));
+  }
+
   // ── safe texture disposal ───────────────────────────────────────────────
   function _disposeTexture(tex) {
     if (!tex) return;
@@ -64,10 +75,8 @@
   function _loadTextureFrame(texture, material, src) {
     if (!texture || !src) return;
     const img = new Image();
-    // Allow cross-origin hosted URLs (GitHub raw assets)
     img.crossOrigin = 'anonymous';
     img.onload = () => {
-      // Guard: if the module-level _texture has been replaced or nulled, bail.
       if (_texture !== texture) return;
       texture.image = img;
       texture.needsUpdate = true;
@@ -84,11 +93,19 @@
     _orientAlpha = e.alpha || 0;
     _orientBeta  = e.beta  || 0;
     _orientGamma = e.gamma || 0;
-    if (_baseAlpha === null) {
+    // Base is NO LONGER set here — see _scheduleBaseSnapshot() in open().
+  }
+
+  // ── snapshot base orientation after a short settle delay ─────────────────
+  // Called once per open(). Waits 300 ms so the sensor has fired at least
+  // a few times and given stable values before we lock in the reference.
+  function _scheduleBaseSnapshot() {
+    _baseAlpha = _baseBeta = _baseGamma = null;
+    setTimeout(() => {
       _baseAlpha = _orientAlpha;
       _baseBeta  = _orientBeta;
       _baseGamma = _orientGamma;
-    }
+    }, 300);
   }
 
   // ── build / tear down DOM ─────────────────────────────────────────────
@@ -156,7 +173,7 @@
     hud.innerHTML = '';
 
     const mood = (window.MOODS || []).find(m => m.label === ch.mood);
-    const moodEmoji = mood ? mood.emoji : '\u2728';
+    const moodEmoji = mood ? mood.emoji : '✨';
 
     const hint = document.createElement('div');
     hint.id = 'ar-hint';
@@ -185,7 +202,7 @@
     badge.textContent = `${moodEmoji}  ${ch.name}`;
 
     const exitBtn = document.createElement('button');
-    exitBtn.textContent = '\u2715 Exit AR';
+    exitBtn.textContent = '✕ Exit AR';
     exitBtn.style.cssText = [
       'pointer-events:all',
       'padding:10px 28px',
@@ -244,16 +261,7 @@
   }
 
   // ── Resolve the best sprite/fallback source for a character ──────────────
-  //
-  // Priority:
-  //   1. ch.sprites   — in-memory frames (may be data: URLs or hosted URLs)
-  //   2. ch.spriteUrls — hosted-only frames written back from store after upload
-  //   3. ch.animUrl / ch.animData — single animated image (GIF etc.)
-  //   4. ch.photoUrl / ch.photoData — static photo
-  //
-  // Returns { sprites, fallbackSrc } for SpriteAnimator.
   function _resolveCharacterMedia(ch) {
-    // Prefer sprites dict with at least one real (non-null) frame.
     const spritesSource = ch.sprites || ch.spriteUrls || null;
     let sprites = null;
     if (spritesSource && typeof spritesSource === 'object') {
@@ -262,10 +270,7 @@
       );
       if (hasAny) sprites = spritesSource;
     }
-
-    // Fallback single-image source.
     const fallbackSrc = ch.animUrl || ch.animData || ch.photoUrl || ch.photoData || null;
-
     return { sprites, fallbackSrc };
   }
 
@@ -276,7 +281,6 @@
     const hasAnimator = window.SpriteAnimator && (sprites || fallbackSrc);
 
     if (!hasAnimator) {
-      // Colour-block fallback — no image at all
       const geo = new THREE.PlaneGeometry(1.0, 1.6);
       const mat = new THREE.MeshBasicMaterial({ color: 0x4f98a3, side: THREE.DoubleSide });
       _model = new THREE.Mesh(geo, mat);
@@ -299,9 +303,8 @@
 
     _animator = new window.SpriteAnimator(sprites, fallbackSrc);
 
-    // Create texture — store in a local const so the onload closure is stable.
     const texture = new THREE.Texture();
-    _texture = texture;  // expose to module scope for _tickSprite + close()
+    _texture = texture;
 
     const geo = new THREE.PlaneGeometry(1.0, 1.6);
     const mat = new THREE.MeshBasicMaterial({
@@ -314,21 +317,20 @@
     _model.position.set(0, 0.8, 0);
     _scene.add(_model);
 
-    // Load first frame using the safe helper
     const firstFrame = _animator.currentFrame();
     if (firstFrame) _loadTextureFrame(texture, mat, firstFrame);
   }
 
   // ── Sprite tick ───────────────────────────────────────────────────────────────
+  // NOTE: lookAt is intentionally called AFTER the position lerp in _tick(),
+  // not here. _tickSprite only advances the animation frame.
   function _tickSprite(deltaMs) {
     if (!_animator || !_model) return;
     const frame = _animator.tick(deltaMs);
     if (frame !== null && _texture) {
-      // Use safe helper — the onload checks _texture is still this texture
       const mat = _model.material;
       _loadTextureFrame(_texture, mat, frame);
     }
-    _model.lookAt(_camera.position);
   }
 
   // ── Hit-test ──────────────────────────────────────────────────────────────────
@@ -350,19 +352,35 @@
     _tickSprite(delta * 1000);
 
     if (_baseAlpha !== null && _model) {
-      let dg = _orientGamma - _baseGamma;
-      let db = _orientBeta  - _baseBeta;
-      dg = Math.max(-30, Math.min(30, dg));
-      db = Math.max(-30, Math.min(30, db));
-      const targetX = (dg / 30) * -1.2;
-      const targetZ = (db / 30) *  0.6;
+      // Alpha  = compass yaw (turning body left/right)   — primary X driver
+      // Gamma  = physical left/right tilt of the device  — secondary X driver
+      // Beta   = forward/back tilt of the device          — Y driver
+      //
+      // shortestAngle wraps the alpha delta to -180..180 so crossing the
+      // 0°/360° boundary doesn't cause the character to fly across the screen.
+      const dalpha = shortestAngle(_orientAlpha, _baseAlpha);
+      const dgamma = clamp(_orientGamma - _baseGamma, -30, 30);
+      const dbeta  = clamp(_orientBeta  - _baseBeta,  -30, 30);
+
+      // Turning right → dalpha negative → targetX positive (sprite moves right)
+      // Tilting device right → dgamma positive → targetX negative (sprite moves left)
+      const targetX = (dalpha / 90) * -1.5 + (dgamma / 30) * -0.4;
+      const targetY = 0.8 + (dbeta / 30) * 0.3;
+
       _model.position.x += (targetX - _model.position.x) * 0.06;
-      _model.position.z += (targetZ - _model.position.z) * 0.06;
+      _model.position.y += (targetY - _model.position.y) * 0.06;
+      _model.position.z += (0       - _model.position.z) * 0.06;
+
+      // Subtle breathing bob — applied on top of the lerped Y
+      _model.position.y += Math.sin(Date.now() * 0.0008) * 0.02;
+
       if (_haloMesh) {
         _haloMesh.position.x = _model.position.x;
         _haloMesh.position.z = _model.position.z;
       }
-      _model.position.y += (Math.sin(Date.now() * 0.001) * 0.004);
+
+      // lookAt AFTER position is finalised for this frame — no one-frame lag
+      _model.lookAt(_camera.position);
     }
 
     if (_haloMesh) {
@@ -399,13 +417,23 @@
     _buildHUD(character);
     _initThree(cv);
 
-    _baseAlpha = _baseBeta = _baseGamma = null;
+    // Add orientation listener first so _orientAlpha/Beta/Gamma start updating,
+    // then snapshot the base values after 300 ms of settle time.
     window.addEventListener('deviceorientation', _onOrient, true);
     if (typeof DeviceOrientationEvent !== 'undefined' &&
         typeof DeviceOrientationEvent.requestPermission === 'function') {
-      DeviceOrientationEvent.requestPermission().then(s => {
-        if (s === 'granted') window.addEventListener('deviceorientation', _onOrient, true);
-      }).catch(() => {});
+      // iOS 13+ requires a user-gesture-gated permission call.
+      DeviceOrientationEvent.requestPermission()
+        .then(s => {
+          if (s === 'granted') {
+            window.addEventListener('deviceorientation', _onOrient, true);
+          }
+          _scheduleBaseSnapshot();
+        })
+        .catch(() => _scheduleBaseSnapshot());
+    } else {
+      // Android / desktop — listener is already live, just wait for settle.
+      _scheduleBaseSnapshot();
     }
 
     cv.addEventListener('pointerup', _onCanvasTap);
@@ -451,8 +479,6 @@
     try { if (_renderer) _renderer.dispose(); } catch (_) {}
     _renderer = _scene = _camera = _model = _haloMesh = _mixer = _clock = _raycaster = null;
 
-    // Null _texture BEFORE disposing so any in-flight onload callbacks
-    // see _texture !== their captured local and bail cleanly.
     const texToDispose = _texture;
     _texture = null;
     _disposeTexture(texToDispose);
