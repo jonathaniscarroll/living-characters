@@ -32,9 +32,66 @@ async function seedGhFileSha(token) {
   } catch (_) {}
 }
 
+/**
+ * validateToken
+ * -------------
+ * Called on every token input change. Hits GET /user to verify the token
+ * is valid and not expired, then checks X-OAuth-Scopes for 'repo' or
+ * 'public_repo'. Shows a clear status: username + scope tick, or a
+ * specific error message so problems are caught before a save attempt.
+ */
+async function validateToken(token) {
+  if (!token) {
+    setGhStatus('', '');
+    return;
+  }
+  setGhStatus('Checking token\u2026', '');
+  try {
+    const res = await fetch('https://api.github.com/user', {
+      headers: {
+        Authorization: 'token ' + token,
+        Accept: 'application/vnd.github.v3+json',
+      },
+    });
+    if (res.status === 401) {
+      setGhStatus('\u274C Token invalid or expired \u2014 generate a new one at github.com/settings/tokens', 'err');
+      return;
+    }
+    if (!res.ok) {
+      setGhStatus('\u274C GitHub error ' + res.status, 'err');
+      return;
+    }
+    const user = await res.json();
+    const scopeHeader = res.headers.get('X-OAuth-Scopes') || '';
+    const scopes = scopeHeader.split(',').map(s => s.trim()).filter(Boolean);
+    const hasWrite = scopes.includes('repo') || scopes.includes('public_repo');
+    if (!hasWrite) {
+      // Fine-grained tokens don't emit X-OAuth-Scopes; treat empty scope list as fine-grained (may work).
+      const isFineGrained = scopes.length === 0;
+      if (isFineGrained) {
+        setGhStatus(`\u2705 ${user.login} (fine-grained token \u2014 ensure Contents: write is enabled)`, 'ok');
+      } else {
+        setGhStatus(`\u26A0\uFE0F ${user.login} \u2014 token missing repo scope (has: ${scopes.join(', ') || 'none'})`, 'err');
+        return;
+      }
+    } else {
+      setGhStatus(`\u2705 ${user.login} \u2014 token OK`, 'ok');
+    }
+    // Token looks good — seed the SHA for the twee file.
+    seedGhFileSha(token);
+  } catch (e) {
+    setGhStatus('\u274C Could not reach GitHub: ' + e.message, 'err');
+  }
+}
+
 function onTokenInput() {
   const t = document.getElementById('gh-token-input').value.trim();
-  if (t) { localStorage.setItem('lc_gh_token', t); setGhStatus('token saved \u2713', 'ok'); seedGhFileSha(t); }
+  if (t) {
+    localStorage.setItem('lc_gh_token', t);
+    validateToken(t);
+  } else {
+    setGhStatus('', '');
+  }
 }
 
 async function autoLoadFromGitHub() {
@@ -127,13 +184,10 @@ async function uploadCharacterAsset(charId, field, dataUrl) {
 }
 
 // ── Sprite asset upload ────────────────────────────────────────────────────────
-// Uploads any sprite frame that is still a data: URL to
-// story/assets/{charId}-sprite-{state}-{frame}.png
-// and replaces the data URL with the hosted URL on ch.spriteUrls.
 async function uploadPendingSprites(ch) {
   if (!ch.sprites) return;
   const token = getToken();
-  if (!token) return; // no token — skip, keep data URLs in memory only
+  if (!token) return;
   if (!ch.spriteUrls) ch.spriteUrls = {};
   const STATES = ['idle', 'walk', 'talk', 'listen'];
   for (const state of STATES) {
@@ -146,8 +200,6 @@ async function uploadPendingSprites(ch) {
       const url = await uploadCharacterAsset(ch.id, `sprite-${state}-${i}`, frame);
       if (url) {
         ch.spriteUrls[state][i] = url;
-        // Replace the data URL with the hosted URL in sprites so the
-        // in-memory object stays consistent with what we wrote to GitHub.
         ch.sprites[state][i] = url;
       }
     }
@@ -164,7 +216,6 @@ async function uploadAllPendingAssets() {
       const url = await uploadCharacterAsset(ch.id, 'anim', ch.animData);
       if (url) ch.animUrl = url;
     }
-    // Upload sprite frames that are still data URLs
     await uploadPendingSprites(ch);
   }
   save();
@@ -189,7 +240,10 @@ async function ghSave() {
     });
     if (!res.ok) {
       const errData = await res.json();
-      if (res.status === 409 || res.status === 422) {
+      if (res.status === 401) {
+        setGhStatus('\u274C 401 Unauthorized \u2014 token expired or missing repo scope. Re-enter your token.', 'err');
+        showToast('Token invalid \u2014 re-enter in the GitHub panel', 'err');
+      } else if (res.status === 409 || res.status === 422) {
         ghFileSha = null; setGhStatus('SHA conflict \u2014 re-syncing, try Save again', 'err'); seedGhFileSha(token);
       } else {
         setGhStatus('Save failed: ' + (errData.message || 'HTTP ' + res.status), 'err');
@@ -267,10 +321,7 @@ function buildTweeSource(roomsList, chars, objs) {
     if (ch.animUrl)  meta.animUrl  = ch.animUrl;
 
     // Sprites: only write hosted URLs — never data: blobs.
-    // ch.spriteUrls is populated by uploadPendingSprites() before ghSave
-    // writes the twee. ch.sprites may contain data URLs (in-memory only).
     if (ch.spriteUrls) {
-      // Only include states that have at least one hosted URL
       const hostedSprites = {};
       let any = false;
       Object.entries(ch.spriteUrls).forEach(([state, frames]) => {
@@ -404,7 +455,6 @@ function importTweeSource(src, silent) {
         };
         if (typeof meta.lat === 'number') ch.lat = meta.lat;
         if (typeof meta.lng === 'number') ch.lng = meta.lng;
-        // Restore spriteUrls (hosted) into both spriteUrls and sprites
         if (meta.spriteUrls) { ch.spriteUrls = meta.spriteUrls; ch.sprites = meta.spriteUrls; }
         if (meta.chromaKey) ch.chromaKey = meta.chromaKey;
         newChars.push(ch);
@@ -501,7 +551,12 @@ function loadLocal() {
 
 window.addEventListener('DOMContentLoaded', () => {
   const saved = localStorage.getItem('lc_gh_token');
-  if (saved) document.getElementById('gh-token-input').value = saved;
+  if (saved) {
+    document.getElementById('gh-token-input').value = saved;
+    // Validate the stored token immediately on load so status is accurate
+    // before the facilitator attempts a save.
+    validateToken(saved);
+  }
   autoLoadFromGitHub();
 });
 
@@ -510,8 +565,8 @@ window.lcStore = {
   buildTweeSource, buildTweeStandalone,
   previewTwee, closeTweePreview, downloadTwee, triggerImport, handleImportFile,
   importTweeSource, onTokenInput, setGhStatus, getToken, decodeBase64Unicode,
-  seedGhFileSha, uploadRoomBackdropToGitHub, uploadCharacterAsset, uploadAllPendingAssets,
-  uploadPendingSprites
+  seedGhFileSha, validateToken, uploadRoomBackdropToGitHub, uploadCharacterAsset,
+  uploadAllPendingAssets, uploadPendingSprites, showToast
 };
 
 export {
@@ -519,6 +574,6 @@ export {
   buildTweeSource, buildTweeStandalone,
   previewTwee, closeTweePreview, downloadTwee, triggerImport, handleImportFile,
   importTweeSource, onTokenInput, setGhStatus, getToken, decodeBase64Unicode,
-  seedGhFileSha, uploadRoomBackdropToGitHub, uploadCharacterAsset, uploadAllPendingAssets,
-  uploadPendingSprites
+  seedGhFileSha, validateToken, uploadRoomBackdropToGitHub, uploadCharacterAsset,
+  uploadAllPendingAssets, uploadPendingSprites, showToast
 };
