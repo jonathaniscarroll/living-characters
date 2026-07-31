@@ -229,7 +229,7 @@ function uploadRoomBackdrop() {
 }
 
 // ---------------------------------------------------------------------------
-// Sprite state (module-level, reset on each openCharModal call)
+// Sprite state (reset on each openCharModal call)
 // ---------------------------------------------------------------------------
 
 let pendingSprites = { idle: [null, null], walk: [null, null], talk: [null, null], listen: [null, null] };
@@ -238,7 +238,6 @@ let _uploadedFrames = [];
 const SPRITE_STATES = ['idle', 'walk', 'talk', 'listen'];
 const SPRITE_STATE_LABELS = { idle: 'Idle', walk: 'Walk', talk: 'Talk', listen: 'Listen' };
 
-/** CSS checkerboard pattern for transparent-bg thumbnails */
 const CHECKERBOARD_STYLE = [
   'background-image:linear-gradient(45deg,#ccc 25%,transparent 25%),',
   'linear-gradient(-45deg,#ccc 25%,transparent 25%),',
@@ -249,12 +248,8 @@ const CHECKERBOARD_STYLE = [
   'background-color:#fff;'
 ].join('');
 
-// ---------------------------------------------------------------------------
-// Sprite ORDER mapping (shared by auto-assign and seed)
-// ---------------------------------------------------------------------------
 const SPRITE_ORDER = ['idle-0','idle-1','walk-0','walk-1','talk-0','talk-1','listen-0','listen-1'];
 
-/** Auto-assign _uploadedFrames into pendingSprites in ORDER sequence */
 function _autoAssignFrames() {
   SPRITE_ORDER.forEach((key, i) => {
     if (i >= _uploadedFrames.length) return;
@@ -263,7 +258,6 @@ function _autoAssignFrames() {
   });
 }
 
-/** Render the thumbnail strip from _uploadedFrames */
 function _renderStrip() {
   const strip = document.getElementById('sprite-strip');
   if (!strip) return;
@@ -293,7 +287,6 @@ function _renderStrip() {
   });
 }
 
-/** Process files array (from input or drop) \u2014 up to 8 total */
 function _ingestFiles(files) {
   const remaining = 8 - _uploadedFrames.length;
   if (remaining <= 0) return;
@@ -315,16 +308,13 @@ function _ingestFiles(files) {
   });
 }
 
-/** Build and inject the Sprite Frames section into the char modal */
 function buildSpriteSection(ch) {
   const existing = document.getElementById('sprite-frames-section');
   if (existing) existing.remove();
 
-  // Reset state
   pendingSprites = { idle: [null, null], walk: [null, null], talk: [null, null], listen: [null, null] };
   _uploadedFrames = [];
 
-  // Seed from existing character sprites
   if (ch && (ch.sprites || ch.spriteUrls)) {
     const src = ch.sprites || ch.spriteUrls;
     SPRITE_ORDER.forEach(key => {
@@ -350,8 +340,6 @@ function buildSpriteSection(ch) {
       \uD83C\uDFAC Sprite Frames
     </button>
     <div id="sprite-section-body" style="display:none;margin-top:10px;">
-
-      <!-- Step 1: Drop zone -->
       <div id="sprite-dropzone" style="
         border:2px dashed rgba(255,255,255,0.2);border-radius:8px;
         padding:20px;text-align:center;cursor:pointer;
@@ -365,17 +353,11 @@ function buildSpriteSection(ch) {
         </div>
         <input type="file" id="sprite-bulk-input" multiple accept="image/*" style="display:none">
       </div>
-
-      <!-- Uploaded thumbnail strip -->
       <div id="sprite-strip" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;min-height:0;"></div>
-
-      <!-- Step 2: Assignment grid (2\u00D74) -->
       <div id="sprite-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;"></div>
-
     </div>
   `;
 
-  // Insert before modal actions or at bottom of modal body
   const form = document.getElementById('char-modal-overlay');
   const target = form ? form.querySelector('.modal-actions, .char-save-btn, #char-modal-save') : null;
   if (target) {
@@ -386,7 +368,6 @@ function buildSpriteSection(ch) {
     else document.getElementById('char-modal-overlay').appendChild(section);
   }
 
-  // Wire drop zone after injection
   const dropzone = document.getElementById('sprite-dropzone');
   const bulkInput = document.getElementById('sprite-bulk-input');
   if (dropzone && bulkInput) {
@@ -397,23 +378,15 @@ function buildSpriteSection(ch) {
         bulkInput.value = '';
       }
     });
-    dropzone.addEventListener('dragover', e => {
-      e.preventDefault();
-      dropzone.style.borderColor = 'var(--accent,#a855f7)';
-    });
-    dropzone.addEventListener('dragleave', () => {
-      dropzone.style.borderColor = 'rgba(255,255,255,0.2)';
-    });
+    dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.style.borderColor = 'var(--accent,#a855f7)'; });
+    dropzone.addEventListener('dragleave', () => { dropzone.style.borderColor = 'rgba(255,255,255,0.2)'; });
     dropzone.addEventListener('drop', e => {
       e.preventDefault();
       dropzone.style.borderColor = 'rgba(255,255,255,0.2)';
-      if (e.dataTransfer.files && e.dataTransfer.files.length) {
-        _ingestFiles(e.dataTransfer.files);
-      }
+      if (e.dataTransfer.files && e.dataTransfer.files.length) _ingestFiles(e.dataTransfer.files);
     });
   }
 
-  // Render initial strip + grid (will show seeded frames if editing)
   _renderStrip();
   _renderAssignmentGrid();
 }
@@ -423,7 +396,6 @@ function _renderAssignmentGrid() {
   if (!grid) return;
   grid.innerHTML = '';
 
-  // 2\u00D74: row 0 = Idle1,Idle2,Walk1,Walk2 | row 1 = Talk1,Talk2,Listen1,Listen2
   SPRITE_ORDER.forEach(key => {
     const [state, idx] = key.split('-');
     const frameIdx = +idx;
@@ -446,7 +418,6 @@ function _renderAssignmentGrid() {
       img.src = dataUrl;
       img.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:contain;';
       slot.appendChild(img);
-
       const clearBtn = document.createElement('button');
       clearBtn.textContent = '\u00D7';
       clearBtn.title = 'Remove frame';
@@ -460,7 +431,6 @@ function _renderAssignmentGrid() {
       slot.appendChild(plus);
     }
 
-    // State label at bottom
     const lbl = document.createElement('span');
     lbl.textContent = label;
     lbl.style.cssText = [
@@ -471,23 +441,12 @@ function _renderAssignmentGrid() {
     ].join('');
     slot.appendChild(lbl);
 
-    // Drag-over: accept URLs from strip thumbs
-    slot.addEventListener('dragover', e => {
-      e.preventDefault();
-      slot.style.borderColor = 'var(--accent,#a855f7)';
-    });
-    slot.addEventListener('dragleave', () => {
-      slot.style.borderColor = dataUrl
-        ? 'var(--accent,#a855f7)'
-        : 'rgba(255,255,255,0.2)';
-    });
+    slot.addEventListener('dragover', e => { e.preventDefault(); slot.style.borderColor = 'var(--accent,#a855f7)'; });
+    slot.addEventListener('dragleave', () => { slot.style.borderColor = dataUrl ? 'var(--accent,#a855f7)' : 'rgba(255,255,255,0.2)'; });
     slot.addEventListener('drop', e => {
       e.preventDefault();
       const url = e.dataTransfer.getData('text/plain');
-      if (url) {
-        pendingSprites[state][frameIdx] = url;
-        _renderAssignmentGrid();
-      }
+      if (url) { pendingSprites[state][frameIdx] = url; _renderAssignmentGrid(); }
     });
 
     grid.appendChild(slot);
@@ -514,15 +473,16 @@ function toggleSpriteSection() {
 
 function openCharModal(charId) {
   editingCharId = charId;
+  // Reset upload buffers (declared in globals.js)
   tempPhotoData = null;
   tempAnimData  = null;
+
   const ch = charId ? characters.find(c => c.id === charId) : null;
   document.getElementById('char-modal-title').textContent = ch ? 'Edit Character' : 'Add a Character';
   document.getElementById('cf-name').value = ch ? ch.name : '';
   document.getElementById('cf-items').value = ch ? (ch.items || []).join(', ') : '';
   const currentIds = ch ? (ch.roomIds || (ch.roomId ? [ch.roomId] : [])) : [];
   buildRoomChipPicker(currentIds);
-
   populateHomeWorkSelects(currentIds, ch?.homeRoomId || null, ch?.workRoomId || null);
 
   const segs = ['morning', 'midday', 'afternoon', 'evening', 'night'];
@@ -535,12 +495,24 @@ function openCharModal(charId) {
     });
   });
 
+  // Phase 5a: hydrate tempPhotoData from photoData OR photoUrl
   const pp = document.getElementById('cf-photo-preview');
-  if (ch && ch.photoData) { pp.src = ch.photoData; pp.style.display = 'block'; tempPhotoData = ch.photoData; }
-  else { pp.src = ''; pp.style.display = 'none'; }
+  if (ch && ch.photoData) {
+    pp.src = ch.photoData; pp.style.display = 'block'; tempPhotoData = ch.photoData;
+  } else if (ch && ch.photoUrl) {
+    pp.src = ch.photoUrl; pp.style.display = 'block'; tempPhotoData = ch.photoUrl;
+  } else {
+    pp.src = ''; pp.style.display = 'none'; tempPhotoData = null;
+  }
+
   const ap = document.getElementById('cf-anim-preview');
-  if (ch && ch.animData) { ap.src = ch.animData; ap.style.display = 'block'; tempAnimData = ch.animData; }
-  else { ap.src = ''; ap.style.display = 'none'; }
+  if (ch && ch.animData) {
+    ap.src = ch.animData; ap.style.display = 'block'; tempAnimData = ch.animData;
+  } else if (ch && ch.animUrl) {
+    ap.src = ch.animUrl; ap.style.display = 'block'; tempAnimData = ch.animUrl;
+  } else {
+    ap.src = ''; ap.style.display = 'none'; tempAnimData = null;
+  }
 
   const mp = document.getElementById('mood-picker');
   mp.innerHTML = '';
@@ -592,8 +564,6 @@ function openCharModal(charId) {
   });
 
   rebuildObjectUsagePrompts();
-
-  // Build sprite section (always, since it manages its own state)
   buildSpriteSection(ch);
 
   const hint = document.getElementById('cf-room-chips-hint');
@@ -620,7 +590,6 @@ function closeCharModal() {
   editingCharId = null;
   tempPhotoData = null;
   tempAnimData  = null;
-  // Reset sprite state
   pendingSprites = { idle: [null, null], walk: [null, null], talk: [null, null], listen: [null, null] };
   _uploadedFrames = [];
   delete window._pendingCharLat;
@@ -667,7 +636,6 @@ function saveCharacter() {
 
   const primaryRoomId = roomIds[0] || '';
   const items = document.getElementById('cf-items').value.split(',').map(s => s.trim()).filter(Boolean);
-
   const activeMoodBtn = document.querySelector('#mood-picker .mood-opt.active');
   const moodLabel = MOODS.find(m => activeMoodBtn && activeMoodBtn.textContent.includes(m.emoji))?.label || 'Happy';
   const homeRoomId = document.getElementById('cf-home-room').value || roomIds[0] || null;
@@ -680,7 +648,6 @@ function saveCharacter() {
     if (text) passages.push({ type: row.dataset.key, text });
   });
 
-  // Build sprites object \u2014 only include states that have at least one frame
   const sprites = {};
   let hasAnySprite = false;
   SPRITE_STATES.forEach(state => {
@@ -688,22 +655,20 @@ function saveCharacter() {
     if (frames.length) { sprites[state] = pendingSprites[state]; hasAnySprite = true; }
   });
 
+  // Phase 5c: always write photoData / animData explicitly
   const data = {
     name, roomId: primaryRoomId, roomIds,
     homeRoomId, workRoomId, schedule,
     mood: moodLabel, items, passages,
-    photoData: tempPhotoData,
-    animData:  tempAnimData,
+    photoData: tempPhotoData || null,
+    animData:  tempAnimData  || null,
   };
 
-  // Persist sprites if any frames were uploaded
   if (hasAnySprite) {
     data.sprites = sprites;
   } else if (editingCharId) {
     const existingChar = characters.find(c => c.id === editingCharId);
-    if (existingChar && existingChar.sprites) {
-      data.sprites = existingChar.sprites;
-    }
+    if (existingChar && existingChar.sprites) data.sprites = existingChar.sprites;
   }
 
   if (window._pendingCharLat !== undefined) {
@@ -731,15 +696,10 @@ function saveCharacter() {
 
   closeCharModal();
   renderMapPins();
-
-  // Always save locally first \u2014 this never fails and requires no token.
   save();
 
-  if (savedId) {
-    document.dispatchEvent(new CustomEvent('lc:character-saved', { detail: { id: savedId } }));
-  }
+  if (savedId) document.dispatchEvent(new CustomEvent('lc:character-saved', { detail: { id: savedId } }));
 
-  // Only attempt GitHub save if a token is present.
   const token = window.lcStore && typeof window.lcStore.getToken === 'function'
     ? window.lcStore.getToken()
     : (document.getElementById('gh-token-input')?.value.trim() || localStorage.getItem('lc_gh_token') || '');
@@ -751,12 +711,10 @@ function saveCharacter() {
     if (commitInput) commitInput.value = charLabel;
     window.lcStore.ghSave().finally(() => { if (commitInput) commitInput.value = prevMsg; });
   } else {
-    if (window.lcStore && typeof window.lcStore.showToast === 'function') {
+    if (window.lcStore && typeof window.lcStore.showToast === 'function')
       window.lcStore.showToast('Saved locally \u2014 add a GitHub token to sync to the repo', '');
-    }
-    if (window.lcStore && typeof window.lcStore.setGhStatus === 'function') {
+    if (window.lcStore && typeof window.lcStore.setGhStatus === 'function')
       window.lcStore.setGhStatus('Saved locally (no token)', '');
-    }
   }
 }
 
@@ -817,7 +775,6 @@ window.lcModals = {
   CAM_PRESETS, setCamPreset, openRoomModal, closeRoomModal, saveRoom, uploadRoomBackdrop,
   initRoomPickerMap, openCharModal, closeCharModal, togglePromptPill, previewFile, saveCharacter,
   openObjModal, closeObjModal, saveObject, deleteObject,
-  // Sprite helpers (called from inline onclick in built HTML)
   toggleSpriteSection,
 };
 
