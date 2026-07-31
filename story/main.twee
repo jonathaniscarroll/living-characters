@@ -1,20 +1,21 @@
-:: StoryTitle
-Living Characters World
+:: test {"id":"room_1785507625629","lat":44.653207,"lng":-63.5814,"radius":30,"cameraX":9,"cameraY":9,"cameraZ":9,"backdropUrl":"https://raw.githubusercontent.com/jonathaniscarroll/living-characters/main/assets/backdrops/room_1785507621182.jpg"}
 
-:: StoryData
-{"ifid":"C15CE33F-61F6-4909-BB59-73EE7A3D57B1"}
+:: library {"id":"room_1785511396164","lat":44.649422,"lng":-63.585176,"radius":30,"cameraX":0,"cameraY":4,"cameraZ":14,"backdropUrl":"https://raw.githubusercontent.com/jonathaniscarroll/living-characters/main/media/room-backdrops/room_1785511387855.png"}
 
-:: StoryInit
-<<run
-  State.variables.rooms      = window.rooms      || [];
-  State.variables.characters = window.characters || [];
-  State.variables.objects    = window.objects    || [];
->>
+:: mop {"roomIds":["room_1785507625629"],"homeRoomId":"room_1785507625629","workRoomId":"room_1785507625629","schedule":{"morning":"home","midday":"work","afternoon":"work","evening":"home","night":"home"},"mood":"Happy","items":[]}
 
-:: PassageReady
-<<run
-  State.variables.rooms      = window.rooms      || [];
-  State.variables.characters = window.characters || [];
-  State.variables.objects    = window.objects    || [];
->>
+:: mop-hello
+hellow
+
+:: belinda {"roomIds":[],"homeRoomId":null,"workRoomId":null,"schedule":{"morning":"home","midday":"work","afternoon":"work","evening":"home","night":"home"},"mood":"Happy","items":[],"lat":44.65227619588055,"lng":-63.58122825622559}
+
+:: guy {"roomIds":[],"homeRoomId":null,"workRoomId":null,"schedule":{"morning":"home","midday":"work","afternoon":"work","evening":"home","night":"home"},"mood":"Happy","items":[],"lat":44.65223040185709,"lng":-63.58047723770142}
+
+:: mop {"roomIds":["room_1785511396164"],"homeRoomId":"room_1785511396164","workRoomId":"room_1785511396164","schedule":{"morning":"home","midday":"work","afternoon":"work","evening":"home","night":"home"},"mood":"Happy","items":["hat"],"photoUrl":"https://raw.githubusercontent.com/jonathaniscarroll/living-characters/main/story/assets/char_1785511501415-photo.png","spriteUrls":{"idle":["https://raw.githubusercontent.com/jonathaniscarroll/living-characters/main/story/assets/char_1785511501415-sprite-idle-0.png",null],"walk":["https://raw.githubusercontent.com/jonathaniscarroll/living-characters/main/story/assets/char_1785511501415-sprite-walk-0.png",null],"talk":["https://raw.githubusercontent.com/jonathaniscarroll/living-characters/main/story/assets/char_1785511501415-sprite-talk-0.png",null],"listen":["https://raw.githubusercontent.com/jonathaniscarroll/living-characters/main/story/assets/char_1785511501415-sprite-listen-0.png",null]},"chromaKey":{"h":120,"tolerance":0.35,"spill":0.15}}
+
+:: mop-hello
+hello
+
+:: mop-question
+peep
 
