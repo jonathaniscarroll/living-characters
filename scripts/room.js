@@ -368,9 +368,9 @@ function _tickWander(agent, dt) {
 
 // ─────────────────────────────────────────────────────────────
 // SPRITE BILLBOARD STATE
-// Map<charId, { animator, texture, mesh }>
+// Map<charId, { animator, textureCache, mesh }>
 // ─────────────────────────────────────────────────────────────
-const _spriteMap = new Map(); // chId → { animator, texture, mesh }
+const _spriteMap = new Map(); // chId → { animator, textureCache, mesh }
 
 /** Build a sprite billboard for one character and add it to the scene. */
 function _buildCharSprite(ch, cx, cz, scene) {
@@ -381,16 +381,28 @@ function _buildCharSprite(ch, cx, cz, scene) {
   let mesh;
 
   if (hasAnimator) {
-    const animator = new window.SpriteAnimator(ch.sprites || null, fallbackSrc);
-    const texture  = new THREE.Texture();
-    texture.image  = new Image();
-    texture.image.onload = () => { texture.needsUpdate = true; };
-    const firstFrame = animator.currentFrame();
-    if (firstFrame) texture.image.src = firstFrame;
+    const spriteAnimator = new window.SpriteAnimator(ch.sprites || null, fallbackSrc);
+
+    // 3a: Pre-load a texture cache for all frame URLs
+    const _textureCache = new Map();
+    const allFrameUrls = Object.values(ch.sprites || ch.spriteUrls || {}).flat().filter(Boolean);
+    // Also include fallback if no sprites
+    if (!allFrameUrls.length && fallbackSrc) allFrameUrls.push(fallbackSrc);
+    allFrameUrls.forEach(url => {
+      if (!_textureCache.has(url)) {
+        _textureCache.set(url, new THREE.TextureLoader().load(url));
+      }
+    });
+
+    // Pick initial frame from cache; fall back to first cached texture
+    const initFrame = spriteAnimator.currentFrame();
+    const initTex = (initFrame && _textureCache.has(initFrame))
+      ? _textureCache.get(initFrame)
+      : (_textureCache.size ? _textureCache.values().next().value : null);
 
     const geo = new THREE.PlaneGeometry(1.0, 1.6);
     const mat = new THREE.MeshBasicMaterial({
-      map: texture,
+      map: initTex || null,
       transparent: true,
       alphaTest: 0.05,
       side: THREE.DoubleSide,
@@ -400,7 +412,7 @@ function _buildCharSprite(ch, cx, cz, scene) {
     mesh._charId = ch.id;
     scene.add(mesh);
 
-    _spriteMap.set(ch.id, { animator, texture, mesh });
+    _spriteMap.set(ch.id, { animator: spriteAnimator, textureCache: _textureCache, mesh });
   } else {
     // Colour-block fallback — no image
     const mood = MOODS.find(m => m.label === ch.mood) || MOODS[0];
@@ -410,8 +422,7 @@ function _buildCharSprite(ch, cx, cz, scene) {
     mesh.position.set(cx, 0.8, cz);
     mesh._charId = ch.id;
     scene.add(mesh);
-    // No animator entry — mesh still participates in billboard facing
-    _spriteMap.set(ch.id, { animator: null, texture: null, mesh });
+    _spriteMap.set(ch.id, { animator: null, textureCache: null, mesh });
   }
 
   return mesh;
@@ -419,12 +430,12 @@ function _buildCharSprite(ch, cx, cz, scene) {
 
 /** Tick all sprite animators and keep billboards facing the camera. */
 function _tickAllSprites(deltaMs, camera) {
-  _spriteMap.forEach(({ animator, texture, mesh }) => {
-    if (animator && texture) {
-      const frame = animator.tick(deltaMs);
-      if (frame !== null) {
-        texture.image.src = frame;
-        // needsUpdate set by image.onload
+  _spriteMap.forEach(({ animator, textureCache, mesh }) => {
+    if (animator && textureCache) {
+      const newFrame = animator.tick(deltaMs);
+      if (newFrame && textureCache.has(newFrame)) {
+        mesh.material.map = textureCache.get(newFrame);
+        mesh.material.needsUpdate = true;
       }
     }
     if (mesh && camera) mesh.lookAt(camera.position);
@@ -439,8 +450,11 @@ function setRoomCharacterState(chId, state) {
 
 /** Clean up all sprite animators and textures. */
 function _destroyAllSprites() {
-  _spriteMap.forEach(({ texture }) => {
-    if (texture) { try { texture.dispose(); } catch (_) {} }
+  _spriteMap.forEach(({ textureCache }) => {
+    if (textureCache) {
+      textureCache.forEach(t => { try { t.dispose(); } catch (_) {} });
+      textureCache.clear();
+    }
   });
   _spriteMap.clear();
 }
