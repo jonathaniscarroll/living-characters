@@ -419,9 +419,7 @@ function buildSpriteSlot(state, frameIdx) {
   slot.appendChild(fileInput);
 
   slot.addEventListener('click', (e) => {
-    // If eyedropper is active, clicks are handled by onSpriteImgClick
     if (eyedropperActive) return;
-    // Only open picker if click wasn't on img or clear btn
     if (e.target === slot || e.target.tagName === 'SPAN') {
       fileInput.click();
     }
@@ -434,7 +432,6 @@ function onSpriteImgClick(e) {
   if (!eyedropperActive) return;
   const img = e.currentTarget;
   const rect = img.getBoundingClientRect();
-  // Scale click coords to natural image coordinates
   const scaleX = img.naturalWidth / rect.width;
   const scaleY = img.naturalHeight / rect.height;
   const x = Math.round((e.clientX - rect.left) * scaleX);
@@ -444,7 +441,6 @@ function onSpriteImgClick(e) {
       chromaSettings.h = Math.round(hue);
       updateChromaSwatch();
       deactivateEyedropper();
-      // Rerun preview on this slot
       const state = img.dataset.state;
       const frame = parseInt(img.dataset.frame, 10);
       rerunChromaOnSlot(state, frame);
@@ -475,10 +471,7 @@ function onSpriteFileChange(input, state, frameIdx) {
 function refreshSpriteSlot(state, frameIdx) {
   const slot = document.getElementById(`sprite-slot-${state}-${frameIdx}`);
   if (!slot) return;
-  // Preserve the hidden file input
-  const fileInput = document.getElementById(`sprite-input-${state}-${frameIdx}`);
   const newSlot = buildSpriteSlot(state, frameIdx);
-  // Re-attach the existing file input (same id, already in DOM)
   slot.parentNode.replaceChild(newSlot, slot);
 }
 
@@ -561,13 +554,10 @@ function openCharModal(charId) {
   editingCharId = charId;
   tempPhotoData = null;
   tempAnimData  = null;
-  tempGlbData   = null;
-  window.tempGlbData = null;
   const ch = charId ? characters.find(c => c.id === charId) : null;
   document.getElementById('char-modal-title').textContent = ch ? 'Edit Character' : 'Add a Character';
   document.getElementById('cf-name').value = ch ? ch.name : '';
   document.getElementById('cf-items').value = ch ? (ch.items || []).join(', ') : '';
-  document.getElementById('cf-glb-url').value = ch ? (ch.glbUrl && !ch.glbUrl.startsWith('data:') ? ch.glbUrl : '') : '';
   const currentIds = ch ? (ch.roomIds || (ch.roomId ? [ch.roomId] : [])) : [];
   buildRoomChipPicker(currentIds);
 
@@ -589,24 +579,6 @@ function openCharModal(charId) {
   const ap = document.getElementById('cf-anim-preview');
   if (ch && ch.animData) { ap.src = ch.animData; ap.style.display = 'block'; tempAnimData = ch.animData; }
   else { ap.src = ''; ap.style.display = 'none'; }
-
-  const glbStatus = document.getElementById('cf-glb-status');
-  if (ch && ch.glbUrl && ch.glbUrl.startsWith('data:')) {
-    tempGlbData = null;
-    window.tempGlbData = null;
-    glbStatus.textContent = '\u26A0\uFE0F Model saved without GitHub token \u2014 re-upload to enable AR on other devices.';
-    glbStatus.style.color = 'var(--accent)';
-  } else if (ch && ch.glbUrl) {
-    glbStatus.textContent = '\u2713 3D model linked (' + ch.glbUrl.split('/').pop() + ')';
-    glbStatus.style.color = 'var(--accent2)';
-  } else {
-    glbStatus.textContent = '';
-  }
-
-  const wrap = document.getElementById('cf-fbx-progress');
-  const bar  = document.getElementById('cf-fbx-progress-bar');
-  if (wrap) wrap.style.display = 'none';
-  if (bar)  bar.style.width = '0%';
 
   const mp = document.getElementById('mood-picker');
   mp.innerHTML = '';
@@ -686,13 +658,6 @@ function closeCharModal() {
   editingCharId = null;
   tempPhotoData = null;
   tempAnimData  = null;
-  tempGlbData   = null;
-  window.tempGlbData = null;
-  document.getElementById('cf-glb-status').textContent = '';
-  const wrap = document.getElementById('cf-fbx-progress');
-  const bar  = document.getElementById('cf-fbx-progress-bar');
-  if (wrap) wrap.style.display = 'none';
-  if (bar)  bar.style.width = '0%';
   // Reset sprite state
   pendingSprites = { idle: [null, null], walk: [null, null], talk: [null, null], listen: [null, null] };
   eyedropperActive = false;
@@ -714,11 +679,6 @@ function previewFile(inputId, previewId, dataKey) {
 }
 
 function saveCharacter() {
-  if (window.lcUpload && window.lcUpload.isUploadInFlight && window.lcUpload.isUploadInFlight()) {
-    if (typeof showToast === 'function') showToast('Still uploading model \u2014 please wait a moment.', 'info');
-    return;
-  }
-
   const name = document.getElementById('cf-name').value.trim();
   if (!name) { alert('Please give the character a name.'); return; }
   const roomIds = getSelectedRoomIds();
@@ -746,14 +706,6 @@ function saveCharacter() {
   const primaryRoomId = roomIds[0] || '';
   const items = document.getElementById('cf-items').value.split(',').map(s => s.trim()).filter(Boolean);
 
-  const urlFieldVal = document.getElementById('cf-glb-url').value.trim();
-  const candidate   = tempGlbData || window.tempGlbData || urlFieldVal || null;
-  const existingChar = editingCharId ? characters.find(c => c.id === editingCharId) : null;
-  const existingPersistent = existingChar?.glbUrl?.startsWith('https://') ? existingChar.glbUrl : null;
-  const glbUrl = (candidate && !candidate.startsWith('data:'))
-    ? candidate
-    : (existingPersistent || candidate || null);
-
   const activeMoodBtn = document.querySelector('#mood-picker .mood-opt.active');
   const moodLabel = MOODS.find(m => activeMoodBtn && activeMoodBtn.textContent.includes(m.emoji))?.label || 'Happy';
   const homeRoomId = document.getElementById('cf-home-room').value || roomIds[0] || null;
@@ -778,7 +730,6 @@ function saveCharacter() {
     name, roomId: primaryRoomId, roomIds,
     homeRoomId, workRoomId, schedule,
     mood: moodLabel, items, passages,
-    glbUrl,
     photoData: tempPhotoData,
     animData:  tempAnimData,
   };
@@ -787,10 +738,12 @@ function saveCharacter() {
   if (hasAnySprite) {
     data.sprites   = sprites;
     data.chromaKey = { ...chromaSettings };
-  } else if (existingChar && existingChar.sprites) {
-    // Keep existing sprites if none were changed in this edit session
-    data.sprites   = existingChar.sprites;
-    data.chromaKey = existingChar.chromaKey;
+  } else if (editingCharId) {
+    const existingChar = characters.find(c => c.id === editingCharId);
+    if (existingChar && existingChar.sprites) {
+      data.sprites   = existingChar.sprites;
+      data.chromaKey = existingChar.chromaKey;
+    }
   }
 
   if (window._pendingCharLat !== undefined) {
@@ -833,11 +786,63 @@ function saveCharacter() {
   }
 }
 
+function openObjModal(objId) {
+  editingObjId = objId;
+  const obj = objId ? objects.find(o => o.id === objId) : null;
+  document.getElementById('obj-modal-title').textContent = obj ? 'Edit Object' : 'Add an Object';
+  document.getElementById('of-name').value = obj ? obj.name : '';
+  document.getElementById('of-desc').value = obj ? (obj.desc || '') : '';
+  document.getElementById('of-px').value = obj ? (obj.x ?? 0) : 0;
+  document.getElementById('of-pz').value = obj ? (obj.z ?? 0) : 0;
+  document.getElementById('of-scale').value = obj ? (obj.scale ?? 1) : 1;
+  const delBtn = document.getElementById('of-delete');
+  if (delBtn) delBtn.style.display = obj ? '' : 'none';
+  document.getElementById('obj-modal-overlay').classList.add('open');
+}
+
+function closeObjModal() {
+  document.getElementById('obj-modal-overlay').classList.remove('open');
+  editingObjId = null;
+}
+
+function saveObject() {
+  const name  = document.getElementById('of-name').value.trim();
+  const desc  = document.getElementById('of-desc').value.trim();
+  const x     = parseFloat(document.getElementById('of-px').value) || 0;
+  const z     = parseFloat(document.getElementById('of-pz').value) || 0;
+  const scale = parseFloat(document.getElementById('of-scale').value) || 1;
+  if (!name) { alert('Please give the object a name.'); return; }
+  const roomId = activeRoomId;
+  if (!roomId) { alert('No active room.'); return; }
+  const data = { name, desc, x, z, scale, roomId };
+  if (editingObjId) {
+    const obj = objects.find(o => o.id === editingObjId);
+    if (obj) Object.assign(obj, data);
+  } else {
+    objects.push({ id: 'obj_' + Date.now(), ...data });
+  }
+  closeObjModal();
+  const room = rooms.find(r => r.id === roomId);
+  if (room) buildRoomScene(room);
+  save();
+}
+
+function deleteObject() {
+  if (!editingObjId) return;
+  if (!confirm('Remove this object?')) return;
+  objects = objects.filter(o => o.id !== editingObjId);
+  closeObjModal();
+  const room = rooms.find(r => r.id === activeRoomId);
+  if (room) buildRoomScene(room);
+  save();
+}
+
 window.lcModals = {
   buildRoomChipPicker, getSelectedRoomIds, populateHomeWorkSelects, readSchedule,
   rebuildObjectUsagePrompts,
   CAM_PRESETS, setCamPreset, openRoomModal, closeRoomModal, saveRoom, uploadRoomBackdrop,
   initRoomPickerMap, openCharModal, closeCharModal, togglePromptPill, previewFile, saveCharacter,
+  openObjModal, closeObjModal, saveObject, deleteObject,
   // Sprite/chroma helpers (called from inline onclick in built HTML)
   toggleSpriteSection, toggleEyedropper, onChromaTolerance, onChromaSpill, applyChromaToAll,
 };
@@ -847,5 +852,6 @@ export {
   rebuildObjectUsagePrompts,
   CAM_PRESETS, setCamPreset, openRoomModal, closeRoomModal, saveRoom, uploadRoomBackdrop,
   initRoomPickerMap, openCharModal, closeCharModal, togglePromptPill, previewFile, saveCharacter,
+  openObjModal, closeObjModal, saveObject, deleteObject,
   toggleSpriteSection, toggleEyedropper, onChromaTolerance, onChromaSpill, applyChromaToAll,
 };
