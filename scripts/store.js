@@ -89,8 +89,6 @@ async function ghLoad() {
 }
 
 // ── Asset upload helper ────────────────────────────────────────────────────────
-// Uploads a single base64 dataUrl to story/assets/{charId}-{field}.{ext}
-// Returns the raw GitHub URL, or null on failure.
 async function uploadCharacterAsset(charId, field, dataUrl) {
   const token = getToken();
   if (!token || !dataUrl || !dataUrl.startsWith('data:')) return null;
@@ -100,7 +98,6 @@ async function uploadCharacterAsset(charId, field, dataUrl) {
   const b64  = dataUrl.replace(/^data:[^;]+;base64,/, '');
   const path = `story/assets/${charId}-${field}.${ext}`;
 
-  // Check if file already exists (to get SHA for update)
   let existingSha = null;
   try {
     const check = await fetch(
@@ -110,11 +107,7 @@ async function uploadCharacterAsset(charId, field, dataUrl) {
     if (check.ok) { const d = await check.json(); existingSha = d.sha; }
   } catch (_) {}
 
-  const body = {
-    message: `Asset: ${charId} ${field}`,
-    content: b64,
-    branch: GH_BRANCH,
-  };
+  const body = { message: `Asset: ${charId} ${field}`, content: b64, branch: GH_BRANCH };
   if (existingSha) body.sha = existingSha;
 
   const res = await fetch(
@@ -133,9 +126,6 @@ async function uploadCharacterAsset(charId, field, dataUrl) {
   return `https://raw.githubusercontent.com/${GH_OWNER}/${GH_REPO}/${GH_BRANCH}/${path}`;
 }
 
-// ── Upload all pending assets before a Twee save ──────────────────────────────
-// For each character that has a local base64 blob but no hosted URL yet,
-// upload the blob and store the resulting raw URL on the character record.
 async function uploadAllPendingAssets() {
   for (const ch of characters) {
     if (ch.photoData && ch.photoData.startsWith('data:') && !ch.photoUrl) {
@@ -147,14 +137,14 @@ async function uploadAllPendingAssets() {
       if (url) ch.animUrl = url;
     }
   }
-  save(); // persist the new photoUrl/animUrl fields to localStorage
+  save();
 }
 
 async function ghSave() {
   const token = getToken();
   if (!token) { setGhStatus('Enter a GitHub token first', 'err'); return; }
   setGhStatus('Uploading assets\u2026');
-  await uploadAllPendingAssets();          // upload blobs first; store URLs on chars
+  await uploadAllPendingAssets();
   setGhStatus('Saving world\u2026');
   const src = buildTweeSource(rooms, characters, objects);
   const encoded = btoa(unescape(encodeURIComponent(src)));
@@ -189,9 +179,6 @@ async function ghSave() {
  * buildTweeSource
  * ---------------
  * Each character written EXACTLY ONCE (no per-room duplication).
- * ch.lat / ch.lng (map-placed characters outside any room) are now
- * included in the character's JSON metadata so they survive reload.
- *
  * Asset policy: write hosted URLs only — never base64 blobs.
  */
 function buildTweeSource(roomsList, chars, objs) {
@@ -240,14 +227,10 @@ function buildTweeSource(roomsList, chars, objs) {
     if (typeof ch.lat === 'number') meta.lat = ch.lat;
     if (typeof ch.lng === 'number') meta.lng = ch.lng;
     if (ch.glbUrl && !ch.glbUrl.startsWith('data:')) meta.glbUrl = ch.glbUrl;
-
-    // Write hosted URLs only — never base64 blobs
     if (ch.photoUrl) meta.photoUrl = ch.photoUrl;
     if (ch.animUrl)  meta.animUrl  = ch.animUrl;
-    // sprites and chromaKey are small metadata strings, keep those
     if (ch.sprites)   meta.sprites   = ch.sprites;
     if (ch.chromaKey) meta.chromaKey = ch.chromaKey;
-    // Do NOT write ch.photoData or ch.animData here
 
     out += `:: ${ch.name} ${JSON.stringify(meta)}\n\n`;
     (ch.passages || []).forEach(p => { out += `:: ${ch.name}-${p.type}\n${p.text}\n\n`; });
@@ -256,8 +239,33 @@ function buildTweeSource(roomsList, chars, objs) {
   return out;
 }
 
+// ── SugarCube bridge passages ──────────────────────────────────────────────────
+// StoryInit: runs once on story start — copies JS globals into $story variables.
+// PassageReady: runs before every passage render — re-syncs in case the authoring
+//   tool has added rooms/characters since the story was opened.
+const _scBridgePassages = `:: StoryInit
+<<run
+  State.variables.rooms      = window.rooms      || [];
+  State.variables.characters = window.characters || [];
+  State.variables.objects    = window.objects    || [];
+>>
+
+:: PassageReady
+<<run
+  State.variables.rooms      = window.rooms      || [];
+  State.variables.characters = window.characters || [];
+  State.variables.objects    = window.objects    || [];
+>>
+
+`;
+
 function buildTweeStandalone(roomsList, chars, objs) {
-  return ':: StoryTitle\nLiving Characters World\n\n:: StoryData\n{"ifid":"C15CE33F-61F6-4909-BB59-73EE7A3D57B1"}\n\n' + buildTweeSource(roomsList, chars, objs);
+  return [
+    ':: StoryTitle\nLiving Characters World\n',
+    ':: StoryData\n{"ifid":"C15CE33F-61F6-4909-BB59-73EE7A3D57B1"}\n',
+    _scBridgePassages,
+    buildTweeSource(roomsList, chars, objs),
+  ].join('\n');
 }
 
 function previewTwee() {
@@ -282,6 +290,13 @@ function handleImportFile(event) {
   event.target.value = '';
 }
 
+// Special passage names that are SugarCube built-ins — skip during import.
+const _SC_SPECIAL = new Set([
+  'StoryTitle', 'StoryData', 'StoryInit', 'PassageReady',
+  'PassageHeader', 'PassageFooter', 'PassageDone', 'StoryBanner',
+  'StoryCaption', 'StoryMenu', 'StorySettings', 'StoryShare',
+]);
+
 function importTweeSource(src, silent) {
   const lines = src.split('\n');
   const newRooms = [], newChars = [], newObjs = [];
@@ -293,13 +308,20 @@ function importTweeSource(src, silent) {
       if (!m) { i++; continue; }
       const passName = m[1].trim();
       const meta = m[2] ? JSON.parse(m[2]) : {};
+
+      // Skip SugarCube special passages — they are injected by buildTweeStandalone
+      if (_SC_SPECIAL.has(passName)) {
+        i++;
+        while (i < lines.length && !lines[i].startsWith(':: ')) { i++; }
+        continue;
+      }
+
       const bodyLines = [];
       i++;
       while (i < lines.length && !lines[i].startsWith(':: ')) { bodyLines.push(lines[i]); i++; }
       const body = bodyLines.join('\n').trim();
 
       if (meta.lat !== undefined && (meta.roomIds === undefined && meta.roomId === undefined)) {
-        // Room passage — has lat but no roomIds
         const roomId = meta.id || ('room_' + passName.replace(/\s+/g, '_'));
         newRooms.push({
           id: roomId, name: passName, lede: body,
@@ -329,10 +351,9 @@ function importTweeSource(src, silent) {
           schedule: meta.schedule || null,
           mood: meta.mood || 'Happy', items: meta.items || [],
           passages: [],
-          // Hosted URLs survive Twee round-trip; blobs are never in Twee
           photoUrl:  meta.photoUrl  || null,
           animUrl:   meta.animUrl   || null,
-          photoData: null,   // blobs are never in Twee; set from URL lazily if needed
+          photoData: null,
           animData:  null,
           glbUrl: meta.glbUrl || null
         };
