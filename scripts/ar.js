@@ -351,6 +351,7 @@
   const liveChar = (window.characters || []).find(c => c.id === _character.id) || _character;
   openTalkPanel(liveChar);
 }
+  }
 
 
   // ── Set character animation state ─────────────────────────
