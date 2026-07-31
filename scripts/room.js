@@ -75,8 +75,19 @@ function openRoom(roomId) {
   document.getElementById('room-lede').textContent = room.lede || '';
   applyRoomBackdrop(room);
   document.getElementById('room-view').classList.add('open');
-  if (!window.THREE || !window.GLTFLoader) { console.warn('3D viewer still loading.'); return; }
-  setTimeout(() => buildRoomScene(room), 360);
+
+  // Wait for THREE + GLTFLoader to be ready, then build
+  let attempts = 0;
+  function tryBuild() {
+    if (window.THREE && window.GLTFLoader) {
+      setTimeout(() => buildRoomScene(room), 360);
+    } else if (attempts++ < 20) {
+      setTimeout(tryBuild, 250); // retry every 250ms, up to ~5 seconds
+    } else {
+      console.warn('3D viewer failed to load after timeout.');
+    }
+  }
+  tryBuild();
 }
 
 function closeRoom() {
