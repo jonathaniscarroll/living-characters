@@ -233,7 +233,7 @@
     <button class="hbtn export-btn" data-facilitator-only onclick="previewTwee()">⬇ .twee</button>
     <button class="hbtn gh-load"   data-facilitator-only onclick="ghLoad()">☁ Load</button>
     <button class="hbtn gh-save"   data-facilitator-only onclick="ghSave()">☁ Save</button>
-    <button class="hbtn mode-toggle" data-mode-toggle onclick="window.lcSetMode(window.lcMode()==='visitor'?'facilitator':'visitor'); this.textContent = window.lcMode()==='facilitator'?'👥 Visitor':'🔧 Facilitator'">🔧 Facilitator</button>
+    <button class="hbtn mode-toggle" data-mode-toggle onclick="window.lcSetMode(window.lcMode()==='visitor'?'facilitator':'visitor'); this.textContent = window.lcMode()==='facilitator'?'🔧 Facilitator':'👥 Visitor'">🔧 Facilitator</button>
   </div>
 </div>
 
@@ -461,6 +461,24 @@
 <input type="file" id="twee-import-input" accept=".twee,.txt" style="display:none" onchange="handleImportFile(event)" />
 
 <div id="toast"></div>
+
+<!-- Mode management: must be a regular (non-module) script so window.lcMode
+     and window.lcSetMode are available synchronously to inline onclick handlers. -->
+<script>
+  window._lcCurrentMode = 'facilitator';
+
+  window.lcMode = function() {
+    return window._lcCurrentMode;
+  };
+
+  window.lcSetMode = function(mode) {
+    window._lcCurrentMode = mode;
+    document.body.classList.toggle('facilitator-mode', mode === 'facilitator');
+  };
+
+  // Apply initial mode on load
+  window.lcSetMode(window._lcCurrentMode);
+</script>
 
 </body>
 </html>
