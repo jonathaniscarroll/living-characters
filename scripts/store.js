@@ -126,6 +126,34 @@ async function uploadCharacterAsset(charId, field, dataUrl) {
   return `https://raw.githubusercontent.com/${GH_OWNER}/${GH_REPO}/${GH_BRANCH}/${path}`;
 }
 
+// ── Sprite asset upload ────────────────────────────────────────────────────────
+// Uploads any sprite frame that is still a data: URL to
+// story/assets/{charId}-sprite-{state}-{frame}.png
+// and replaces the data URL with the hosted URL on ch.spriteUrls.
+async function uploadPendingSprites(ch) {
+  if (!ch.sprites) return;
+  const token = getToken();
+  if (!token) return; // no token — skip, keep data URLs in memory only
+  if (!ch.spriteUrls) ch.spriteUrls = {};
+  const STATES = ['idle', 'walk', 'talk', 'listen'];
+  for (const state of STATES) {
+    const frames = ch.sprites[state];
+    if (!Array.isArray(frames)) continue;
+    if (!ch.spriteUrls[state]) ch.spriteUrls[state] = [null, null];
+    for (let i = 0; i < 2; i++) {
+      const frame = frames[i];
+      if (!frame || !frame.startsWith('data:')) continue;
+      const url = await uploadCharacterAsset(ch.id, `sprite-${state}-${i}`, frame);
+      if (url) {
+        ch.spriteUrls[state][i] = url;
+        // Replace the data URL with the hosted URL in sprites so the
+        // in-memory object stays consistent with what we wrote to GitHub.
+        ch.sprites[state][i] = url;
+      }
+    }
+  }
+}
+
 async function uploadAllPendingAssets() {
   for (const ch of characters) {
     if (ch.photoData && ch.photoData.startsWith('data:') && !ch.photoUrl) {
@@ -136,6 +164,8 @@ async function uploadAllPendingAssets() {
       const url = await uploadCharacterAsset(ch.id, 'anim', ch.animData);
       if (url) ch.animUrl = url;
     }
+    // Upload sprite frames that are still data URLs
+    await uploadPendingSprites(ch);
   }
   save();
 }
@@ -179,7 +209,13 @@ async function ghSave() {
  * buildTweeSource
  * ---------------
  * Each character written EXACTLY ONCE (no per-room duplication).
- * Asset policy: write hosted URLs only — never base64 blobs.
+ * Asset policy: write hosted URLs only — NEVER base64 blobs.
+ *
+ * Sprite frames are stored on ch.sprites[state][i] in memory but may
+ * still be data: URLs if assets haven't been uploaded yet (no token).
+ * We only write spriteUrls (already-hosted URLs) into the twee file.
+ * This prevents the file bloating to 20MB when characters have sprite
+ * frames that haven't been pushed to GitHub yet.
  */
 function buildTweeSource(roomsList, chars, objs) {
   let out = '';
@@ -229,7 +265,20 @@ function buildTweeSource(roomsList, chars, objs) {
     if (ch.glbUrl && !ch.glbUrl.startsWith('data:')) meta.glbUrl = ch.glbUrl;
     if (ch.photoUrl) meta.photoUrl = ch.photoUrl;
     if (ch.animUrl)  meta.animUrl  = ch.animUrl;
-    if (ch.sprites)   meta.sprites   = ch.sprites;
+
+    // Sprites: only write hosted URLs — never data: blobs.
+    // ch.spriteUrls is populated by uploadPendingSprites() before ghSave
+    // writes the twee. ch.sprites may contain data URLs (in-memory only).
+    if (ch.spriteUrls) {
+      // Only include states that have at least one hosted URL
+      const hostedSprites = {};
+      let any = false;
+      Object.entries(ch.spriteUrls).forEach(([state, frames]) => {
+        const hosted = (frames || []).map(f => (f && !f.startsWith('data:')) ? f : null);
+        if (hosted.some(Boolean)) { hostedSprites[state] = hosted; any = true; }
+      });
+      if (any) meta.spriteUrls = hostedSprites;
+    }
     if (ch.chromaKey) meta.chromaKey = ch.chromaKey;
 
     out += `:: ${ch.name} ${JSON.stringify(meta)}\n\n`;
@@ -240,9 +289,6 @@ function buildTweeSource(roomsList, chars, objs) {
 }
 
 // ── SugarCube bridge passages ──────────────────────────────────────────────────
-// StoryInit: runs once on story start — copies JS globals into $story variables.
-// PassageReady: runs before every passage render — re-syncs in case the authoring
-//   tool has added rooms/characters since the story was opened.
 const _scBridgePassages = `:: StoryInit
 <<run
   State.variables.rooms      = window.rooms      || [];
@@ -309,7 +355,6 @@ function importTweeSource(src, silent) {
       const passName = m[1].trim();
       const meta = m[2] ? JSON.parse(m[2]) : {};
 
-      // Skip SugarCube special passages — they are injected by buildTweeStandalone
       if (_SC_SPECIAL.has(passName)) {
         i++;
         while (i < lines.length && !lines[i].startsWith(':: ')) { i++; }
@@ -359,7 +404,8 @@ function importTweeSource(src, silent) {
         };
         if (typeof meta.lat === 'number') ch.lat = meta.lat;
         if (typeof meta.lng === 'number') ch.lng = meta.lng;
-        if (meta.sprites)   ch.sprites   = meta.sprites;
+        // Restore spriteUrls (hosted) into both spriteUrls and sprites
+        if (meta.spriteUrls) { ch.spriteUrls = meta.spriteUrls; ch.sprites = meta.spriteUrls; }
         if (meta.chromaKey) ch.chromaKey = meta.chromaKey;
         newChars.push(ch);
       } else if (passName.includes('-')) {
@@ -464,7 +510,8 @@ window.lcStore = {
   buildTweeSource, buildTweeStandalone,
   previewTwee, closeTweePreview, downloadTwee, triggerImport, handleImportFile,
   importTweeSource, onTokenInput, setGhStatus, getToken, decodeBase64Unicode,
-  seedGhFileSha, uploadRoomBackdropToGitHub, uploadCharacterAsset, uploadAllPendingAssets
+  seedGhFileSha, uploadRoomBackdropToGitHub, uploadCharacterAsset, uploadAllPendingAssets,
+  uploadPendingSprites
 };
 
 export {
@@ -472,5 +519,6 @@ export {
   buildTweeSource, buildTweeStandalone,
   previewTwee, closeTweePreview, downloadTwee, triggerImport, handleImportFile,
   importTweeSource, onTokenInput, setGhStatus, getToken, decodeBase64Unicode,
-  seedGhFileSha, uploadRoomBackdropToGitHub, uploadCharacterAsset, uploadAllPendingAssets
+  seedGhFileSha, uploadRoomBackdropToGitHub, uploadCharacterAsset, uploadAllPendingAssets,
+  uploadPendingSprites
 };

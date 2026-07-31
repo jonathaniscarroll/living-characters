@@ -771,18 +771,34 @@ function saveCharacter() {
 
   closeCharModal();
   renderMapPins();
+
+  // Always save locally first — this never fails and requires no token.
   save();
 
   if (savedId) {
     document.dispatchEvent(new CustomEvent('lc:character-saved', { detail: { id: savedId } }));
   }
 
-  const charLabel   = isNew ? `Add character: ${name}` : `Update character: ${name}`;
-  const commitInput = document.getElementById('gh-commit-input');
-  const prevMsg     = commitInput ? commitInput.value : '';
-  if (commitInput) commitInput.value = charLabel;
-  if (window.lcStore && typeof window.lcStore.ghSave === 'function') {
+  // Only attempt GitHub save if a token is present.
+  // Without a token the PUT returns 401; save() above already persisted locally.
+  const token = window.lcStore && typeof window.lcStore.getToken === 'function'
+    ? window.lcStore.getToken()
+    : (document.getElementById('gh-token-input')?.value.trim() || localStorage.getItem('lc_gh_token') || '');
+
+  if (token) {
+    const charLabel   = isNew ? `Add character: ${name}` : `Update character: ${name}`;
+    const commitInput = document.getElementById('gh-commit-input');
+    const prevMsg     = commitInput ? commitInput.value : '';
+    if (commitInput) commitInput.value = charLabel;
     window.lcStore.ghSave().finally(() => { if (commitInput) commitInput.value = prevMsg; });
+  } else {
+    // Let the facilitator know the save was local-only.
+    if (window.lcStore && typeof window.lcStore.showToast === 'function') {
+      window.lcStore.showToast('Saved locally \u2014 add a GitHub token to sync to the repo', '');
+    }
+    if (window.lcStore && typeof window.lcStore.setGhStatus === 'function') {
+      window.lcStore.setGhStatus('Saved locally (no token)', '');
+    }
   }
 }
 
