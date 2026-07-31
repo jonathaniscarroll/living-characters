@@ -8,12 +8,12 @@ const AR_RANGE = 50; // metres — how close a visitor must be to enter AR
 
 let _insideRoomIds = new Set();
 
-// ── User position state ──────────────────────────────────────────────────────
+// ── User position state ─────────────────────────────────────────────────────
 let userMarker = null;
 let userAccuracyCircle = null;
 let _gpsFirstFix = false;
 
-// ── Day segment ──────────────────────────────────────────────────────────────
+// ── Day segment ────────────────────────────────────────────────────────────
 let currentSegment = 'morning';
 
 function setDaySegment(seg) {
@@ -34,7 +34,7 @@ function getActiveRoomId(character) {
   return segValue;
 }
 
-// ── User position marker helpers ─────────────────────────────────────────────
+// ── User position marker helpers ───────────────────────────────────────────────
 
 (function _injectPulseStyle() {
   if (document.getElementById('lc-user-pulse-style')) return;
@@ -102,21 +102,19 @@ function _updateUserMarker(lat, lng, accuracy) {
   }
 }
 
-// ── Map init ─────────────────────────────────────────────────────────────────
-
+// ── Map init ──────────────────────────────────────────────────────────────────
 const DEFAULT_CENTER = [44.65, -63.59];
 const DEFAULT_ZOOM   = 16;
 
 function initMap() {
   map = L.map('map', { zoomControl: true }).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© OpenStreetMap contributors', maxZoom: 19
+    attribution: '\u00a9 OpenStreetMap contributors', maxZoom: 19
   }).addTo(map);
 
-  // ── Editor mode: tap empty map → Add Character at that position ──────────
+  // ── Editor mode: tap empty map → Add Character at that position ────────────────
   map.on('click', function (e) {
-    if (!facilitatorMode) return;          // only in editor / facilitator mode
-    // Ignore if a pin or room circle was clicked (they stop propagation)
+    if (!facilitatorMode) return;
     _openAddCharacterAt(e.latlng.lat, e.latlng.lng);
   });
 
@@ -137,27 +135,21 @@ function initMap() {
   }
 }
 
-// ── Editor: open Add-Character modal pre-filled with map coords ───────────────
+// ── Editor: open Add-Character modal pre-filled with map coords ─────────────────
 
 function _openAddCharacterAt(lat, lng) {
-  // Store coords globally so saveCharacter() can pick them up
   window._pendingCharLat = lat;
   window._pendingCharLng = lng;
-
-  // Use the global wrapper that index.html wires up — always available
   if (typeof window.openCharModal === 'function') {
     window.openCharModal(null);
     return;
   }
-  // Fallback: dispatch a custom event for modals.js to catch
   document.dispatchEvent(new CustomEvent('lc:add-character-at', { detail: { lat, lng } }));
 }
 
-// ── Pin rendering ─────────────────────────────────────────────────────────────
+// ── Pin rendering ─────────────────────────────────────────────────────────────────
 
 function _charLatLng(ch) {
-  // Characters authored on the map have lat/lng stored directly.
-  // Fallback: use their active room's position (legacy behaviour).
   if (typeof ch.lat === 'number' && typeof ch.lng === 'number') {
     return { lat: ch.lat, lng: ch.lng };
   }
@@ -176,7 +168,7 @@ function _isNearCharacter(ch) {
 function renderMapPins() {
   map.eachLayer(l => { if (l._lcPin) map.removeLayer(l); });
 
-  // Room circles (facilitator context — kept for legacy room workflow)
+  // Room circles
   rooms.forEach(room => {
     const circle = L.circle([room.lat, room.lng], {
       radius: room.radius || 30, color: '#f5a623',
@@ -188,8 +180,8 @@ function renderMapPins() {
     const icon = L.divIcon({ className: '', html:
       `<div style="background:#16213e;border:2px solid #f5a623;border-radius:8px;padding:4px 8px;
                   font-size:11px;font-weight:700;color:#f5a623;white-space:nowrap;cursor:pointer;">
-        🏠 ${room.name}<br>
-        <span style="font-size:9px;color:#a0a0b0">${charsHere.length} char${charsHere.length!==1?'s':''} · ${objs.length} obj${objs.length!==1?'s':''}</span>
+        \uD83C\uDFE0 ${room.name}<br>
+        <span style="font-size:9px;color:#a0a0b0">${charsHere.length} char${charsHere.length!==1?'s':''} \u00b7 ${objs.length} obj${objs.length!==1?'s':''}</span>
       </div>`, iconAnchor: [0, 0] });
     const marker = L.marker([room.lat, room.lng], { icon }).addTo(map);
     marker._lcPin = true;
@@ -205,16 +197,19 @@ function renderMapPins() {
     const near = _isNearCharacter(ch);
     const arEnabled = ch.arEnabled !== false;
 
-    // AR pulse ring only shown in viewer mode when character is nearby
     const ringHTML = (!facilitatorMode && arEnabled && near)
       ? '<div class="lc-ar-ring"></div>' : '';
 
-    // Small camera badge on pin when AR is available (viewer mode)
     const arBadge = (!facilitatorMode && arEnabled)
       ? `<div style="position:absolute;top:-4px;right:-4px;background:#01696f;color:#fff;
                     border-radius:50%;width:16px;height:16px;font-size:10px;
                     display:flex;align-items:center;justify-content:center;
-                    border:1.5px solid #fff;" title="Visit in AR">📷</div>` : '';
+                    border:1.5px solid #fff;" title="Visit in AR">\uD83D\uDCF7</div>` : '';
+
+    // Use photoData (local blob) if available, otherwise fall back to the
+    // hosted photoUrl saved to GitHub. Without this fallback, pins show
+    // the placeholder bear after every page reload / GitHub import.
+    const imgSrc = ch.photoData || ch.photoUrl || null;
 
     const icon = L.divIcon({ className: '', html:
       `<div style="display:flex;flex-direction:column;align-items:center;cursor:pointer;position:relative;">
@@ -223,9 +218,9 @@ function renderMapPins() {
           <div style="width:44px;height:44px;border-radius:50%;border:3px solid ${mood.color};
                       overflow:hidden;background:#0a0f1e;
                       display:flex;align-items:center;justify-content:center;">
-            ${ch.photoData
-              ? `<img src="${ch.photoData}" style="width:100%;height:100%;object-fit:cover" alt="${ch.name}">`
-              : '<span style="font-size:22px">🧸</span>'}
+            ${imgSrc
+              ? `<img src="${imgSrc}" style="width:100%;height:100%;object-fit:cover" alt="${ch.name}">`
+              : '<span style="font-size:22px">\uD83E\uDDF8</span>'}
           </div>
           ${arBadge}
         </div>
@@ -242,19 +237,16 @@ function renderMapPins() {
       L.DomEvent.stopPropagation(e);
 
       if (facilitatorMode) {
-        // Editor: open the character card as before
         window.openCard(ch.id);
         return;
       }
 
-      // Viewer mode ──────────────────────────────────────────────────────────
       if (!arEnabled) {
         window.openCard(ch.id);
         return;
       }
 
       if (_isNearCharacter(ch)) {
-        // Close any open card, then launch AR
         if (typeof window.closeCard === 'function') window.closeCard();
         window.ARView.open(ch);
       } else {
@@ -262,8 +254,7 @@ function renderMapPins() {
         const dist = (userLat !== null && pos2)
           ? Math.round(haversine(userLat, userLng, pos2.lat, pos2.lng)) + 'm away'
           : '';
-        showToast(`📍 Move closer to visit ${ch.name}${dist ? ' (' + dist + ')' : ''}`);
-        // Still open the card so they can read dialogue / items from afar
+        showToast(`\uD83D\uDCCD Move closer to visit ${ch.name}${dist ? ' (' + dist + ')' : ''}`);
         window.openCard(ch.id);
       }
     });
@@ -280,7 +271,7 @@ function showTooltip(ch, evt) {
   const near = _isNearCharacter(ch);
   document.getElementById('tt-name').textContent = ch.name;
   document.getElementById('tt-loc').textContent  = pos
-    ? (near && !facilitatorMode ? '📷 Tap to visit in AR' : `${pos.lat.toFixed(4)}, ${pos.lng.toFixed(4)}`)
+    ? (near && !facilitatorMode ? '\uD83D\uDCF7 Tap to visit in AR' : `${pos.lat.toFixed(4)}, ${pos.lng.toFixed(4)}`)
     : '';
   document.getElementById('tt-mood').textContent = mood.emoji + ' ' + mood.label;
   tt.style.left = (evt.clientX + 12) + 'px';
@@ -290,11 +281,10 @@ function showTooltip(ch, evt) {
 
 function hideTooltip() { document.getElementById('tooltip').classList.remove('show'); }
 
-// ── GPS ───────────────────────────────────────────────────────────────────────
-
+// ── GPS ─────────────────────────────────────────────────────────────────────────
 function startGPS() {
   if (!navigator.geolocation) { alert('Geolocation not supported.'); return; }
-  document.getElementById('gps-status').textContent = 'GPS: acquiring…';
+  document.getElementById('gps-status').textContent = 'GPS: acquiring\u2026';
   gpsWatchId = navigator.geolocation.watchPosition(pos => {
     const { latitude: lat, longitude: lng, accuracy } = pos.coords;
     userLat = lat; userLng = lng;
@@ -303,7 +293,6 @@ function startGPS() {
     _updateUserMarker(lat, lng, accuracy);
     checkProximity();
     updateCompass();
-    // Re-render pins so AR rings appear / disappear as user moves
     renderMapPins();
   }, err => {
     const msgs = { 1: 'permission denied', 2: 'position unavailable', 3: 'timeout' };
@@ -318,7 +307,6 @@ function startSim() {
   }
   if (!rooms.length && !characters.length) { alert('Add a room or character first.'); return; }
   simActive = true; let idx = 0;
-  // Sim over character positions if they have lat/lng, else rooms
   const targets = characters.filter(c => typeof c.lat === 'number').length
     ? characters.filter(c => typeof c.lat === 'number')
     : rooms;
@@ -334,12 +322,11 @@ function startSim() {
   step(); simInterval = setInterval(step, 4000);
 }
 
-// ── Proximity (viewer mode) ───────────────────────────────────────────────────
+// ── Proximity (viewer mode) ─────────────────────────────────────────────────────
 
 function checkProximity() {
   if (userLat === null || facilitatorMode) return;
 
-  // Character proximity (AR workflow)
   characters.forEach(ch => {
     if (ch.arEnabled === false) return;
     const pos = _charLatLng(ch);
@@ -348,13 +335,12 @@ function checkProximity() {
     const key  = 'ar_entered_' + ch.id;
     if (dist <= AR_RANGE && !window[key]) {
       window[key] = true;
-      showToast(`📷 ${ch.name} is nearby — tap their pin to visit in AR`);
+      showToast(`\uD83D\uDCF7 ${ch.name} is nearby \u2014 tap their pin to visit in AR`);
     } else if (dist > AR_RANGE) {
       window[key] = false;
     }
   });
 
-  // Legacy room proximity
   const nowInside = new Set();
   rooms.forEach(room => {
     const dist = haversine(userLat, userLng, room.lat, room.lng);
@@ -363,14 +349,14 @@ function checkProximity() {
   nowInside.forEach(roomId => {
     if (!_insideRoomIds.has(roomId)) {
       const room = rooms.find(r => r.id === roomId);
-      showToast('📍 Entering ' + (room ? room.name : 'room') + '…');
+      showToast('\uD83D\uDCCD Entering ' + (room ? room.name : 'room') + '\u2026');
       if (activeRoomId !== roomId) window.openRoom(roomId);
     }
   });
   _insideRoomIds.forEach(roomId => {
     if (!nowInside.has(roomId)) {
       const room = rooms.find(r => r.id === roomId);
-      showToast('🚶 Left ' + (room ? room.name : 'room'));
+      showToast('\uD83D\uDEB6 Left ' + (room ? room.name : 'room'));
       if (activeRoomId === roomId) window.closeRoom();
     }
   });
@@ -385,14 +371,12 @@ function haversine(lat1, lng1, lat2, lng2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 }
 
-// ── Compass ───────────────────────────────────────────────────────────────────
-
+// ── Compass ──────────────────────────────────────────────────────────────────────
 function updateCompass() {
   const list = document.getElementById('compass-list');
   list.innerHTML = '';
   if (userLat === null) return;
 
-  // Show characters in compass if they have lat/lng, else fall back to rooms
   const sources = characters.filter(c => typeof c.lat === 'number').length
     ? characters.map(c => {
         const pos = _charLatLng(c);
@@ -404,24 +388,23 @@ function updateCompass() {
     const inside = s.dist <= AR_RANGE;
     const item = document.createElement('div');
     item.className = 'compass-list-item' + (inside ? ' inside' : '');
-    item.innerHTML = `<span class="room-name">${s.name}</span><span>${inside ? '📷 here' : Math.round(s.dist) + 'm'}</span>`;
+    item.innerHTML = `<span class="room-name">${s.name}</span><span>${inside ? '\uD83D\uDCF7 here' : Math.round(s.dist) + 'm'}</span>`;
     list.appendChild(item);
   });
 }
 
-// ── Mode toggle ───────────────────────────────────────────────────────────────
+// ── Mode toggle ──────────────────────────────────────────────────────────────────
 
 function toggleMode() {
   facilitatorMode = !facilitatorMode;
   _insideRoomIds.clear();
-  // Reset AR-entered flags
   characters.forEach(ch => { window['ar_entered_' + ch.id] = false; });
   document.getElementById('mode-label').textContent = facilitatorMode ? 'Facilitator' : 'Visitor';
   document.querySelector('.hbtn.toggle-mode').textContent = facilitatorMode ? 'Projector' : 'Facilitator';
-  renderMapPins(); // re-render so AR badges / rings update
+  renderMapPins();
 }
 
-// ── Spawn test character at map centre ───────────────────────────────────────
+// ── Spawn test character at map centre ────────────────────────────────────────────
 
 function spawnTestRoom() {
   const centre = map.getCenter();
@@ -431,7 +414,6 @@ function spawnTestRoom() {
   characters.push({
     id: chId, name: 'Pebble', roomId, roomIds: [roomId],
     homeRoomId: roomId, workRoomId: roomId,
-    // Direct lat/lng for AR placement
     lat: centre.lat, lng: centre.lng,
     schedule: { morning: 'home', midday: 'work', afternoon: 'work', evening: 'home', night: 'home' },
     mood: 'Happy', items: ['small rock', 'lucky leaf'],
@@ -454,7 +436,6 @@ function spawnTestRoom() {
 // ── Expose to modals/store so newly saved characters pick up pending coords ───
 
 document.addEventListener('lc:character-saved', (e) => {
-  // If a character was just saved and we have pending map coords, apply them
   if (window._pendingCharLat !== undefined && e.detail && e.detail.id) {
     const ch = characters.find(c => c.id === e.detail.id);
     if (ch) {
