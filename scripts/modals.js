@@ -28,7 +28,7 @@ function populateHomeWorkSelects(selectedIds, homeRoomId, workRoomId) {
   const workEl = document.getElementById('cf-work-room');
   if (!homeEl || !workEl) return;
   [homeEl, workEl].forEach(el => {
-    el.innerHTML = '<option value="">— choose a room —</option>';
+    el.innerHTML = '<option value="">\u2014 choose a room \u2014</option>';
     selectedIds.forEach(id => {
       const room = rooms.find(r => r.id === id);
       if (!room) return;
@@ -228,6 +228,335 @@ function uploadRoomBackdrop() {
   reader.readAsDataURL(file);
 }
 
+// ---------------------------------------------------------------------------
+// Sprite / Chroma Key state (module-level, reset on each openCharModal call)
+// ---------------------------------------------------------------------------
+
+let pendingSprites = { idle: [null, null], walk: [null, null], talk: [null, null], listen: [null, null] };
+let chromaSettings = { h: 120, tolerance: 0.35, spill: 0.15 };
+let eyedropperActive = false;
+
+const SPRITE_STATES = ['idle', 'walk', 'talk', 'listen'];
+const SPRITE_STATE_LABELS = { idle: 'Idle', walk: 'Walk', talk: 'Talk', listen: 'Listen' };
+
+/** CSS checkerboard pattern for transparent-bg thumbnails */
+const CHECKERBOARD_STYLE = [
+  'background-image:linear-gradient(45deg,#ccc 25%,transparent 25%),',
+  'linear-gradient(-45deg,#ccc 25%,transparent 25%),',
+  'linear-gradient(45deg,transparent 75%,#ccc 75%),',
+  'linear-gradient(-45deg,transparent 75%,#ccc 75%);',
+  'background-size:12px 12px;',
+  'background-position:0 0,0 6px,6px -6px,-6px 0px;',
+  'background-color:#fff;'
+].join('');
+
+/** Hue (0-360) to CSS hex colour for the swatch */
+function hueToHex(h) {
+  const s = 1, l = 0.5;
+  const a = s * Math.min(l, 1 - l);
+  const f = n => {
+    const k = (n + h / 30) % 12;
+    const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+    return Math.round(255 * color).toString(16).padStart(2, '0');
+  };
+  return '#' + f(0) + f(8) + f(4);
+}
+
+/** Build and inject the Sprite Frames section into the char modal */
+function buildSpriteSection(ch) {
+  const existing = document.getElementById('sprite-frames-section');
+  if (existing) existing.remove();
+
+  // Reset state
+  pendingSprites = { idle: [null, null], walk: [null, null], talk: [null, null], listen: [null, null] };
+  chromaSettings = (ch && ch.chromaKey) ? { ...ch.chromaKey } : { h: 120, tolerance: 0.35, spill: 0.15 };
+  eyedropperActive = false;
+
+  // Seed existing sprites if editing a character
+  if (ch && ch.sprites) {
+    SPRITE_STATES.forEach(state => {
+      if (ch.sprites[state]) {
+        pendingSprites[state] = [ch.sprites[state][0] || null, ch.sprites[state][1] || null];
+      }
+    });
+  }
+
+  const section = document.createElement('div');
+  section.id = 'sprite-frames-section';
+  section.style.cssText = 'margin-top:16px;border-top:1px solid rgba(255,255,255,0.1);padding-top:12px;';
+
+  // Collapsible header
+  section.innerHTML = `
+    <button id="sprite-section-toggle" onclick="lcModals.toggleSpriteSection()" style="
+      background:none;border:none;color:var(--text,#e0e0e0);font-size:13px;font-weight:600;
+      cursor:pointer;padding:4px 0;display:flex;align-items:center;gap:6px;width:100%;text-align:left;
+    ">
+      <span id="sprite-section-arrow" style="display:inline-block;transition:transform .2s;">\u25B6</span>
+      \uD83C\uDFAC Sprite Frames
+    </button>
+    <div id="sprite-section-body" style="display:none;margin-top:10px;">
+
+      <!-- Chroma key controls -->
+      <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:12px;padding:8px;background:rgba(255,255,255,0.05);border-radius:6px;">
+        <label style="font-size:11px;color:var(--text-muted,#999);width:100%;margin-bottom:2px;">\uD83D\uDD27 Chroma Key</label>
+
+        <!-- Swatch + eyedropper -->
+        <div style="display:flex;align-items:center;gap:6px;">
+          <div id="chroma-swatch" style="width:28px;height:28px;border-radius:4px;border:2px solid rgba(255,255,255,0.2);background:${hueToHex(chromaSettings.h)};flex-shrink:0;"></div>
+          <button id="chroma-eyedropper" onclick="lcModals.toggleEyedropper()" title="Pick colour from image" style="
+            background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:4px;
+            color:var(--text,#e0e0e0);font-size:14px;padding:4px 8px;cursor:pointer;
+          ">\uD83D\uDC41\uFE0F</button>
+          <span id="chroma-eyedropper-hint" style="font-size:11px;color:var(--text-muted,#999);display:none;">Click a frame to sample colour</span>
+        </div>
+
+        <!-- Tolerance slider -->
+        <div style="flex:1;min-width:140px;">
+          <label style="font-size:11px;color:var(--text-muted,#999);">Amount removed: <span id="chroma-tolerance-val">${chromaSettings.tolerance.toFixed(2)}</span></label>
+          <input type="range" id="chroma-tolerance" min="0" max="1" step="0.01" value="${chromaSettings.tolerance}"
+            oninput="lcModals.onChromaTolerance(this.value)"
+            style="width:100%;margin-top:3px;">
+        </div>
+
+        <!-- Spill slider -->
+        <div style="flex:1;min-width:140px;">
+          <label style="font-size:11px;color:var(--text-muted,#999);">Edge softness: <span id="chroma-spill-val">${chromaSettings.spill.toFixed(2)}</span></label>
+          <input type="range" id="chroma-spill" min="0" max="1" step="0.01" value="${chromaSettings.spill}"
+            oninput="lcModals.onChromaSpill(this.value)"
+            style="width:100%;margin-top:3px;">
+        </div>
+
+        <!-- Apply all -->
+        <button onclick="lcModals.applyChromaToAll()" style="
+          background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:4px;
+          color:var(--text,#e0e0e0);font-size:12px;padding:5px 10px;cursor:pointer;white-space:nowrap;
+        ">Apply to all frames</button>
+      </div>
+
+      <!-- Sprite upload grid -->
+      <div id="sprite-grid" style="display:flex;flex-direction:column;gap:8px;"></div>
+    </div>
+  `;
+
+  // Insert before the first <hr> or at the bottom of the form
+  const form = document.getElementById('char-modal-overlay');
+  const target = form ? form.querySelector('.modal-actions, .char-save-btn, #char-modal-save') : null;
+  if (target) {
+    target.parentNode.insertBefore(section, target);
+  } else {
+    const modalBody = document.querySelector('#char-modal-overlay .modal-body, #char-modal-overlay .modal-scroll, #char-modal-overlay form');
+    if (modalBody) modalBody.appendChild(section);
+    else document.getElementById('char-modal-overlay').appendChild(section);
+  }
+
+  // Build grid rows
+  buildSpriteGrid();
+}
+
+function buildSpriteGrid() {
+  const grid = document.getElementById('sprite-grid');
+  if (!grid) return;
+  grid.innerHTML = '';
+
+  SPRITE_STATES.forEach(state => {
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;gap:8px;';
+
+    const stateLabel = document.createElement('span');
+    stateLabel.textContent = SPRITE_STATE_LABELS[state];
+    stateLabel.style.cssText = 'font-size:11px;color:var(--text-muted,#999);width:36px;flex-shrink:0;text-transform:uppercase;letter-spacing:.5px;';
+    row.appendChild(stateLabel);
+
+    [0, 1].forEach(frameIdx => {
+      const slot = buildSpriteSlot(state, frameIdx);
+      row.appendChild(slot);
+    });
+
+    grid.appendChild(row);
+  });
+}
+
+function buildSpriteSlot(state, frameIdx) {
+  const dataUrl = pendingSprites[state][frameIdx];
+  const slot = document.createElement('div');
+  slot.id = `sprite-slot-${state}-${frameIdx}`;
+  slot.style.cssText = `position:relative;width:64px;height:72px;border-radius:6px;border:1.5px dashed rgba(255,255,255,0.2);overflow:hidden;flex-shrink:0;cursor:pointer;${CHECKERBOARD_STYLE}`;
+
+  if (dataUrl) {
+    const img = document.createElement('img');
+    img.src = dataUrl;
+    img.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:contain;';
+    img.dataset.state = state;
+    img.dataset.frame = frameIdx;
+    img.addEventListener('click', onSpriteImgClick);
+    slot.appendChild(img);
+
+    const clearBtn = document.createElement('button');
+    clearBtn.textContent = '\u00D7';
+    clearBtn.title = 'Remove frame';
+    clearBtn.style.cssText = 'position:absolute;top:2px;right:2px;width:16px;height:16px;border-radius:50%;background:rgba(0,0,0,.6);border:none;color:#fff;font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;line-height:1;';
+    clearBtn.onclick = (e) => { e.stopPropagation(); clearSpriteSlot(state, frameIdx); };
+    slot.appendChild(clearBtn);
+  } else {
+    const plus = document.createElement('span');
+    plus.textContent = '+';
+    plus.style.cssText = 'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:20px;color:rgba(255,255,255,0.3);pointer-events:none;';
+    slot.appendChild(plus);
+
+    const frameLabel = document.createElement('span');
+    frameLabel.textContent = frameIdx === 0 ? 'A' : 'B';
+    frameLabel.style.cssText = 'position:absolute;bottom:3px;left:0;right:0;text-align:center;font-size:9px;color:rgba(255,255,255,0.3);pointer-events:none;';
+    slot.appendChild(frameLabel);
+  }
+
+  // Hidden file input
+  const fileInput = document.createElement('input');
+  fileInput.type = 'file';
+  fileInput.accept = 'image/*';
+  fileInput.style.display = 'none';
+  fileInput.id = `sprite-input-${state}-${frameIdx}`;
+  fileInput.addEventListener('change', () => onSpriteFileChange(fileInput, state, frameIdx));
+  slot.appendChild(fileInput);
+
+  slot.addEventListener('click', (e) => {
+    // If eyedropper is active, clicks are handled by onSpriteImgClick
+    if (eyedropperActive) return;
+    // Only open picker if click wasn't on img or clear btn
+    if (e.target === slot || e.target.tagName === 'SPAN') {
+      fileInput.click();
+    }
+  });
+
+  return slot;
+}
+
+function onSpriteImgClick(e) {
+  if (!eyedropperActive) return;
+  const img = e.currentTarget;
+  const rect = img.getBoundingClientRect();
+  // Scale click coords to natural image coordinates
+  const scaleX = img.naturalWidth / rect.width;
+  const scaleY = img.naturalHeight / rect.height;
+  const x = Math.round((e.clientX - rect.left) * scaleX);
+  const y = Math.round((e.clientY - rect.top) * scaleY);
+  if (window.lcChroma && typeof window.lcChroma.sampleHue === 'function') {
+    window.lcChroma.sampleHue(img.src, x, y).then(hue => {
+      chromaSettings.h = Math.round(hue);
+      updateChromaSwatch();
+      deactivateEyedropper();
+      // Rerun preview on this slot
+      const state = img.dataset.state;
+      const frame = parseInt(img.dataset.frame, 10);
+      rerunChromaOnSlot(state, frame);
+    }).catch(() => deactivateEyedropper());
+  } else {
+    deactivateEyedropper();
+  }
+  e.stopPropagation();
+}
+
+function onSpriteFileChange(input, state, frameIdx) {
+  const file = input.files && input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    const raw = e.target.result;
+    let keyed = raw;
+    if (window.lcChroma && typeof window.lcChroma.chromaKey === 'function') {
+      try { keyed = await window.lcChroma.chromaKey(raw, chromaSettings); } catch (_) {}
+    }
+    pendingSprites[state][frameIdx] = keyed;
+    refreshSpriteSlot(state, frameIdx);
+  };
+  reader.readAsDataURL(file);
+  input.value = '';
+}
+
+function refreshSpriteSlot(state, frameIdx) {
+  const slot = document.getElementById(`sprite-slot-${state}-${frameIdx}`);
+  if (!slot) return;
+  // Preserve the hidden file input
+  const fileInput = document.getElementById(`sprite-input-${state}-${frameIdx}`);
+  const newSlot = buildSpriteSlot(state, frameIdx);
+  // Re-attach the existing file input (same id, already in DOM)
+  slot.parentNode.replaceChild(newSlot, slot);
+}
+
+function clearSpriteSlot(state, frameIdx) {
+  pendingSprites[state][frameIdx] = null;
+  refreshSpriteSlot(state, frameIdx);
+}
+
+async function rerunChromaOnSlot(state, frameIdx) {
+  const current = pendingSprites[state][frameIdx];
+  if (!current || !window.lcChroma) return;
+  try {
+    const keyed = await window.lcChroma.chromaKey(current, chromaSettings);
+    pendingSprites[state][frameIdx] = keyed;
+    refreshSpriteSlot(state, frameIdx);
+  } catch (_) {}
+}
+
+// --- Chroma UI event handlers ---
+
+function onChromaTolerance(val) {
+  chromaSettings.tolerance = parseFloat(val);
+  const el = document.getElementById('chroma-tolerance-val');
+  if (el) el.textContent = chromaSettings.tolerance.toFixed(2);
+}
+
+function onChromaSpill(val) {
+  chromaSettings.spill = parseFloat(val);
+  const el = document.getElementById('chroma-spill-val');
+  if (el) el.textContent = chromaSettings.spill.toFixed(2);
+}
+
+async function applyChromaToAll() {
+  if (!window.lcChroma) return;
+  const btn = document.querySelector('#sprite-frames-section button[onclick*="applyChromaToAll"]');
+  if (btn) { btn.disabled = true; btn.textContent = 'Applying\u2026'; }
+  for (const state of SPRITE_STATES) {
+    for (let i = 0; i < 2; i++) {
+      await rerunChromaOnSlot(state, i);
+    }
+  }
+  if (btn) { btn.disabled = false; btn.textContent = 'Apply to all frames'; }
+}
+
+function updateChromaSwatch() {
+  const swatch = document.getElementById('chroma-swatch');
+  if (swatch) swatch.style.background = hueToHex(chromaSettings.h);
+}
+
+function toggleEyedropper() {
+  eyedropperActive = !eyedropperActive;
+  const btn = document.getElementById('chroma-eyedropper');
+  const hint = document.getElementById('chroma-eyedropper-hint');
+  if (btn) btn.style.background = eyedropperActive ? 'rgba(255,200,0,.25)' : 'rgba(255,255,255,0.08)';
+  if (hint) hint.style.display = eyedropperActive ? 'inline' : 'none';
+}
+
+function deactivateEyedropper() {
+  eyedropperActive = false;
+  const btn = document.getElementById('chroma-eyedropper');
+  const hint = document.getElementById('chroma-eyedropper-hint');
+  if (btn) btn.style.background = 'rgba(255,255,255,0.08)';
+  if (hint) hint.style.display = 'none';
+}
+
+function toggleSpriteSection() {
+  const body = document.getElementById('sprite-section-body');
+  const arrow = document.getElementById('sprite-section-arrow');
+  if (!body) return;
+  const open = body.style.display !== 'none';
+  body.style.display = open ? 'none' : 'block';
+  if (arrow) arrow.style.transform = open ? '' : 'rotate(90deg)';
+}
+
+// ---------------------------------------------------------------------------
+// Character modal open / close / save
+// ---------------------------------------------------------------------------
+
 function openCharModal(charId) {
   editingCharId = charId;
   tempPhotoData = null;
@@ -263,11 +592,9 @@ function openCharModal(charId) {
 
   const glbStatus = document.getElementById('cf-glb-status');
   if (ch && ch.glbUrl && ch.glbUrl.startsWith('data:')) {
-    // data: URL on the character means it was saved without a GitHub token.
-    // Don’t seed it back into tempGlbData — show a prompt to re-upload instead.
     tempGlbData = null;
     window.tempGlbData = null;
-    glbStatus.textContent = '\u26A0\uFE0F Model saved without GitHub token — re-upload to enable AR on other devices.';
+    glbStatus.textContent = '\u26A0\uFE0F Model saved without GitHub token \u2014 re-upload to enable AR on other devices.';
     glbStatus.style.color = 'var(--accent)';
   } else if (ch && ch.glbUrl) {
     glbStatus.textContent = '\u2713 3D model linked (' + ch.glbUrl.split('/').pop() + ')';
@@ -332,6 +659,9 @@ function openCharModal(charId) {
 
   rebuildObjectUsagePrompts();
 
+  // Build sprite section (always, since it manages its own state)
+  buildSpriteSection(ch);
+
   const hint = document.getElementById('cf-room-chips-hint');
   if (hint) {
     if (window._pendingCharLat !== undefined) {
@@ -363,6 +693,9 @@ function closeCharModal() {
   const bar  = document.getElementById('cf-fbx-progress-bar');
   if (wrap) wrap.style.display = 'none';
   if (bar)  bar.style.width = '0%';
+  // Reset sprite state
+  pendingSprites = { idle: [null, null], walk: [null, null], talk: [null, null], listen: [null, null] };
+  eyedropperActive = false;
   delete window._pendingCharLat;
   delete window._pendingCharLng;
 }
@@ -381,9 +714,6 @@ function previewFile(inputId, previewId, dataKey) {
 }
 
 function saveCharacter() {
-  // Guard: if an upload is still in flight, don’t save yet.
-  // (Belt-and-suspenders: the Save button should already be disabled,
-  // but protect against inline-onclick callers too.)
   if (window.lcUpload && window.lcUpload.isUploadInFlight && window.lcUpload.isUploadInFlight()) {
     if (typeof showToast === 'function') showToast('Still uploading model \u2014 please wait a moment.', 'info');
     return;
@@ -416,12 +746,8 @@ function saveCharacter() {
   const primaryRoomId = roomIds[0] || '';
   const items = document.getElementById('cf-items').value.split(',').map(s => s.trim()).filter(Boolean);
 
-  // Resolve GLB: prefer module-local var, then window global, then URL field.
-  // Never write a data: URL if a persistent https:// URL is available anywhere.
   const urlFieldVal = document.getElementById('cf-glb-url').value.trim();
   const candidate   = tempGlbData || window.tempGlbData || urlFieldVal || null;
-  // If we somehow still have a data: URL but the existing character already
-  // has a persistent https:// URL, keep the persistent one.
   const existingChar = editingCharId ? characters.find(c => c.id === editingCharId) : null;
   const existingPersistent = existingChar?.glbUrl?.startsWith('https://') ? existingChar.glbUrl : null;
   const glbUrl = (candidate && !candidate.startsWith('data:'))
@@ -440,6 +766,14 @@ function saveCharacter() {
     if (text) passages.push({ type: row.dataset.key, text });
   });
 
+  // Build sprites object — only include states that have at least one frame
+  const sprites = {};
+  let hasAnySprite = false;
+  SPRITE_STATES.forEach(state => {
+    const frames = pendingSprites[state].filter(Boolean);
+    if (frames.length) { sprites[state] = pendingSprites[state]; hasAnySprite = true; }
+  });
+
   const data = {
     name, roomId: primaryRoomId, roomIds,
     homeRoomId, workRoomId, schedule,
@@ -448,6 +782,16 @@ function saveCharacter() {
     photoData: tempPhotoData,
     animData:  tempAnimData,
   };
+
+  // Persist sprites and chroma settings if any frames were uploaded
+  if (hasAnySprite) {
+    data.sprites   = sprites;
+    data.chromaKey = { ...chromaSettings };
+  } else if (existingChar && existingChar.sprites) {
+    // Keep existing sprites if none were changed in this edit session
+    data.sprites   = existingChar.sprites;
+    data.chromaKey = existingChar.chromaKey;
+  }
 
   if (window._pendingCharLat !== undefined) {
     data.lat = window._pendingCharLat;
@@ -493,12 +837,15 @@ window.lcModals = {
   buildRoomChipPicker, getSelectedRoomIds, populateHomeWorkSelects, readSchedule,
   rebuildObjectUsagePrompts,
   CAM_PRESETS, setCamPreset, openRoomModal, closeRoomModal, saveRoom, uploadRoomBackdrop,
-  initRoomPickerMap, openCharModal, closeCharModal, togglePromptPill, previewFile, saveCharacter
+  initRoomPickerMap, openCharModal, closeCharModal, togglePromptPill, previewFile, saveCharacter,
+  // Sprite/chroma helpers (called from inline onclick in built HTML)
+  toggleSpriteSection, toggleEyedropper, onChromaTolerance, onChromaSpill, applyChromaToAll,
 };
 
 export {
   buildRoomChipPicker, getSelectedRoomIds, populateHomeWorkSelects, readSchedule,
   rebuildObjectUsagePrompts,
   CAM_PRESETS, setCamPreset, openRoomModal, closeRoomModal, saveRoom, uploadRoomBackdrop,
-  initRoomPickerMap, openCharModal, closeCharModal, togglePromptPill, previewFile, saveCharacter
+  initRoomPickerMap, openCharModal, closeCharModal, togglePromptPill, previewFile, saveCharacter,
+  toggleSpriteSection, toggleEyedropper, onChromaTolerance, onChromaSpill, applyChromaToAll,
 };
