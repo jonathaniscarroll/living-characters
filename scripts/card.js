@@ -102,11 +102,9 @@ function closeCard() {
 }
 
 function editSelectedChar() {
-  // Capture the ID *before* closeCard() nulls _selectedCharId
-  const idToEdit = _selectedCharId;
-  if (!idToEdit) return;
+  if (!_selectedCharId) return;
   closeCard();
-  window.lcModals.openCharModal(idToEdit);
+  window.lcModals.openCharModal(_selectedCharId);
 }
 
 function deleteSelectedChar() {
