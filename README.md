@@ -125,3 +125,5 @@ node scripts/obj-to-glb.js input.obj output.glb
 Note: OBJ format does not store animation data. For textured or animated models, use Blender's export to GLB instead.
 
  
+ 
+ 
