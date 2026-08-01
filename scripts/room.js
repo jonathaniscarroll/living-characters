@@ -224,10 +224,10 @@ function onRoomObjectClick(e) {
 // ─────────────────────────────────────────────────────────────
 // WANDER AI
 // Each agent: { chId, mesh, ring, state, timer, targetX, targetZ,
-//               homeX, homeZ, speed, mixer, idleClip, walkClip }
+//               homeX, homeZ, speed, mixer, idleClip, walkClip, bounds }
 // States: 'idle' | 'walking'
 // ─────────────────────────────────────────────────────────────
-const WANDER_RADIUS = 3.5;   // max distance from home position
+const WANDER_RADIUS = 3.5;   // fallback only — normally overridden by worldBounds
 const WANDER_SPEED  = 0.8;   // units per second
 const IDLE_MIN = 2;           // seconds
 const IDLE_MAX = 6;
@@ -238,7 +238,7 @@ let _wanderAgents = [];
 
 function _randBetween(a, b) { return a + Math.random() * (b - a); }
 
-function _initWanderAgent(chId, mesh, ring, homeX, homeZ, mixer, animations) {
+function _initWanderAgent(chId, mesh, ring, homeX, homeZ, mixer, animations, bounds) {
   const idleClip = animations
     ? (THREE.AnimationClip.findByName(animations, 'Idle')
     || THREE.AnimationClip.findByName(animations, 'idle')
@@ -261,6 +261,7 @@ function _initWanderAgent(chId, mesh, ring, homeX, homeZ, mixer, animations) {
     speed: WANDER_SPEED * _randBetween(0.7, 1.3),
     mixer, idleClip, walkClip,
     _activeAction: null,
+    bounds,   // worldBounds passed from buildRoomScene; undefined for legacy agents
   };
   _playAgentClip(agent, idleClip);
   _wanderAgents.push(agent);
@@ -276,18 +277,23 @@ function _playAgentClip(agent, clip) {
 }
 
 function _tickWander(agent, dt) {
-  // Don't wander while being dragged
-  if (_dragTarget && _dragTarget.id === agent.chId) return;
-
+  if (agent.frozen || (_dragTarget && _dragTarget.id === agent.chId)) return;
   agent.timer -= dt;
+
+  const b = agent.bounds;  // may be undefined for legacy agents — guard below
 
   if (agent.state === 'idle') {
     if (agent.timer <= 0) {
-      // Pick a new target near home
-      const angle = Math.random() * Math.PI * 2;
-      const dist  = _randBetween(1, WANDER_RADIUS);
-      agent.targetX = agent.homeX + Math.cos(angle) * dist;
-      agent.targetZ = agent.homeZ + Math.sin(angle) * dist;
+      // Pick a random target within bounds (or fall back to old WANDER_RADIUS)
+      if (b) {
+        agent.targetX = _randBetween(b.minX, b.maxX);
+        agent.targetZ = _randBetween(b.minZ, b.maxZ);
+      } else {
+        const angle = Math.random() * Math.PI * 2;
+        const dist  = _randBetween(1, WANDER_RADIUS);
+        agent.targetX = agent.homeX + Math.cos(angle) * dist;
+        agent.targetZ = agent.homeZ + Math.sin(angle) * dist;
+      }
       agent.state = 'walking';
       agent.timer = _randBetween(WALK_MIN, WALK_MAX);
       _playAgentClip(agent, agent.walkClip || agent.idleClip);
@@ -298,15 +304,20 @@ function _tickWander(agent, dt) {
     const dist = Math.sqrt(dx * dx + dz * dz);
 
     if (dist < 0.05 || agent.timer <= 0) {
-      // Arrived or timed out — go idle
       agent.state = 'idle';
       agent.timer = _randBetween(IDLE_MIN, IDLE_MAX);
       _playAgentClip(agent, agent.idleClip);
     } else {
-      // Step toward target
       const step = Math.min(agent.speed * dt, dist);
-      const nx = agent.mesh.position.x + (dx / dist) * step;
-      const nz = agent.mesh.position.z + (dz / dist) * step;
+      let nx = agent.mesh.position.x + (dx / dist) * step;
+      let nz = agent.mesh.position.z + (dz / dist) * step;
+
+      // Clamp to bounds every tick so characters can never escape
+      if (b) {
+        nx = Math.max(b.minX, Math.min(b.maxX, nx));
+        nz = Math.max(b.minZ, Math.min(b.maxZ, nz));
+      }
+
       agent.mesh.position.x = nx;
       agent.mesh.position.z = nz;
       // Face direction of travel
@@ -338,6 +349,19 @@ function buildRoomScene(room) {
   );
   camera.position.set(9, 9, 9);
   camera.lookAt(0, 1, 0);
+  camera.updateProjectionMatrix();
+
+  // Compute visible world-space bounds from the orthographic frustum
+  const EDGE_PAD  = 0.8;   // world units of padding inside screen edge
+  const visHalfW = (viewSize * aspect / 2) / camera.zoom;
+  const visHalfH = (viewSize / 2)          / camera.zoom;
+  const worldBounds = {
+    minX: -visHalfW + EDGE_PAD,
+    maxX:  visHalfW - EDGE_PAD,
+    minZ: -visHalfH + EDGE_PAD,
+    maxZ:  visHalfH - EDGE_PAD,
+  };
+  console.log('worldBounds:', worldBounds);
 
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.setClearColor(0x000000, 0);
@@ -346,25 +370,7 @@ function buildRoomScene(room) {
   renderer.setPixelRatio(window.devicePixelRatio);
   stage.appendChild(renderer.domElement);
 
-  const hasBg = !!(room.backdropData || room.backdropUrl || BACKDROP_IMAGES[room.backdrop]);
-  const floor = new THREE.Mesh(
-    new THREE.PlaneGeometry(20, 20),
-    new THREE.MeshLambertMaterial({
-      color: FLOOR_COLORS[room.backdrop] || '#1a3a1a',
-      transparent: hasBg, opacity: hasBg ? 0.18 : 1
-    })
-  );
-  floor.rotation.x = -Math.PI / 2;
-  floor.receiveShadow = true;
-  scene.add(floor);
-
-  if (!hasBg) {
-    const wallMat = new THREE.MeshLambertMaterial({ color: WALL_COLORS[room.backdrop] || '#2d5a27' });
-    const wN = new THREE.Mesh(new THREE.BoxGeometry(20, 6, 0.2), wallMat);
-    wN.position.set(0, 3, -8); scene.add(wN);
-    const wW = new THREE.Mesh(new THREE.BoxGeometry(0.2, 6, 20), wallMat);
-    wW.position.set(-8, 3, 0); scene.add(wW);
-  }
+  // Floor mesh and wall meshes removed — backdrop image provides all visual floor
 
   scene.add(new THREE.AmbientLight(0xffffff, 1.3));
   const dl = new THREE.DirectionalLight(0xffffff, 0.7);
@@ -441,8 +447,9 @@ function buildRoomScene(room) {
   const charsInRoom = characters.filter(c => (c.roomIds || [c.roomId]).includes(room.id));
   charsInRoom.forEach((ch, i) => {
     const angle = (i / Math.max(charsInRoom.length, 1)) * Math.PI * 1.2 - 0.6;
-    const cx = ch.sceneX ?? Math.cos(angle) * 3.5;
-    const cz = ch.sceneZ ?? Math.sin(angle) * 3.5;
+    // Clamp spawn positions to worldBounds so characters start on-screen
+    const cx = Math.max(worldBounds.minX, Math.min(worldBounds.maxX, ch.sceneX ?? Math.cos(angle) * 3.5));
+    const cz = Math.max(worldBounds.minZ, Math.min(worldBounds.maxZ, ch.sceneZ ?? Math.sin(angle) * 3.5));
     const mood = MOODS.find(m => m.label === ch.mood) || MOODS[0];
 
     const ring = new THREE.Mesh(
@@ -471,7 +478,7 @@ function buildRoomScene(room) {
 
         const mixer = new THREE.AnimationMixer(model);
         glbMixers.push(mixer);
-        _initWanderAgent(ch.id, model, ring, cx, cz, mixer, gltf.animations);
+        _initWanderAgent(ch.id, model, ring, cx, cz, mixer, gltf.animations, worldBounds);
 
         const lbl = document.createElement('div');
         lbl.className = 'char-label'; lbl.textContent = ch.name;
@@ -487,7 +494,7 @@ function buildRoomScene(room) {
       scene.add(sprite);
       charObjects.push({ obj: sprite, chId: ch.id, cx, cz });
       // Sprites wander without animation mixer
-      _initWanderAgent(ch.id, sprite, ring, cx, cz, null, null);
+      _initWanderAgent(ch.id, sprite, ring, cx, cz, null, null, worldBounds);
       const lbl = document.createElement('div');
       lbl.className = 'char-label'; lbl.textContent = ch.name;
       stage.appendChild(lbl);
@@ -503,7 +510,7 @@ function buildRoomScene(room) {
       box.castShadow = true; box._charId = ch.id;
       scene.add(box);
       charObjects.push({ obj: box, chId: ch.id, cx, cz });
-      _initWanderAgent(ch.id, box, ring, cx, cz, null, null);
+      _initWanderAgent(ch.id, box, ring, cx, cz, null, null, worldBounds);
       const lbl = document.createElement('div');
       lbl.className = 'char-label'; lbl.textContent = ch.name;
       stage.appendChild(lbl);
