@@ -18,51 +18,40 @@ jobs:
         with:
           ref: dev
 
-      - name: Verify vendored tools
+      - name: Build static site into dev/ subfolder
         run: |
-          test -f vendor/tweego/tweego
-          test -f vendor/storyformats/sugarcube-2/format.js
-          chmod +x vendor/tweego/tweego
+          mkdir -p _site/dev
+          rsync -a \
+            --exclude='.git' \
+            --exclude='.github' \
+            --exclude='todo' \
+            --exclude='node_modules' \
+            --exclude='_site' \
+            --exclude='story' \
+            --exclude='vendor/tweego' \
+            --exclude='*.vsix' \
+            --exclude='vspackage' \
+            --exclude='copilot.vsix' \
+            --exclude='localStorage.json' \
+            . _site/dev/
 
-      - name: Build story with Tweego
-        env:
-          TWEEGO_PATH: vendor/storyformats
+      - name: Verify output
         run: |
-          mkdir -p build
-          vendor/tweego/tweego --format=sugarcube-2 -o build/index.html story
+          test -f _site/dev/index.html
+          echo "Site files:"
+          ls -la _site/dev/
 
-      - name: Copy authoring tool
-        run: |
-          if [ -d author ]; then
-            cp -r author build/author
-          fi
-
-      - name: Copy living-characters tool
-        run: |
-          # Copy all site files that are NOT part of the story build
-          # Adjust this list to match whatever non-story assets live at repo root
-          for item in index.html scripts media css vendor; do
-            if [ -e "$item" ]; then
-              cp -r "$item" build/
-            fi
-          done
-
-      - name: Verify build output
-        run: |
-          test -f build/index.html
-          ls -la build
-
-      - name: Checkout gh-pages into subfolder
+      - name: Checkout gh-pages branch
         uses: actions/checkout@v4
         with:
           ref: gh-pages
           path: gh-pages-current
           fetch-depth: 0
 
-      - name: Merge dev build into gh-pages/dev
+      - name: Merge dev into gh-pages/dev
         run: |
           rm -rf gh-pages-current/dev
-          cp -r build gh-pages-current/dev
+          cp -r _site/dev gh-pages-current/dev
 
       - name: Push updated gh-pages
         run: |
