@@ -13,32 +13,80 @@ function hideObjInspect() {
   document.getElementById('obj-inspect').classList.remove('show');
 }
 
+// ─────────────────────────────────────────────────────────────
+// GLTFLoader wrapper that handles data: URLs reliably
+// ─────────────────────────────────────────────────────────────
+function loadGlbUrl(url, onLoad, onError) {
+  if (!window.GLTFLoader) { if (onError) onError(new Error('GLTFLoader not ready')); return; }
+  const loader = new window.GLTFLoader();
+  if (url.startsWith('data:')) {
+    try {
+      const base64 = url.split(',')[1];
+      const binary = atob(base64);
+      const buf = new ArrayBuffer(binary.length);
+      const view = new Uint8Array(buf);
+      for (let i = 0; i < binary.length; i++) view[i] = binary.charCodeAt(i);
+      loader.parse(buf, '', onLoad, onError);
+    } catch (e) { if (onError) onError(e); }
+  } else {
+    loader.load(url, onLoad, undefined, onError);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// Backdrop image map
+// ─────────────────────────────────────────────────────────────
+const ROOM_BACKDROP_FILES = {
+  grass:  './media/garden.png',
+  forest: './media/garden.png',
+  wood:   './media/room2.png',
+  stone:  './media/room2.png',
+};
+
+function applyRoomBackdrop(room) {
+  const stage = document.getElementById('room-stage');
+  if (!stage) return;
+  const uploadedSrc = room.backdropData || room.backdropUrl || null;
+  if (uploadedSrc) {
+    stage.style.cssText += [
+      `background-image:url('${uploadedSrc}')`,
+      'background-size:cover',
+      'background-position:center',
+    ].join(';');
+    return;
+  }
+  const bgFile = ROOM_BACKDROP_FILES[room.backdrop];
+  if (bgFile) {
+    stage.style.backgroundImage    = `url('${bgFile}')`;
+    stage.style.backgroundSize     = 'cover';
+    stage.style.backgroundPosition = 'center';
+    stage.style.backgroundColor    = '';
+    return;
+  }
+  stage.style.backgroundImage = '';
+  stage.style.background = FLOOR_COLORS[room.backdrop] || '#1a1a2e';
+}
+
 function openRoom(roomId) {
   const room = rooms.find(r => r.id === roomId);
   if (!room) return;
   activeRoomId = roomId;
   document.getElementById('room-title').textContent = room.name;
   document.getElementById('room-lede').textContent = room.lede || '';
-  const stage = document.getElementById('room-stage');
-  const backdropSrc = room.backdropData || room.backdropUrl || null;
-  if (backdropSrc) {
-    stage.style.backgroundImage = `url('${backdropSrc}')`;
-    stage.style.backgroundSize = 'cover';
-    stage.style.backgroundPosition = 'center';
-  } else {
-    const bgFile = BACKDROP_IMAGES[room.backdrop];
-    if (bgFile) {
-      stage.style.backgroundImage = `url('${MEDIA_URL}${bgFile}')`;
-      stage.style.backgroundSize = 'cover';
-      stage.style.backgroundPosition = 'center';
+  applyRoomBackdrop(room);
+  document.getElementById('room-view').classList.add('open');
+
+  let attempts = 0;
+  function tryBuild() {
+    if (window.THREE && window.GLTFLoader) {
+      setTimeout(() => buildRoomScene(room), 360);
+    } else if (attempts++ < 20) {
+      setTimeout(tryBuild, 250);
     } else {
-      stage.style.backgroundImage = '';
-      stage.style.background = FLOOR_COLORS[room.backdrop] || '#1a1a2e';
+      console.warn('3D viewer failed to load after timeout.');
     }
   }
-  document.getElementById('room-view').classList.add('open');
-  if (!window.THREE || !window.GLTFLoader) { console.warn('3D viewer still loading.'); return; }
-  setTimeout(() => buildRoomScene(room), 360);
+  tryBuild();
 }
 
 function closeRoom() {
@@ -65,6 +113,10 @@ function spawnTalkCloseUp(ch) {
   const glbUrl = ch.glbUrl || ch.animData || ch.photoData || null;
   if (!glbUrl) return;
 
+  const activeRoom = rooms.find(r => r.id === activeRoomId);
+  const roomZoom   = activeRoom?.cameraZoom ?? 2;
+  const closeUpZoom = Math.min(3.5, Math.max(1.5, roomZoom));
+
   const overlay = document.createElement('div');
   overlay.id = 'talk-closeup-overlay';
   overlay.style.cssText = [
@@ -81,9 +133,10 @@ function spawnTalkCloseUp(ch) {
 
   const scene = new THREE.Scene();
   scene.background = null;
-  const cam = new THREE.PerspectiveCamera(45, 200 / 300, 0.1, 100);
+  const cam = new THREE.OrthographicCamera(45, 200 / 300, 0.1, 100);
   cam.position.set(0, 1.2, 3.5);
-  cam.lookAt(0, 1, 0);
+  cam.lookAt(0, 0.8, 0);
+  cam.zoom = closeUpZoom;
   scene.add(new THREE.AmbientLight(0xffffff, 1.6));
   const dl = new THREE.DirectionalLight(0xffffff, 0.8);
   dl.position.set(2, 5, 3);
@@ -97,13 +150,15 @@ function spawnTalkCloseUp(ch) {
   _talkCloseUpMixers = [];
 
   if (glbUrl.startsWith('data:image') || glbUrl.match(/\.(gif|png|jpe?g)$/i)) {
-    const tex = new THREE.TextureLoader().load(glbUrl);
+    const loader = new THREE.TextureLoader();
+    loader.setCrossOrigin('anonymous');
+    const tex = loader.load(glbUrl);
     const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true }));
     sprite.scale.set(1.6, 2.4, 1);
     sprite.position.set(0, 1.2, 0);
     scene.add(sprite);
-  } else if (window.GLTFLoader) {
-    new window.GLTFLoader().load(glbUrl, gltf => {
+  } else {
+    loadGlbUrl(glbUrl, gltf => {
       const model = gltf.scene;
       const box = new THREE.Box3().setFromObject(model);
       const size = new THREE.Vector3(); box.getSize(size);
@@ -142,7 +197,7 @@ function dismissTalkCloseUp() {
 // ─────────────────────────────────────────────────────────────
 // DRAG-TO-MOVE state (objects AND characters)
 // ─────────────────────────────────────────────────────────────
-let _dragTarget   = null;  // { type:'obj'|'char', id, mesh, origY }
+let _dragTarget   = null;
 let _roomEditMode = false;
 let _lastRoomPointer = null;
 
@@ -151,9 +206,37 @@ function enableRoomEdit() {
   const btn = document.querySelector('.room-tbtn.move-obj');
   if (btn) {
     btn.style.background = _roomEditMode ? '#7a3090' : '';
-    btn.textContent = _roomEditMode ? '✅ Done Moving' : 'Move Objects';
+    btn.textContent = _roomEditMode ? '\u2705 Done Moving' : 'Move Objects';
   }
-  if (!_roomEditMode) _dragTarget = null;
+  if (!_roomEditMode) {
+    if (_dragTarget) _commitDrag(_dragTarget);
+    _dragTarget = null;
+    _wanderAgents.forEach(agent => { agent.frozen = false; });
+  } else {
+    _wanderAgents.forEach(agent => { agent.frozen = true; });
+  }
+}
+
+function _commitDrag(target) {
+  const pos = target.mesh.position;
+  if (target.type === 'obj') {
+    const obj = objects.find(o => o.id === target.id);
+    if (obj) {
+      obj.px = pos.x; obj.pz = pos.z;
+      obj.position = { x: pos.x, y: pos.y, z: pos.z };
+    }
+  } else {
+    const ch = characters.find(c => c.id === target.id);
+    if (ch) { ch.sceneX = pos.x; ch.sceneZ = pos.z; }
+    const agent = _wanderAgents.find(a => a.chId === target.id);
+    if (agent) {
+      agent.homeX = pos.x; agent.homeZ = pos.z;
+      agent.targetX = pos.x; agent.targetZ = pos.z;
+      agent.state = 'idle';
+    }
+    if (target.ring) { target.ring.position.x = pos.x; target.ring.position.z = pos.z; }
+  }
+  save();
 }
 
 function _screenToFloor(e, renderer, camera) {
@@ -187,25 +270,15 @@ function onRoomObjectClick(e) {
   if (_dragTarget) {
     const point = _screenToFloor(e, threeRenderer, threeCamera);
     if (point) {
-      _dragTarget.mesh.position.set(point.x, _dragTarget.origY, point.z);
-      if (_dragTarget.type === 'obj') {
-        const obj = objects.find(o => o.id === _dragTarget.id);
-        if (obj) { obj.px = point.x; obj.pz = point.z; obj.position = { x: point.x, y: _dragTarget.origY, z: point.z }; }
-      } else {
-        const ch = characters.find(c => c.id === _dragTarget.id);
-        if (ch) { ch.sceneX = point.x; ch.sceneZ = point.z; }
-        // Update wander agent home
-        const agent = _wanderAgents.find(a => a.chId === _dragTarget.id);
-        if (agent) { agent.homeX = point.x; agent.homeZ = point.z; }
-      }
-      save();
+      _dragTarget.mesh.position.set(point.x, _dragTarget.floorY, point.z);
+      if (_dragTarget.ring) { _dragTarget.ring.position.x = point.x; _dragTarget.ring.position.z = point.z; }
     }
+    _commitDrag(_dragTarget);
     _dragTarget = null;
     if (threeRenderer) threeRenderer.domElement.style.cursor = 'crosshair';
     return;
   }
 
-  // Pick: find clicked object or character mesh
   const pickable = [];
   threeScene.traverse(c => { if (c.isMesh && (c._objId || c._charId)) pickable.push(c); });
   const hits = ray.intersectObjects(pickable, false);
@@ -213,55 +286,50 @@ function onRoomObjectClick(e) {
     const h = hits[0].object;
     const id   = h._objId || h._charId;
     const type = h._objId ? 'obj' : 'char';
-    // Walk up to find the group root
     let mesh = h;
     while (mesh.parent && !mesh.parent.isScene) mesh = mesh.parent;
-    _dragTarget = { type, id, mesh, origY: mesh.position.y };
+    let ring = null;
+    if (type === 'char') {
+      threeScene.traverse(c => { if (c._moodRingCharId === id) ring = c; });
+    }
+    _dragTarget = { type, id, mesh, ring, floorY: mesh.position.y };
     if (threeRenderer) threeRenderer.domElement.style.cursor = 'grabbing';
   }
 }
 
 // ─────────────────────────────────────────────────────────────
 // WANDER AI
-// Each agent: { chId, mesh, ring, state, timer, targetX, targetZ,
-//               homeX, homeZ, speed, mixer, idleClip, walkClip, bounds }
-// States: 'idle' | 'walking'
 // ─────────────────────────────────────────────────────────────
-const WANDER_RADIUS = 3.5;   // fallback only — normally overridden by worldBounds
-const WANDER_SPEED  = 0.8;   // units per second
-const IDLE_MIN = 2;           // seconds
-const IDLE_MAX = 6;
-const WALK_MIN = 1.5;
-const WALK_MAX = 4;
+const WANDER_RADIUS = 3.5;
+const WANDER_SPEED  = 0.8;
+const IDLE_MIN = 2, IDLE_MAX = 6;
+const WALK_MIN = 1.5, WALK_MAX = 4;
 
 let _wanderAgents = [];
 
 function _randBetween(a, b) { return a + Math.random() * (b - a); }
 
-function _initWanderAgent(chId, mesh, ring, homeX, homeZ, mixer, animations, bounds) {
+function _initWanderAgent(chId, mesh, ring, homeX, homeZ, mixer, animations) {
   const idleClip = animations
     ? (THREE.AnimationClip.findByName(animations, 'Idle')
     || THREE.AnimationClip.findByName(animations, 'idle')
-    || animations[0] || null)
-    : null;
+    || animations[0] || null) : null;
   const walkClip = animations
     ? (THREE.AnimationClip.findByName(animations, 'Walk')
     || THREE.AnimationClip.findByName(animations, 'walk')
     || THREE.AnimationClip.findByName(animations, 'Run')
     || THREE.AnimationClip.findByName(animations, 'run')
-    || null)
-    : null;
+    || null) : null;
 
   const agent = {
-    chId, mesh, ring,
-    homeX, homeZ,
+    chId, mesh, ring, homeX, homeZ,
     state: 'idle',
     timer: _randBetween(IDLE_MIN, IDLE_MAX),
     targetX: homeX, targetZ: homeZ,
     speed: WANDER_SPEED * _randBetween(0.7, 1.3),
     mixer, idleClip, walkClip,
     _activeAction: null,
-    bounds,   // worldBounds passed from buildRoomScene; undefined for legacy agents
+    frozen: false,
   };
   _playAgentClip(agent, idleClip);
   _wanderAgents.push(agent);
@@ -280,52 +348,108 @@ function _tickWander(agent, dt) {
   if (agent.frozen || (_dragTarget && _dragTarget.id === agent.chId)) return;
   agent.timer -= dt;
 
-  const b = agent.bounds;  // may be undefined for legacy agents — guard below
-
   if (agent.state === 'idle') {
     if (agent.timer <= 0) {
-      // Pick a random target within bounds (or fall back to old WANDER_RADIUS)
-      if (b) {
-        agent.targetX = _randBetween(b.minX, b.maxX);
-        agent.targetZ = _randBetween(b.minZ, b.maxZ);
-      } else {
-        const angle = Math.random() * Math.PI * 2;
-        const dist  = _randBetween(1, WANDER_RADIUS);
-        agent.targetX = agent.homeX + Math.cos(angle) * dist;
-        agent.targetZ = agent.homeZ + Math.sin(angle) * dist;
-      }
+      const angle = Math.random() * Math.PI * 2;
+      const dist  = _randBetween(1, WANDER_RADIUS);
+      agent.targetX = agent.homeX + Math.cos(angle) * dist;
+      agent.targetZ = agent.homeZ + Math.sin(angle) * dist;
       agent.state = 'walking';
       agent.timer = _randBetween(WALK_MIN, WALK_MAX);
       _playAgentClip(agent, agent.walkClip || agent.idleClip);
     }
-  } else { // walking
+  } else {
     const dx = agent.targetX - agent.mesh.position.x;
     const dz = agent.targetZ - agent.mesh.position.z;
     const dist = Math.sqrt(dx * dx + dz * dz);
-
     if (dist < 0.05 || agent.timer <= 0) {
       agent.state = 'idle';
       agent.timer = _randBetween(IDLE_MIN, IDLE_MAX);
       _playAgentClip(agent, agent.idleClip);
     } else {
       const step = Math.min(agent.speed * dt, dist);
-      let nx = agent.mesh.position.x + (dx / dist) * step;
-      let nz = agent.mesh.position.z + (dz / dist) * step;
-
-      // Clamp to bounds every tick so characters can never escape
-      if (b) {
-        nx = Math.max(b.minX, Math.min(b.maxX, nx));
-        nz = Math.max(b.minZ, Math.min(b.maxZ, nz));
-      }
-
+      const nx = agent.mesh.position.x + (dx / dist) * step;
+      const nz = agent.mesh.position.z + (dz / dist) * step;
       agent.mesh.position.x = nx;
       agent.mesh.position.z = nz;
-      // Face direction of travel
       agent.mesh.rotation.y = Math.atan2(dx, dz);
-      // Move mood ring with character
       if (agent.ring) { agent.ring.position.x = nx; agent.ring.position.z = nz; }
     }
   }
+}
+
+// ─────────────────────────────────────────────────────────────
+// SPRITE BILLBOARD STATE
+// Map<charId, { animator, texture, mesh }>
+// ─────────────────────────────────────────────────────────────
+const _spriteMap = new Map();
+
+function _buildCharSprite(ch, cx, cz, scene) {
+  const THREE = window.THREE;
+  const fallbackSrc = ch.animData || ch.photoData || null;
+  const hasAnimator  = window.SpriteAnimator && (ch.sprites || fallbackSrc);
+
+  let mesh;
+
+  if (hasAnimator) {
+    const animator = new window.SpriteAnimator(ch.sprites || null, fallbackSrc);
+    const texture  = new THREE.Texture();
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    texture.image = img;
+    texture.image.onload = () => { texture.needsUpdate = true; };
+    const firstFrame = animator.currentFrame();
+    if (firstFrame) texture.image.src = firstFrame;
+
+    const geo = new THREE.PlaneGeometry(1.0, 1.6);
+    const mat = new THREE.MeshBasicMaterial({
+      map: texture,
+      transparent: true,
+      alphaTest: 0.05,
+      side: THREE.DoubleSide,
+    });
+    mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(cx, 0.8, cz);
+    mesh._charId = ch.id;
+    scene.add(mesh);
+
+    _spriteMap.set(ch.id, { animator, texture, mesh });
+  } else {
+    const mood = MOODS.find(m => m.label === ch.mood) || MOODS[0];
+    const geo  = new THREE.PlaneGeometry(1.0, 1.6);
+    const mat  = new THREE.MeshBasicMaterial({ color: mood.color, side: THREE.DoubleSide });
+    mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(cx, 0.8, cz);
+    mesh._charId = ch.id;
+    scene.add(mesh);
+    _spriteMap.set(ch.id, { animator: null, texture: null, mesh });
+  }
+
+  return mesh;
+}
+
+function _tickAllSprites(deltaMs, camera) {
+  _spriteMap.forEach(({ animator, texture, mesh }) => {
+    if (animator && texture) {
+      const frame = animator.tick(deltaMs);
+      if (frame !== null) {
+        texture.image.src = frame;
+      }
+    }
+    if (mesh && camera) mesh.lookAt(camera.position);
+  });
+}
+
+function setRoomCharacterState(chId, state) {
+  const entry = _spriteMap.get(chId);
+  if (entry && entry.animator) entry.animator.setState(state);
+}
+
+function _destroyAllSprites() {
+  _spriteMap.forEach(({ texture }) => {
+    if (texture) { try { texture.dispose(); } catch (_) {} }
+  });
+  _spriteMap.clear();
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -334,6 +458,8 @@ function _tickWander(agent, dt) {
 function buildRoomScene(room) {
   destroyRoomScene();
   _wanderAgents = [];
+
+  applyRoomBackdrop(room);
 
   const stage = document.getElementById('room-stage');
   const W = stage.clientWidth  || window.innerWidth;
@@ -347,30 +473,46 @@ function buildRoomScene(room) {
     -viewSize * aspect / 2, viewSize * aspect / 2,
      viewSize / 2, -viewSize / 2, 1, 1000
   );
-  camera.position.set(9, 9, 9);
-  camera.lookAt(0, 1, 0);
-  camera.updateProjectionMatrix();
 
-  // Compute visible world-space bounds from the orthographic frustum
-  const EDGE_PAD  = 0.8;   // world units of padding inside screen edge
-  const visHalfW = (viewSize * aspect / 2) / camera.zoom;
-  const visHalfH = (viewSize / 2)          / camera.zoom;
-  const worldBounds = {
-    minX: -visHalfW + EDGE_PAD,
-    maxX:  visHalfW - EDGE_PAD,
-    minZ: -visHalfH + EDGE_PAD,
-    maxZ:  visHalfH - EDGE_PAD,
-  };
-  console.log('worldBounds:', worldBounds);
+  const camX = room.cameraX ?? 9;
+  const camY = room.cameraY ?? 9;
+  const camZ = room.cameraZ ?? 9;
+  camera.position.set(camX, camY, camZ);
+  camera.zoom = Math.min(5, Math.max(0.5, room.cameraZoom ?? 2));
+  camera.lookAt(
+    room.cameraTargetX ?? 0,
+    room.cameraTargetY ?? 0,
+    room.cameraTargetZ ?? 0
+  );
+  camera.updateProjectionMatrix();
 
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.setClearColor(0x000000, 0);
   renderer.shadowMap.enabled = true;
   renderer.setSize(W, H);
   renderer.setPixelRatio(window.devicePixelRatio);
-  stage.appendChild(renderer.domElement);
 
-  // Floor mesh and wall meshes removed — backdrop image provides all visual floor
+  stage.insertBefore(renderer.domElement, stage.firstChild);
+
+  const hasBg = !!(room.backdropData || room.backdropUrl || ROOM_BACKDROP_FILES[room.backdrop]);
+  const floor = new THREE.Mesh(
+    new THREE.PlaneGeometry(20, 20),
+    new THREE.MeshLambertMaterial({
+      color: FLOOR_COLORS[room.backdrop] || '#1a3a1a',
+      transparent: hasBg, opacity: hasBg ? 0.18 : 1
+    })
+  );
+  floor.rotation.x = -Math.PI / 2;
+  floor.receiveShadow = true;
+  scene.add(floor);
+
+  if (!hasBg) {
+    const wallMat = new THREE.MeshLambertMaterial({ color: WALL_COLORS[room.backdrop] || '#2d5a27' });
+    const wN = new THREE.Mesh(new THREE.BoxGeometry(20, 6, 0.2), wallMat);
+    wN.position.set(0, 3, -8); scene.add(wN);
+    const wW = new THREE.Mesh(new THREE.BoxGeometry(0.2, 6, 20), wallMat);
+    wW.position.set(-8, 3, 0); scene.add(wW);
+  }
 
   scene.add(new THREE.AmbientLight(0xffffff, 1.3));
   const dl = new THREE.DirectionalLight(0xffffff, 0.7);
@@ -380,20 +522,22 @@ function buildRoomScene(room) {
   glbMixers = [];
   const clock = new THREE.Clock();
   const labels = [];
-  const charObjects = []; // { obj, chId, cx, cz }
+  const charObjects = [];
 
-  // ── Objects ──────────────────────────────────────────────────
+  // ── Objects ──
   const objsInRoom = objects.filter(o => o.roomId === room.id);
   objsInRoom.forEach(obj => {
     const px = obj.position?.x ?? obj.px ?? 0;
-    const py = obj.position?.y ?? 0;
     const pz = obj.position?.z ?? obj.pz ?? 0;
     const ry = obj.rotation?.y ?? 0;
     const sc = obj.scale || 1;
 
     function placeObjMesh(model, autoScale) {
-      model.scale.setScalar(sc * (autoScale || 1));
-      model.position.set(px, py, pz);
+      const s = autoScale || 1;
+      model.scale.setScalar(sc * s);
+      const bbox2 = new THREE.Box3().setFromObject(model);
+      const floorY = -bbox2.min.y;
+      model.position.set(px, floorY, pz);
       model.rotation.y = ry;
       model.castShadow = true;
       model._objId = obj.id;
@@ -401,13 +545,14 @@ function buildRoomScene(room) {
       model.traverse(c => { if (c.isMesh) c._objId = obj.id; });
       const lbl = document.createElement('div');
       lbl.className = 'obj-label';
-      lbl.textContent = '📦 ' + obj.name;
+      lbl.textContent = '\uD83D\uDCE6 ' + obj.name;
       stage.appendChild(lbl);
-      labels.push({ label: lbl, obj: model, headY: py + sc * (autoScale || 1) + 0.2 });
+      const bbox3 = new THREE.Box3().setFromObject(model);
+      labels.push({ label: lbl, obj: model, headY: bbox3.max.y + 0.2 });
     }
 
-    if (obj.glbUrl && window.GLTFLoader) {
-      new window.GLTFLoader().load(obj.glbUrl, gltf => {
+    if (obj.glbUrl) {
+      loadGlbUrl(obj.glbUrl, gltf => {
         const model = gltf.scene;
         const b = new THREE.Box3().setFromObject(model);
         const s = new THREE.Vector3(); b.getSize(s);
@@ -417,18 +562,27 @@ function buildRoomScene(room) {
           mx.clipAction(gltf.animations[0]).play();
           glbMixers.push(mx);
         }
-      }, undefined, () => fallbackObjBox());
+      }, () => fallbackObjBox());
     } else { fallbackObjBox(); }
 
     function fallbackObjBox() {
-      placeObjMesh(new THREE.Mesh(
+      const mesh = new THREE.Mesh(
         new THREE.BoxGeometry(0.6, 0.6, 0.6),
         new THREE.MeshLambertMaterial({ color: 0x8b6914 })
-      ), 1);
+      );
+      mesh.position.set(px, 0.3, pz);
+      mesh.castShadow = true;
+      mesh._objId = obj.id;
+      scene.add(mesh);
+      mesh.traverse(c => { if (c.isMesh) c._objId = obj.id; });
+      const lbl = document.createElement('div');
+      lbl.className = 'obj-label';
+      lbl.textContent = '\uD83D\uDCE6 ' + obj.name;
+      stage.appendChild(lbl);
+      labels.push({ label: lbl, obj: mesh, headY: 0.6 + 0.2 });
     }
   });
 
-  // Object list panel
   const panel = document.getElementById('obj-list-panel');
   const listC = document.getElementById('obj-list-container');
   listC.innerHTML = '';
@@ -438,18 +592,18 @@ function buildRoomScene(room) {
     objsInRoom.forEach(o => {
       const row = document.createElement('div');
       row.className = 'obj-list-row';
-      row.innerHTML = `<div class="obj-list-name">${o.name}</div><button class="obj-list-edit" onclick="openObjModal('${o.id}')">✏️</button>`;
+      row.innerHTML = `<div class="obj-list-name">${o.name}</div><button class="obj-list-edit" onclick="openObjModal('${o.id}')">\u270F\uFE0F</button>`;
       listC.appendChild(row);
     });
   }
 
-  // ── Characters ───────────────────────────────────────────────
+  // ── Characters (sprite billboard) ──
+  // Keep charsInRoom in scope here and pass it into handleRoomTap
   const charsInRoom = characters.filter(c => (c.roomIds || [c.roomId]).includes(room.id));
-  charsInRoom.forEach((ch, i) => {
-    const angle = (i / Math.max(charsInRoom.length, 1)) * Math.PI * 1.2 - 0.6;
-    // Clamp spawn positions to worldBounds so characters start on-screen
-    const cx = Math.max(worldBounds.minX, Math.min(worldBounds.maxX, ch.sceneX ?? Math.cos(angle) * 3.5));
-    const cz = Math.max(worldBounds.minZ, Math.min(worldBounds.maxZ, ch.sceneZ ?? Math.sin(angle) * 3.5));
+  charsInRoom.forEach((ch) => {
+    const hasStoredPos = ch.sceneX != null && ch.sceneZ != null;
+    const cx = hasStoredPos ? ch.sceneX : 0;
+    const cz = hasStoredPos ? ch.sceneZ : 0;
     const mood = MOODS.find(m => m.label === ch.mood) || MOODS[0];
 
     const ring = new THREE.Mesh(
@@ -461,61 +615,15 @@ function buildRoomScene(room) {
     ring._moodRingCharId = ch.id;
     scene.add(ring);
 
-    if (ch.glbUrl && window.GLTFLoader) {
-      new window.GLTFLoader().load(ch.glbUrl, gltf => {
-        const model = gltf.scene;
-        const box = new THREE.Box3().setFromObject(model);
-        const size = new THREE.Vector3(); box.getSize(size);
-        const scale = 2 / Math.max(size.x, size.y, size.z);
-        model.scale.setScalar(scale);
-        model.position.set(cx, 0, cz);
-        model.rotation.y = Math.PI;
-        model.castShadow = true;
-        model._charId = ch.id;
-        scene.add(model);
-        model.traverse(c => { if (c.isMesh) c._charId = ch.id; });
-        charObjects.push({ obj: model, chId: ch.id, cx, cz });
+    const mesh = _buildCharSprite(ch, cx, cz, scene);
+    charObjects.push({ obj: mesh, chId: ch.id, cx, cz });
+    _initWanderAgent(ch.id, mesh, ring, cx, cz, null, null);
 
-        const mixer = new THREE.AnimationMixer(model);
-        glbMixers.push(mixer);
-        _initWanderAgent(ch.id, model, ring, cx, cz, mixer, gltf.animations, worldBounds);
-
-        const lbl = document.createElement('div');
-        lbl.className = 'char-label'; lbl.textContent = ch.name;
-        stage.appendChild(lbl);
-        labels.push({ label: lbl, obj: model, headY: size.y * scale + 0.3 });
-      }, undefined, () => fallbackChar());
-    } else if (ch.photoData || ch.animData) {
-      const tex = new THREE.TextureLoader().load(ch.animData || ch.photoData);
-      const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true }));
-      sprite.scale.set(1.8, 1.8, 1);
-      sprite.position.set(cx, 1.1, cz);
-      sprite._charId = ch.id;
-      scene.add(sprite);
-      charObjects.push({ obj: sprite, chId: ch.id, cx, cz });
-      // Sprites wander without animation mixer
-      _initWanderAgent(ch.id, sprite, ring, cx, cz, null, null, worldBounds);
-      const lbl = document.createElement('div');
-      lbl.className = 'char-label'; lbl.textContent = ch.name;
-      stage.appendChild(lbl);
-      labels.push({ label: lbl, obj: sprite, headY: 2.1 });
-    } else { fallbackChar(); }
-
-    function fallbackChar() {
-      const box = new THREE.Mesh(
-        new THREE.BoxGeometry(0.8, 1.4, 0.3),
-        new THREE.MeshLambertMaterial({ color: mood.color })
-      );
-      box.position.set(cx, 0.7, cz);
-      box.castShadow = true; box._charId = ch.id;
-      scene.add(box);
-      charObjects.push({ obj: box, chId: ch.id, cx, cz });
-      _initWanderAgent(ch.id, box, ring, cx, cz, null, null, worldBounds);
-      const lbl = document.createElement('div');
-      lbl.className = 'char-label'; lbl.textContent = ch.name;
-      stage.appendChild(lbl);
-      labels.push({ label: lbl, obj: box, headY: 1.6 });
-    }
+    const lbl = document.createElement('div');
+    lbl.className = 'char-label';
+    lbl.textContent = ch.name;
+    stage.appendChild(lbl);
+    labels.push({ label: lbl, obj: mesh, headY: 1.6 + 0.1 });
   });
 
   threeScene    = scene;
@@ -535,32 +643,28 @@ function buildRoomScene(room) {
   function animate() {
     threeAnimFrameId = requestAnimationFrame(animate);
     const dt = clock.getDelta();
-
-    // Tick animation mixers
     glbMixers.forEach(m => m.update(dt));
-
-    // Tick wander agents
     _wanderAgents.forEach(agent => _tickWander(agent, dt));
-
-    // Live drag follow
+    _tickAllSprites(dt * 1000, camera);
     if (_roomEditMode && _dragTarget && _lastRoomPointer) {
       const point = _screenToFloor(_lastRoomPointer, renderer, camera);
-      if (point) _dragTarget.mesh.position.set(point.x, _dragTarget.origY, point.z);
+      if (point) {
+        _dragTarget.mesh.position.set(point.x, _dragTarget.floorY, point.z);
+        if (_dragTarget.ring) { _dragTarget.ring.position.x = point.x; _dragTarget.ring.position.z = point.z; }
+      }
     }
-
     renderer.render(scene, camera);
     updateLabels();
   }
   animate();
 
-  // ── Pointer handling ─────────────────────────────────────────
   const dom = renderer.domElement;
   dom.addEventListener('mousemove', e => { _lastRoomPointer = e; }, { passive: true });
   dom.addEventListener('touchmove', e => { _lastRoomPointer = e; e.preventDefault(); }, { passive: false });
-
+  // Pass charsInRoom into handleRoomTap so it is in scope
   dom.addEventListener('click', e => {
     if (_roomEditMode) { onRoomObjectClick(e); return; }
-    handleRoomTap(e, renderer, camera, charObjects);
+    handleRoomTap(e, renderer, camera, charObjects, charsInRoom);
   });
   dom.addEventListener('touchend', e => {
     if (_roomEditMode && e.changedTouches?.length) {
@@ -569,7 +673,10 @@ function buildRoomScene(room) {
   }, { passive: true });
 }
 
-function handleRoomTap(e, renderer, camera, charObjects) {
+// charsInRoom is now received as a parameter instead of being
+// captured from the outer buildRoomScene closure (which caused
+// "charsInRoom is not defined" when called as a standalone fn).
+function handleRoomTap(e, renderer, camera, charObjects, charsInRoom) {
   const rect = renderer.domElement.getBoundingClientRect();
   const clientX = e.touches ? e.touches[0].clientX : e.clientX;
   const clientY = e.touches ? e.touches[0].clientY : e.clientY;
@@ -606,7 +713,12 @@ function handleRoomTap(e, renderer, camera, charObjects) {
     });
     if (closest && minD < 3) {
       const ch = characters.find(c => c.id === closest);
-      if (ch) { openTalkPanel(ch); spawnTalkCloseUp(ch); }
+      if (ch) {
+        (charsInRoom || []).forEach(c => setRoomCharacterState(c.id, 'idle'));
+        setRoomCharacterState(closest, 'talk');
+        openTalkPanel(ch);
+        spawnTalkCloseUp(ch);
+      }
     }
   }
 }
@@ -622,8 +734,11 @@ function destroyRoomScene() {
   document.getElementById('room-stage').querySelectorAll('.char-label,.obj-label').forEach(el => el.remove());
   glbMixers = [];
   _wanderAgents = [];
+  _dragTarget = null;
+  _roomEditMode = false;
   threeScene = null;
   threeCamera = null;
+  _destroyAllSprites();
 }
 
 function editActiveRoom() {
@@ -696,15 +811,15 @@ function deleteObject() {
 }
 
 window.lcRoom = {
-  openRoom, closeRoom, buildRoomScene, destroyRoomScene,
+  openRoom, closeRoom, buildRoomScene, destroyRoomScene, applyRoomBackdrop,
   editActiveRoom, openObjModal, closeObjModal, saveObject, deleteObject,
   showObjInspect, hideObjInspect, enableRoomEdit, onRoomObjectClick,
-  spawnTalkCloseUp, dismissTalkCloseUp
+  spawnTalkCloseUp, dismissTalkCloseUp, setRoomCharacterState,
 };
 
 export {
-  openRoom, closeRoom, buildRoomScene, destroyRoomScene,
+  openRoom, closeRoom, buildRoomScene, destroyRoomScene, applyRoomBackdrop,
   editActiveRoom, openObjModal, closeObjModal, saveObject, deleteObject,
   showObjInspect, hideObjInspect, enableRoomEdit, onRoomObjectClick,
-  spawnTalkCloseUp, dismissTalkCloseUp
+  spawnTalkCloseUp, dismissTalkCloseUp, setRoomCharacterState,
 };

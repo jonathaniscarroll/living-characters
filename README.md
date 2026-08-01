@@ -1,129 +1,152 @@
-# Living Characters
+# living-characters
 
-Living Characters is a browser-based facilitator tool for building a location-aware story world where characters, rooms, and objects can be composed into a live scene. The app runs entirely in the browser as a static web experience, so it can be used locally or hosted on a simple static server.
+> **Branch `living-characters-ar`** — AR camera edition.  
+> Characters live at spots on a shared map. Tap a pin → open their card → **Visit in AR** → they appear standing in the real world through your camera.
 
-## What the site does
+---
 
-The current implementation supports a full loop for creating and presenting a small story world:
+## What it is
 
-- Create and edit rooms with a name, description, GPS coordinates, trigger radius, and backdrop style.
-- Create and edit characters with room membership, mood, items, dialogue passages, and optional image/animation/GLB media.
-- Add room objects with position, rotation, scale, and descriptive text.
-- Open a room in a Three.js stage to inspect characters and objects in context.
-- Open character cards and trigger prompt-based dialogue from the room scene or map.
-- Import and export the world as Twee text.
-- Sync the world to GitHub through a personal access token.
-- Persist the working world in browser storage so it can be resumed later.
+`living-characters` is a browser-based world-building tool for NSCAD Art Camp. Participants sculpt characters from felt and clay, photogrammetrically scan them, and give them a presence on a shared map. Facilitators author dialogue, moods, items, and Twee passages for each character. Participants then encounter those characters in an **augmented reality** view — overlaid on the live camera feed, standing on the actual floor in front of them.
 
-### Room Backdrop Upload
+The spatial through-line mirrors [`spatial-narrative`](https://github.com/jonathaniscarroll/spatial-narrative): one active thing at a time, a compass (or map pin) pointing toward others.
 
-When editing a room, you can upload a custom backdrop image:
+---
 
-1. Click **📸 Upload backdrop image** in the room modal.
-2. Select an image file from your device.
-3. The image is immediately stored as `backdropData` (base64) on the room and used right away — no GitHub token required.
-4. If you have a GitHub token entered, the image will also be uploaded to `media/room-backdrops/{roomId}.png` in the repository and the `backdropUrl` will be updated once that completes.
-5. The backdrop becomes the background of that room's Three.js scene when you open it.
+## AR Interaction Model
 
-**Priority order for room backgrounds:**
-- `backdropData` — local base64 (set immediately on upload, works offline)
-- `backdropUrl` — remote URL (set after successful GitHub upload)
-- Preset backdrop style (forest, stone, water, etc.)
+### What happens when you tap "Visit in AR"
 
-### Object Placement in Room Scenes
+1. The device camera opens.
+2. **On Android Chrome / WebXR-enabled browsers:** WebXR immersive-ar launches with hit-test. A white ring appears on detected surfaces. Tap the floor to anchor the character there.
+3. **On iOS Safari / fallback browsers:** A simulated AR mode opens — the live camera feed plays behind a transparent Three.js canvas. The character is auto-placed at arm's length in front of you. Tap anywhere on the ground to reposition.
+4. The character's GLB model loads and plays its Idle animation. Their mood-ring colour pulses at the top of the screen.
+5. Tap **💬 Talk** to open the dialogue tree. Tap **🎒 Items** to inspect carried items.
+6. Tap **✕ Exit AR** to return to the character card.
 
-- Click **Move Objects** in the room toolbar to enable object movement mode.
-- In move mode, click an object to select it (cursor changes to grabbing), then click a new floor position to place it.
-- Objects are constrained to the floor plane (Y=0) for easy placement.
-- Lighting is evened out with increased ambient light so materials render consistently regardless of angle.
+### Desktop fallback
 
-## Known Issues Fixed (July 2026)
+On desktop browsers without camera access, the simulated AR path renders the character on a neutral dark background using the same Three.js scene, so the workshop can still be demonstrated.
 
-### Image upload button crash
-**Root cause:** `uploadRoomBackdrop()` in `modals.js` called `window.lcStore.uploadRoomBackdropToGitHub()` unconditionally. If no GitHub token was set, or if the module hadn't fully registered `lcStore` yet, this threw a `TypeError` and crashed the upload flow before the file was even read.
+---
 
-**Fix:** The function now checks that `window.lcStore` exists and that `uploadRoomBackdropToGitHub` is a function before calling it. It also guards against an empty file input (e.g. user opens the picker and cancels). The base64 preview and `tempBackdropData` / `tempBackdropUrl` are always set first from the `FileReader`, so the room works immediately regardless of GitHub status.
+## Library choices
 
-### Backdrop images not displaying in Three.js room scenes
-**Two root causes:**
+| Library | Why |
+|---|---|
+| **Three.js r152** (CDN) | 3D rendering — already present in the repo for room.js |
+| **`GLTFLoader`** (Three.js add-on) | GLB/GLTF model loading — already present |
+| **WebXR Hit Test API** | Ground-plane detection on Android Chrome — built into the browser, zero bundle cost |
+| **`getUserMedia`** | Camera feed for the simulated AR fallback — built-in, no library needed |
+| **Leaflet** | 2D map — already present |
 
-1. `openRoom()` only checked `room.backdropUrl` for the CSS background on `#room-stage`. Locally-uploaded images are stored as `room.backdropData` (base64) — `backdropUrl` is only set after a GitHub upload completes. So locally-uploaded backdrops never appeared.
+No new CDN dependencies are introduced. The AR feature is entirely contained in `scripts/ar.js` and `scripts/ar-patch.js`.
 
-2. `buildRoomScene()` used a broken `OrthographicCamera` frustum: `new THREE.OrthographicCamera(W/-200, H/200, H/200, H/-200, ...)`. The right/left bounds mixed up `W` and `H` with `/200` as a scale, which produced a skewed or clipped view. The canvas still rendered, but the scene geometry was distorted.
+---
 
-**Fixes:**
-- `openRoom()` now checks `room.backdropData || room.backdropUrl` as the CSS `backgroundImage` source, with `backdropData` taking priority.
-- `buildRoomScene()` uses a correct aspect-ratio frustum: `OrthographicCamera(-viewSize*aspect/2, viewSize*aspect/2, viewSize/2, -viewSize/2, 1, 1000)`.
-- `hasBg` in `buildRoomScene` now also checks `room.backdropData` so floor transparency is correctly applied for locally-uploaded images.
+## File structure
 
-## Quick start
-
-This is a static web app, so there is no build step.
-
-1. Open the repository root in a terminal.
-2. Serve the folder over HTTP, for example with `python3 -m http.server 8000`.
-3. Visit `http://localhost:8000/` in a browser.
-
-A direct file open may work in some environments, but a local static server is the safer option because the app uses module-based scripts.
-
-## Project structure
-
-```text
+```
 living-characters/
-  index.html               # app shell and UI entry point
-  scripts/
-    store.js               # persistence, Twee import/export, GitHub save/load
-    map.js                 # Leaflet map, pins, GPS, compass, simulation
-    room.js                # Three.js room stage, object rendering, inspect overlay
-    card.js                # character cards and talk panels
-    modals.js              # room, character, and object editor workflows
-  story/
-    main.twee              # default target for GitHub-backed sync
-  media/                   # optional backdrop and media assets
-  author/                  # authoring notes and supporting materials
+├── index.html               ← main app shell (AR scripts injected here)
+├── scripts/
+│   ├── ar.js                ← NEW: WebXR + simulated AR view module
+│   ├── ar-patch.js          ← NEW: runtime wiring — injects AR buttons into existing UI
+│   ├── map.js               ← existing: Leaflet map, character pins, GPS marker
+│   ├── modals.js            ← existing: add/edit character modal
+│   ├── card.js              ← existing: character card display
+│   ├── room.js              ← existing: Three.js room scene (legacy, preserved)
+│   ├── twee.js              ← existing: Twee export builder (unchanged)
+│   └── store.js             ← existing: localStorage + GitHub save/load (unchanged)
+└── story/                   ← exported .twee files land here
 ```
 
-## Audit summary
+---
 
-### Strengths
+## Character data model — new AR fields
 
-- The app already offers a coherent creative workflow for a single facilitator.
-- The map, room scene, character cards, and dialogue builder work together as a unified authoring experience.
-- Twee import/export and GitHub sync make it practical to move work between devices or collaborators.
-- Local persistence makes it easy to resume work without a backend.
+The following fields are added to each character object and automatically persisted by `store.js` (JSON round-trip):
 
-### Current limitations
+```js
+{
+  // … existing fields …
+  name:      'Mira',
+  mood:      'curious',
+  glbUrl:    'https://…/mira.glb',
+  photoData: 'data:image/…',
+  dialogue:  { hello: '…', question: '…', secret: '…' },
+  items:     [ { name: 'Blue Stone', description: 'Found near the tide pool' } ],
+  lat: 44.6, lng: -63.6,
 
-- The experience is intentionally single-user and facilitator-led; it is not a multi-user live server.
-- Media handling is functional but still fairly manual, especially for GLB and custom image assets.
-- Object placement and scene editing are basic; drag-and-drop and richer interactions are still missing.
-- The project currently relies on browser storage and a GitHub token rather than a dedicated account or authentication system.
-- There are no automated tests or a formal build pipeline yet.
-
-## Suggested next steps
-
-The most valuable improvements would be:
-
-- A more polished asset-library workflow for backdrops, character media, and GLB objects.
-- Direct manipulation of objects in the room scene.
-- Richer object-state interactions, such as item-linked reactions or conditional dialogue.
-- Better validation and feedback for unsupported media files.
-- Basic automated testing and a lightweight deployment checklist.
-
-## Design intent
-
-The app sits between a spatial story editor and a live facilitation tool. Rooms still matter because they carry real-world coordinates and provide stage space, but characters become the primary unit of dramatic interaction. That makes it well suited to workshops, physical props, and facilitator-led experiences where the map and room scene are used as a shared stage.
-
-### OBJ to GLB Conversion (Local Tool)
-
-Use the included script to convert OBJ files to GLB for Three.js:
-
-```bash
-node scripts/obj-to-glb.js input.obj output.glb
+  // ── New AR fields ──
+  arEnabled: true,   // show AR button and allow placement
+  arScale:   1.0,    // scale multiplier for GLB in AR (default 1.0)
+  arYOffset: 0,      // vertical offset on the ground plane (metres)
+}
 ```
 
-Note: OBJ format does not store animation data. For textured or animated models, use Blender's export to GLB instead.
+---
 
- 
- 
- 
+## Facilitator workflow
+
+### Creating a character
+
+1. Open the app on the facilitator machine.
+2. Tap an empty spot on the map to open **Add Character**.
+3. Fill in name, mood, upload a photo or GLB model, add dialogue lines and items.
+4. Scroll down to **AR Settings** — confirm AR is enabled and adjust scale if needed.
+5. Save. The character pin appears on the map with a 📷 badge.
+
+### Giving participants access
+
+- Share the URL (GitHub Pages) — all characters live in `localStorage` on the facilitator machine unless you use the **GitHub save** button to push to the repo.
+- For multi-device use, use **GitHub save/load** (existing feature in `store.js`) to sync the character JSON to the repository, then participants load the same URL.
+
+### Visiting a character in AR
+
+1. Tap the character pin → tap **View Card**.
+2. Tap **📷 Visit in AR**.
+3. Point the camera at the floor. Tap to place the character.
+4. Talk, inspect items, then tap **✕ Exit AR**.
+
+---
+
+## Twee export
+
+The **Export Twee** button in the toolbar generates a `.twee` file for the whole cast using the existing `scripts/twee.js` pipeline — completely unchanged. Passage structure per character:
+
+```twee
+:: CharacterName
+:: CharacterName-hello
+:: CharacterName-question
+:: CharacterName-secret
+:: CharacterName-item-<thing>
+:: CharacterName-home
+:: CharacterName-work
+```
+
+The GitHub save flow writes this to the `story/` directory.
+
+---
+
+## Technical constraints
+
+- **No backend** — all data in `localStorage` plus optional GitHub save/load.
+- **No install** — runs in any modern browser from a URL.
+- **No new bundle dependencies** — AR uses WebXR (built-in) + Three.js (already loaded).
+- **Room scenes preserved** — `room.js` is not removed. "Visit Room" remains accessible; "Visit in AR" is the new default action on every card.
+
+---
+
+## Browser support for AR
+
+| Browser | AR mode |
+|---|---|
+| Android Chrome 81+ | ✅ WebXR hit-test (true ground detection) |
+| iOS Safari 16+ | ⚠️ Simulated AR (camera + Three.js overlay) |
+| Desktop Chrome/Firefox | ⚠️ Simulated AR (no camera, dark background) |
+| Any modern browser | ✅ Map, cards, dialogue, Twee export |
+
+---
+
+*living-characters is part of NSCAD's Mobile Media Lab. Thursday is always beach day.*
