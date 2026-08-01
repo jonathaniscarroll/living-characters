@@ -1,0 +1,90 @@
+name: Dev Preview Deploy
+
+on:
+  push:
+    branches: [ dev ]
+  workflow_dispatch:
+
+# Needs both Pages permissions AND contents write to commit the snapshot
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build-dev-preview:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}dev/
+
+    steps:
+      - name: Checkout main (for the current live site)
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: main-site
+
+      - name: Checkout dev (for the preview)
+        uses: actions/checkout@v4
+        with:
+          ref: dev
+          path: dev-site
+
+      - name: Assemble combined build
+        run: |
+          mkdir -p build
+
+          # --- Root: copy main site as-is (this is what users see at /)
+          rsync -a \
+            --exclude='.git' \
+            --exclude='.github' \
+            --exclude='todo' \
+            --exclude='node_modules' \
+            --exclude='story' \
+            --exclude='vendor/tweego' \
+            --exclude='*.vsix' \
+            --exclude='vspackage' \
+            --exclude='copilot.vsix' \
+            --exclude='localStorage.json' \
+            main-site/ build/
+
+          # --- /dev/: copy dev branch into subfolder
+          mkdir -p build/dev
+          rsync -a \
+            --exclude='.git' \
+            --exclude='.github' \
+            --exclude='todo' \
+            --exclude='node_modules' \
+            --exclude='story' \
+            --exclude='vendor/tweego' \
+            --exclude='*.vsix' \
+            --exclude='vspackage' \
+            --exclude='copilot.vsix' \
+            --exclude='localStorage.json' \
+            dev-site/ build/dev/
+
+      - name: Verify output
+        run: |
+          test -f build/index.html
+          test -f build/dev/index.html
+          echo "Root site:"
+          ls build/
+          echo "Dev preview:"
+          ls build/dev/
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact (main + dev/ combined)
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: build
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
