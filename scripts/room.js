@@ -309,7 +309,7 @@ let _wanderAgents = [];
 
 function _randBetween(a, b) { return a + Math.random() * (b - a); }
 
-function _initWanderAgent(chId, mesh, ring, homeX, homeZ, mixer, animations) {
+function _initWanderAgent(chId, mesh, ring, homeX, homeZ, mixer, animations, bounds) {
   const idleClip = animations
     ? (THREE.AnimationClip.findByName(animations, 'Idle')
     || THREE.AnimationClip.findByName(animations, 'idle')
@@ -323,6 +323,7 @@ function _initWanderAgent(chId, mesh, ring, homeX, homeZ, mixer, animations) {
 
   const agent = {
     chId, mesh, ring, homeX, homeZ,
+    bounds, // optional; undefined preserves the old WANDER_RADIUS behavior
     state: 'idle',
     timer: _randBetween(IDLE_MIN, IDLE_MAX),
     targetX: homeX, targetZ: homeZ,
@@ -344,6 +345,14 @@ function _playAgentClip(agent, clip) {
   agent._activeAction = action;
 }
 
+function _clampToBounds(x, z, bounds) {
+  if (!bounds) return { x, z };
+  return {
+    x: THREE.MathUtils.clamp(x, bounds.minX, bounds.maxX),
+    z: THREE.MathUtils.clamp(z, bounds.minZ, bounds.maxZ),
+  };
+}
+
 function _tickWander(agent, dt) {
   if (agent.frozen || (_dragTarget && _dragTarget.id === agent.chId)) return;
   agent.timer -= dt;
@@ -352,8 +361,14 @@ function _tickWander(agent, dt) {
     if (agent.timer <= 0) {
       const angle = Math.random() * Math.PI * 2;
       const dist  = _randBetween(1, WANDER_RADIUS);
-      agent.targetX = agent.homeX + Math.cos(angle) * dist;
-      agent.targetZ = agent.homeZ + Math.sin(angle) * dist;
+      let tx = agent.homeX + Math.cos(angle) * dist;
+      let tz = agent.homeZ + Math.sin(angle) * dist;
+      if (agent.bounds) {
+        const c = _clampToBounds(tx, tz, agent.bounds);
+        tx = c.x; tz = c.z;
+      }
+      agent.targetX = tx;
+      agent.targetZ = tz;
       agent.state = 'walking';
       agent.timer = _randBetween(WALK_MIN, WALK_MAX);
       _playAgentClip(agent, agent.walkClip || agent.idleClip);
@@ -368,8 +383,12 @@ function _tickWander(agent, dt) {
       _playAgentClip(agent, agent.idleClip);
     } else {
       const step = Math.min(agent.speed * dt, dist);
-      const nx = agent.mesh.position.x + (dx / dist) * step;
-      const nz = agent.mesh.position.z + (dz / dist) * step;
+      let nx = agent.mesh.position.x + (dx / dist) * step;
+      let nz = agent.mesh.position.z + (dz / dist) * step;
+      if (agent.bounds) {
+        const c = _clampToBounds(nx, nz, agent.bounds);
+        nx = c.x; nz = c.z;
+      }
       agent.mesh.position.x = nx;
       agent.mesh.position.z = nz;
       agent.mesh.rotation.y = Math.atan2(dx, dz);
@@ -486,6 +505,21 @@ function buildRoomScene(room) {
   );
   camera.updateProjectionMatrix();
 
+  // Visible ground-plane bounds for the orthographic camera, centered on the
+  // camera's look-at target. Characters are clamped to this rectangle so they
+  // never wander off the visible area.
+  const halfW = (viewSize * aspect / 2) / camera.zoom;
+  const halfH = (viewSize / 2) / camera.zoom;
+  const targetX = room.cameraTargetX ?? 0;
+  const targetZ = room.cameraTargetZ ?? 0;
+  const worldBounds = {
+    minX: targetX - halfW,
+    maxX: targetX + halfW,
+    minZ: targetZ - halfH,
+    maxZ: targetZ + halfH,
+  };
+  console.log('worldBounds', worldBounds);
+
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.setClearColor(0x000000, 0);
   renderer.shadowMap.enabled = true;
@@ -582,8 +616,12 @@ function buildRoomScene(room) {
   const charsInRoom = characters.filter(c => (c.roomIds || [c.roomId]).includes(room.id));
   charsInRoom.forEach((ch) => {
     const hasStoredPos = ch.sceneX != null && ch.sceneZ != null;
-    const cx = hasStoredPos ? ch.sceneX : 0;
-    const cz = hasStoredPos ? ch.sceneZ : 0;
+    let cx = hasStoredPos ? ch.sceneX : 0;
+    let cz = hasStoredPos ? ch.sceneZ : 0;
+    if (worldBounds) {
+      const c = _clampToBounds(cx, cz, worldBounds);
+      cx = c.x; cz = c.z;
+    }
     const mood = MOODS.find(m => m.label === ch.mood) || MOODS[0];
 
     const ring = new THREE.Mesh(
@@ -597,7 +635,7 @@ function buildRoomScene(room) {
 
     const mesh = _buildCharSprite(ch, cx, cz, scene);
     charObjects.push({ obj: mesh, chId: ch.id, cx, cz });
-    _initWanderAgent(ch.id, mesh, ring, cx, cz, null, null);
+    _initWanderAgent(ch.id, mesh, ring, cx, cz, null, null, worldBounds);
 
     const lbl = document.createElement('div');
     lbl.className = 'char-label';
