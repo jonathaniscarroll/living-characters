@@ -1,0 +1,74 @@
+name: Dev Preview Deploy
+
+on:
+  push:
+    branches: [ dev ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-dev-preview:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout dev
+        uses: actions/checkout@v4
+        with:
+          ref: dev
+
+      - name: Verify vendored tools
+        run: |
+          test -f vendor/tweego/tweego
+          test -f vendor/storyformats/sugarcube-2/format.js
+          chmod +x vendor/tweego/tweego
+
+      - name: Build story with Tweego
+        env:
+          TWEEGO_PATH: vendor/storyformats
+        run: |
+          mkdir -p build
+          vendor/tweego/tweego --format=sugarcube-2 -o build/index.html story
+
+      - name: Copy authoring tool
+        run: |
+          if [ -d author ]; then
+            cp -r author build/author
+          fi
+
+      - name: Copy living-characters tool
+        run: |
+          # Copy all site files that are NOT part of the story build
+          # Adjust this list to match whatever non-story assets live at repo root
+          for item in index.html scripts media css vendor; do
+            if [ -e "$item" ]; then
+              cp -r "$item" build/
+            fi
+          done
+
+      - name: Verify build output
+        run: |
+          test -f build/index.html
+          ls -la build
+
+      - name: Checkout gh-pages into subfolder
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          path: gh-pages-current
+          fetch-depth: 0
+
+      - name: Merge dev build into gh-pages/dev
+        run: |
+          rm -rf gh-pages-current/dev
+          cp -r build gh-pages-current/dev
+
+      - name: Push updated gh-pages
+        run: |
+          cd gh-pages-current
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add dev/
+          git diff --cached --quiet || git commit -m "Deploy dev preview [skip ci]"
+          git push
