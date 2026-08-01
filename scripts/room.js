@@ -494,26 +494,6 @@ function buildRoomScene(room) {
 
   stage.insertBefore(renderer.domElement, stage.firstChild);
 
-  const hasBg = !!(room.backdropData || room.backdropUrl || ROOM_BACKDROP_FILES[room.backdrop]);
-  const floor = new THREE.Mesh(
-    new THREE.PlaneGeometry(20, 20),
-    new THREE.MeshLambertMaterial({
-      color: FLOOR_COLORS[room.backdrop] || '#1a3a1a',
-      transparent: hasBg, opacity: hasBg ? 0.18 : 1
-    })
-  );
-  floor.rotation.x = -Math.PI / 2;
-  floor.receiveShadow = true;
-  scene.add(floor);
-
-  if (!hasBg) {
-    const wallMat = new THREE.MeshLambertMaterial({ color: WALL_COLORS[room.backdrop] || '#2d5a27' });
-    const wN = new THREE.Mesh(new THREE.BoxGeometry(20, 6, 0.2), wallMat);
-    wN.position.set(0, 3, -8); scene.add(wN);
-    const wW = new THREE.Mesh(new THREE.BoxGeometry(0.2, 6, 20), wallMat);
-    wW.position.set(-8, 3, 0); scene.add(wW);
-  }
-
   scene.add(new THREE.AmbientLight(0xffffff, 1.3));
   const dl = new THREE.DirectionalLight(0xffffff, 0.7);
   dl.position.set(5, 12, 5); dl.castShadow = true;
