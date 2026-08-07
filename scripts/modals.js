@@ -489,8 +489,7 @@ function onSpriteMultiFileChange(input, state) {
   });
 }
 
-// Single-file slot behaviour for backwards compatibility: when a frame is chosen via
-// legacy APIs, treat it as setting frame 0 or 1 in the strip (expanding list as needed).
+// Single-file slot behaviour for backwards compatibility
 function onSpriteFileChange(input, state, frameIdx) {
   const file = input.files && input.files[0];
   if (!file) return;
@@ -501,7 +500,6 @@ function onSpriteFileChange(input, state, frameIdx) {
     if (window.lcChroma && typeof window.lcChroma.chromaKey === 'function') {
       try { keyed = await window.lcChroma.chromaKey(raw, chromaSettings); } catch (_) {}
     }
-
     const list = pendingSprites[state] || [];
     while (list.length <= frameIdx) list.push(null);
     list[frameIdx] = keyed;
@@ -522,13 +520,11 @@ function attachSpriteDragHandlers(card) {
     spriteDragState.fromIndex = parseInt(card.dataset.index, 10);
     e.dataTransfer.effectAllowed = 'move';
   });
-
   card.addEventListener('dragover', (e) => {
     if (spriteDragState.state !== card.dataset.state) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
   });
-
   card.addEventListener('drop', (e) => {
     e.preventDefault();
     const state = card.dataset.state;
@@ -536,51 +532,27 @@ function attachSpriteDragHandlers(card) {
     const toIndex = parseInt(card.dataset.index, 10);
     if (Number.isNaN(toIndex) || toIndex === spriteDragState.fromIndex) return;
     reorderSpriteFrames(state, spriteDragState.fromIndex, toIndex);
-    spriteDragState.state = null;
-    spriteDragState.fromIndex = null;
+    spriteDragState.state = null; spriteDragState.fromIndex = null;
   });
-
-  card.addEventListener('dragend', () => {
-    spriteDragState.state = null;
-    spriteDragState.fromIndex = null;
-  });
-
-  // Touch support for tablets: simple tap-to-pick, tap-to-swap within same state
+  card.addEventListener('dragend', () => { spriteDragState.state = null; spriteDragState.fromIndex = null; });
   card.addEventListener('touchstart', (e) => {
     if (eyedropperActive) return;
     const state = card.dataset.state;
     const index = parseInt(card.dataset.index, 10);
     if (!spriteDragState.state) {
-      spriteDragState.state = state;
-      spriteDragState.fromIndex = index;
+      spriteDragState.state = state; spriteDragState.fromIndex = index;
       card.style.outline = '2px solid var(--accent2, #ffd54f)';
       card.style.outlineOffset = '2px';
     } else if (spriteDragState.state === state) {
       const from = spriteDragState.fromIndex;
-      const to = index;
-      if (from !== to) {
-        reorderSpriteFrames(state, from, to);
-      }
+      if (from !== index) reorderSpriteFrames(state, from, index);
       const strip = document.querySelector(`.sprite-strip[data-state="${state}"]`);
-      if (strip) {
-        strip.querySelectorAll('.sprite-card').forEach(c => {
-          c.style.outline = '';
-          c.style.outlineOffset = '';
-        });
-      }
-      spriteDragState.state = null;
-      spriteDragState.fromIndex = null;
+      if (strip) strip.querySelectorAll('.sprite-card').forEach(c => { c.style.outline = ''; c.style.outlineOffset = ''; });
+      spriteDragState.state = null; spriteDragState.fromIndex = null;
     } else {
-      // Different state; reset
       const prevStrip = document.querySelector(`.sprite-strip[data-state="${spriteDragState.state}"]`);
-      if (prevStrip) {
-        prevStrip.querySelectorAll('.sprite-card').forEach(c => {
-          c.style.outline = '';
-          c.style.outlineOffset = '';
-        });
-      }
-      spriteDragState.state = null;
-      spriteDragState.fromIndex = null;
+      if (prevStrip) prevStrip.querySelectorAll('.sprite-card').forEach(c => { c.style.outline = ''; c.style.outlineOffset = ''; });
+      spriteDragState.state = null; spriteDragState.fromIndex = null;
     }
     e.preventDefault();
   });
@@ -612,9 +584,7 @@ function onSpriteImgClick(e) {
       const frame = parseInt(img.dataset.frame, 10);
       rerunChromaOnFrame(state, frame);
     }).catch(() => deactivateEyedropper());
-  } else {
-    deactivateEyedropper();
-  }
+  } else { deactivateEyedropper(); }
   e.stopPropagation();
 }
 
@@ -630,38 +600,30 @@ async function rerunChromaOnFrame(state, frameIdx) {
   } catch (_) {}
 }
 
-// --- Chroma UI event handlers ---
-
 function onChromaTolerance(val) {
   chromaSettings.tolerance = parseFloat(val);
   const el = document.getElementById('chroma-tolerance-val');
   if (el) el.textContent = chromaSettings.tolerance.toFixed(2);
 }
-
 function onChromaSpill(val) {
   chromaSettings.spill = parseFloat(val);
   const el = document.getElementById('chroma-spill-val');
   if (el) el.textContent = chromaSettings.spill.toFixed(2);
 }
-
 async function applyChromaToAll() {
   if (!window.lcChroma) return;
   const btn = document.querySelector('#sprite-frames-section button[onclick*="applyChromaToAll"]');
   if (btn) { btn.disabled = true; btn.textContent = 'Applying\u2026'; }
   for (const state of SPRITE_STATES) {
     const frames = pendingSprites[state] || [];
-    for (let i = 0; i < frames.length; i++) {
-      await rerunChromaOnFrame(state, i);
-    }
+    for (let i = 0; i < frames.length; i++) await rerunChromaOnFrame(state, i);
   }
   if (btn) { btn.disabled = false; btn.textContent = 'Apply to all frames'; }
 }
-
 function updateChromaSwatch() {
   const swatch = document.getElementById('chroma-swatch');
   if (swatch) swatch.style.background = hueToHex(chromaSettings.h);
 }
-
 function toggleEyedropper() {
   eyedropperActive = !eyedropperActive;
   const btn = document.getElementById('chroma-eyedropper');
@@ -669,7 +631,6 @@ function toggleEyedropper() {
   if (btn) btn.style.background = eyedropperActive ? 'rgba(255,200,0,.25)' : 'rgba(255,255,255,0.08)';
   if (hint) hint.style.display = eyedropperActive ? 'inline' : 'none';
 }
-
 function deactivateEyedropper() {
   eyedropperActive = false;
   const btn = document.getElementById('chroma-eyedropper');
@@ -677,10 +638,136 @@ function deactivateEyedropper() {
   if (btn) btn.style.background = 'rgba(255,255,255,0.08)';
   if (hint) hint.style.display = 'none';
 }
-
 function toggleSpriteSection() {
   const body = document.getElementById('sprite-section-body');
   const arrow = document.getElementById('sprite-section-arrow');
+  if (!body) return;
+  const open = body.style.display !== 'none';
+  body.style.display = open ? 'none' : 'block';
+  if (arrow) arrow.style.transform = open ? '' : 'rotate(90deg)';
+}
+
+// ---------------------------------------------------------------------------
+// Object sprite section (Phase 2) — re-used from room.js pattern but owned
+// here so it fires from the modal that modals.js controls.
+// ---------------------------------------------------------------------------
+
+const OBJ_CHECKERBOARD = [
+  'background-image:linear-gradient(45deg,#ccc 25%,transparent 25%),',
+  'linear-gradient(-45deg,#ccc 25%,transparent 25%),',
+  'linear-gradient(45deg,transparent 75%,#ccc 75%),',
+  'linear-gradient(-45deg,transparent 75%,#ccc 75%);',
+  'background-size:12px 12px;',
+  'background-position:0 0,0 6px,6px -6px,-6px 0;',
+  'background-color:#fff;'
+].join('');
+
+let _objPendingFrames = [];
+
+function buildObjSpriteSection() {
+  const existing = document.getElementById('obj-sprite-section');
+  if (existing) existing.remove();
+
+  const section = document.createElement('div');
+  section.id = 'obj-sprite-section';
+  section.style.cssText = 'margin-top:14px;border-top:1px solid rgba(255,255,255,0.1);padding-top:10px;';
+  section.innerHTML = `
+    <button id="obj-sprite-toggle" onclick="lcModals.toggleObjSpriteSection()"
+      style="background:none;border:none;color:var(--text,#e0e0e0);font-size:13px;
+             font-weight:600;cursor:pointer;padding:4px 0;display:flex;align-items:center;
+             gap:6px;width:100%;text-align:left;">
+      <span id="obj-sprite-arrow" style="display:inline-block;transition:transform .2s;">&#9658;</span>
+      &#127974; Sprite Frames
+    </button>
+    <div id="obj-sprite-body" style="display:none;margin-top:10px;">
+      <div style="font-size:11px;color:var(--text-muted,#999);margin-bottom:8px;">
+        Upload image frames that animate on the object in the room. Replaces the 3D model.
+      </div>
+      <div id="obj-sprite-strip"
+           style="display:flex;flex-wrap:nowrap;gap:6px;overflow-x:auto;
+                  padding-bottom:4px;min-height:64px;align-items:flex-start;">
+      </div>
+      <div style="margin-top:8px;display:flex;gap:6px;align-items:center;">
+        <button onclick="lcModals.triggerObjFrameUpload()"
+          style="font-size:11px;padding:5px 12px;border-radius:999px;
+                 border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.05);
+                 color:var(--text,#e0e0e0);cursor:pointer;">+ Add frames</button>
+        <input id="obj-frame-input" type="file" accept="image/*" multiple
+               style="display:none;" onchange="lcModals.onObjFrameFileChange(this)">
+        <span id="obj-frame-count"
+              style="font-size:11px;color:var(--text-muted,#999);"></span>
+      </div>
+    </div>
+  `;
+
+  const overlay = document.getElementById('obj-modal-overlay');
+  // Insert before the delete button or at the end of the modal box
+  const anchor = overlay.querySelector('#of-delete, .modal-actions');
+  if (anchor) anchor.parentNode.insertBefore(section, anchor);
+  else overlay.querySelector('.modal-box').appendChild(section);
+
+  renderObjSpriteStrip();
+}
+
+function renderObjSpriteStrip() {
+  const strip   = document.getElementById('obj-sprite-strip');
+  const counter = document.getElementById('obj-frame-count');
+  if (!strip) return;
+  strip.innerHTML = '';
+  _objPendingFrames.forEach((dataUrl, index) => {
+    const card = document.createElement('div');
+    card.style.cssText = `position:relative;width:64px;height:80px;border-radius:6px;
+      border:1px solid rgba(255,255,255,0.18);overflow:hidden;flex-shrink:0;
+      ${OBJ_CHECKERBOARD}`;
+    const img = document.createElement('img');
+    img.src = dataUrl;
+    img.style.cssText = 'width:100%;height:100%;object-fit:contain;display:block;';
+    card.appendChild(img);
+    const del = document.createElement('button');
+    del.textContent = '\u00D7';
+    del.style.cssText = 'position:absolute;top:2px;right:2px;width:16px;height:16px;' +
+      'border-radius:50%;background:rgba(0,0,0,.6);border:none;color:#fff;' +
+      'font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;';
+    del.addEventListener('click', (e) => { e.stopPropagation(); _objPendingFrames.splice(index, 1); renderObjSpriteStrip(); });
+    card.appendChild(del);
+    const num = document.createElement('div');
+    num.textContent = String(index + 1);
+    num.style.cssText = 'position:absolute;bottom:0;left:0;right:0;text-align:center;' +
+      'font-size:9px;color:rgba(255,255,255,.65);text-shadow:0 0 4px rgba(0,0,0,.7);padding-bottom:2px;';
+    card.appendChild(num);
+    strip.appendChild(card);
+  });
+  if (counter) counter.textContent = _objPendingFrames.length ? `${_objPendingFrames.length} frame${_objPendingFrames.length > 1 ? 's' : ''}` : '';
+}
+
+function triggerObjFrameUpload() {
+  document.getElementById('obj-frame-input')?.click();
+}
+
+function onObjFrameFileChange(input) {
+  const files = Array.from(input.files || []);
+  if (!files.length) return;
+  Promise.all(files.map(file => new Promise(resolve => {
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      let data = e.target.result;
+      if (window.lcChroma && typeof window.lcChroma.chromaKey === 'function') {
+        try { data = await window.lcChroma.chromaKey(data, { h: 120, tolerance: 0.3, spill: 0.15 }); } catch (_) {}
+      }
+      resolve(data);
+    };
+    reader.onerror = () => resolve(null);
+    reader.readAsDataURL(file);
+  }))).then(results => {
+    results.forEach(r => { if (r) _objPendingFrames.push(r); });
+    renderObjSpriteStrip();
+    input.value = '';
+  });
+}
+
+function toggleObjSpriteSection() {
+  const body  = document.getElementById('obj-sprite-body');
+  const arrow = document.getElementById('obj-sprite-arrow');
   if (!body) return;
   const open = body.style.display !== 'none';
   body.style.display = open ? 'none' : 'block';
@@ -799,7 +886,6 @@ function closeCharModal() {
   editingCharId = null;
   tempPhotoData = null;
   tempAnimData  = null;
-  // Reset sprite state
   pendingSprites = { idle: [], walk: [], talk: [], listen: [] };
   eyedropperActive = false;
   delete window._pendingCharLat;
@@ -859,13 +945,11 @@ function saveCharacter() {
     if (text) passages.push({ type: row.dataset.key, text });
   });
 
-  // Build sprites object — only include states that have at least one frame
   const sprites = {};
   let hasAnySprite = false;
   SPRITE_STATES.forEach(state => {
     const frames = pendingSprites[state].filter(Boolean);
     if (frames.length) { sprites[state] = frames; hasAnySprite = true; }
-
   });
 
   const data = {
@@ -876,7 +960,6 @@ function saveCharacter() {
     animData:  tempAnimData,
   };
 
-  // Persist sprites and chroma settings if any frames were uploaded
   if (hasAnySprite) {
     data.sprites   = sprites;
     data.chromaKey = { ...chromaSettings };
@@ -895,10 +978,7 @@ function saveCharacter() {
     delete window._pendingCharLng;
   } else if (editingCharId) {
     const existing = characters.find(c => c.id === editingCharId);
-    if (existing && typeof existing.lat === 'number') {
-      data.lat = existing.lat;
-      data.lng = existing.lng;
-    }
+    if (existing && typeof existing.lat === 'number') { data.lat = existing.lat; data.lng = existing.lng; }
   }
 
   const isNew = !editingCharId;
@@ -913,16 +993,10 @@ function saveCharacter() {
 
   closeCharModal();
   renderMapPins();
-
-  // Always save locally first — this never fails and requires no token.
   save();
 
-  if (savedId) {
-    document.dispatchEvent(new CustomEvent('lc:character-saved', { detail: { id: savedId } }));
-  }
+  if (savedId) document.dispatchEvent(new CustomEvent('lc:character-saved', { detail: { id: savedId } }));
 
-  // Only attempt GitHub save if a token is present.
-  // Without a token the PUT returns 401; save() above already persisted locally.
   const token = window.lcStore && typeof window.lcStore.getToken === 'function'
     ? window.lcStore.getToken()
     : (document.getElementById('gh-token-input')?.value.trim() || localStorage.getItem('lc_gh_token') || '');
@@ -934,33 +1008,41 @@ function saveCharacter() {
     if (commitInput) commitInput.value = charLabel;
     window.lcStore.ghSave().finally(() => { if (commitInput) commitInput.value = prevMsg; });
   } else {
-    // Let the facilitator know the save was local-only.
-    if (window.lcStore && typeof window.lcStore.showToast === 'function') {
+    if (window.lcStore && typeof window.lcStore.showToast === 'function')
       window.lcStore.showToast('Saved locally \u2014 add a GitHub token to sync to the repo', '');
-    }
-    if (window.lcStore && typeof window.lcStore.setGhStatus === 'function') {
+    if (window.lcStore && typeof window.lcStore.setGhStatus === 'function')
       window.lcStore.setGhStatus('Saved locally (no token)', '');
-    }
   }
 }
+
+// ---------------------------------------------------------------------------
+// Object modal open / close / save  (Phase 2: includes sprite frame section)
+// ---------------------------------------------------------------------------
 
 function openObjModal(objId) {
   editingObjId = objId;
   const obj = objId ? objects.find(o => o.id === objId) : null;
   document.getElementById('obj-modal-title').textContent = obj ? 'Edit Object' : 'Add an Object';
-  document.getElementById('of-name').value = obj ? obj.name : '';
-  document.getElementById('of-desc').value = obj ? (obj.desc || '') : '';
-  document.getElementById('of-px').value = obj ? (obj.x ?? 0) : 0;
-  document.getElementById('of-pz').value = obj ? (obj.z ?? 0) : 0;
+  document.getElementById('of-name').value  = obj ? obj.name : '';
+  document.getElementById('of-desc').value  = obj ? (obj.desc || '') : '';
+  document.getElementById('of-px').value    = obj ? (obj.x ?? obj.px ?? 0) : 0;
+  document.getElementById('of-pz').value    = obj ? (obj.z ?? obj.pz ?? 0) : 0;
   document.getElementById('of-scale').value = obj ? (obj.scale ?? 1) : 1;
   const delBtn = document.getElementById('of-delete');
   if (delBtn) delBtn.style.display = obj ? '' : 'none';
+  // Seed pending frames from saved object (or empty for new)
+  _objPendingFrames = obj ? [...(obj.frames || [])] : [];
   document.getElementById('obj-modal-overlay').classList.add('open');
+  // Build the sprite section after the overlay is visible
+  buildObjSpriteSection();
 }
 
 function closeObjModal() {
   document.getElementById('obj-modal-overlay').classList.remove('open');
   editingObjId = null;
+  _objPendingFrames = [];
+  const s = document.getElementById('obj-sprite-section');
+  if (s) s.remove();
 }
 
 function saveObject() {
@@ -972,7 +1054,8 @@ function saveObject() {
   if (!name) { alert('Please give the object a name.'); return; }
   const roomId = activeRoomId;
   if (!roomId) { alert('No active room.'); return; }
-  const data = { name, desc, x, z, scale, roomId };
+  const frames = _objPendingFrames.length ? [..._objPendingFrames] : (editingObjId ? (objects.find(o => o.id === editingObjId)?.frames || []) : []);
+  const data = { name, desc, x, z, scale, roomId, frames };
   if (editingObjId) {
     const obj = objects.find(o => o.id === editingObjId);
     if (obj) Object.assign(obj, data);
@@ -1003,6 +1086,9 @@ window.lcModals = {
   openObjModal, closeObjModal, saveObject, deleteObject,
   // Sprite/chroma helpers (called from inline onclick in built HTML)
   toggleSpriteSection, toggleEyedropper, onChromaTolerance, onChromaSpill, applyChromaToAll,
+  // Object sprite helpers
+  buildObjSpriteSection, renderObjSpriteStrip, triggerObjFrameUpload,
+  onObjFrameFileChange, toggleObjSpriteSection,
 };
 
 export {
@@ -1012,4 +1098,6 @@ export {
   initRoomPickerMap, openCharModal, closeCharModal, togglePromptPill, previewFile, saveCharacter,
   openObjModal, closeObjModal, saveObject, deleteObject,
   toggleSpriteSection, toggleEyedropper, onChromaTolerance, onChromaSpill, applyChromaToAll,
+  buildObjSpriteSection, renderObjSpriteStrip, triggerObjFrameUpload,
+  onObjFrameFileChange, toggleObjSpriteSection,
 };

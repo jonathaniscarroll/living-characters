@@ -300,7 +300,7 @@ function onRoomObjectClick(e) {
 // ─────────────────────────────────────────────────────────────
 // WANDER AI
 // ─────────────────────────────────────────────────────────────
-const WANDER_RADIUS = 3.5;
+const WANDER_RADIUS = 3.5; // fallback only — normally overridden by worldBounds
 const WANDER_SPEED  = 0.8;
 const IDLE_MIN = 2, IDLE_MAX = 6;
 const WALK_MIN = 1.5, WALK_MAX = 4;
@@ -309,7 +309,7 @@ let _wanderAgents = [];
 
 function _randBetween(a, b) { return a + Math.random() * (b - a); }
 
-function _initWanderAgent(chId, mesh, ring, homeX, homeZ, mixer, animations) {
+function _initWanderAgent(chId, mesh, ring, homeX, homeZ, mixer, animations, bounds) {
   const idleClip = animations
     ? (THREE.AnimationClip.findByName(animations, 'Idle')
     || THREE.AnimationClip.findByName(animations, 'idle')
@@ -323,6 +323,7 @@ function _initWanderAgent(chId, mesh, ring, homeX, homeZ, mixer, animations) {
 
   const agent = {
     chId, mesh, ring, homeX, homeZ,
+    bounds, // optional; undefined preserves the old WANDER_RADIUS behavior
     state: 'idle',
     timer: _randBetween(IDLE_MIN, IDLE_MAX),
     targetX: homeX, targetZ: homeZ,
@@ -344,6 +345,14 @@ function _playAgentClip(agent, clip) {
   agent._activeAction = action;
 }
 
+function _clampToBounds(x, z, bounds) {
+  if (!bounds) return { x, z };
+  return {
+    x: THREE.MathUtils.clamp(x, bounds.minX, bounds.maxX),
+    z: THREE.MathUtils.clamp(z, bounds.minZ, bounds.maxZ),
+  };
+}
+
 function _tickWander(agent, dt) {
   if (agent.frozen || (_dragTarget && _dragTarget.id === agent.chId)) return;
   agent.timer -= dt;
@@ -352,8 +361,14 @@ function _tickWander(agent, dt) {
     if (agent.timer <= 0) {
       const angle = Math.random() * Math.PI * 2;
       const dist  = _randBetween(1, WANDER_RADIUS);
-      agent.targetX = agent.homeX + Math.cos(angle) * dist;
-      agent.targetZ = agent.homeZ + Math.sin(angle) * dist;
+      let tx = agent.homeX + Math.cos(angle) * dist;
+      let tz = agent.homeZ + Math.sin(angle) * dist;
+      if (agent.bounds) {
+        const c = _clampToBounds(tx, tz, agent.bounds);
+        tx = c.x; tz = c.z;
+      }
+      agent.targetX = tx;
+      agent.targetZ = tz;
       agent.state = 'walking';
       agent.timer = _randBetween(WALK_MIN, WALK_MAX);
       _playAgentClip(agent, agent.walkClip || agent.idleClip);
@@ -368,8 +383,12 @@ function _tickWander(agent, dt) {
       _playAgentClip(agent, agent.idleClip);
     } else {
       const step = Math.min(agent.speed * dt, dist);
-      const nx = agent.mesh.position.x + (dx / dist) * step;
-      const nz = agent.mesh.position.z + (dz / dist) * step;
+      let nx = agent.mesh.position.x + (dx / dist) * step;
+      let nz = agent.mesh.position.z + (dz / dist) * step;
+      if (agent.bounds) {
+        const c = _clampToBounds(nx, nz, agent.bounds);
+        nx = c.x; nz = c.z;
+      }
       agent.mesh.position.x = nx;
       agent.mesh.position.z = nz;
       agent.mesh.rotation.y = Math.atan2(dx, dz);
@@ -379,7 +398,7 @@ function _tickWander(agent, dt) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// SPRITE BILLBOARD STATE
+// SPRITE BILLBOARD STATE — characters
 // Map<charId, { animator, texture, mesh }>
 // ─────────────────────────────────────────────────────────────
 const _spriteMap = new Map();
@@ -453,6 +472,41 @@ function _destroyAllSprites() {
 }
 
 // ─────────────────────────────────────────────────────────────
+// OBJECT SPRITE MAP
+// Map<objId, { texture, mesh, frames, frameIdx, elapsed }>
+// ─────────────────────────────────────────────────────────────
+const _objSpriteMap = new Map();
+const OBJ_FRAME_MS = 150; // ms per frame
+
+function _tickObjSprites(deltaMs, camera) {
+  _objSpriteMap.forEach((entry) => {
+    const { texture, mesh, frames } = entry;
+    if (frames.length > 1) {
+      entry.elapsed += deltaMs;
+      if (entry.elapsed >= OBJ_FRAME_MS) {
+        entry.elapsed = 0;
+        entry.frameIdx = (entry.frameIdx + 1) % frames.length;
+        texture.image.src = frames[entry.frameIdx];
+      }
+    }
+    // Billboard: always face camera
+    if (mesh && camera) mesh.lookAt(camera.position);
+  });
+}
+
+function _destroyObjSprites() {
+  _objSpriteMap.forEach(({ texture }) => {
+    try { texture.dispose(); } catch (_) {}
+  });
+  _objSpriteMap.clear();
+}
+
+// ─────────────────────────────────────────────────────────────
+// OBJECT MODAL — sprite frame temp state
+// ─────────────────────────────────────────────────────────────
+let _objPendingFrames = []; // working copy while modal is open
+
+// ─────────────────────────────────────────────────────────────
 // BUILD ROOM SCENE
 // ─────────────────────────────────────────────────────────────
 function buildRoomScene(room) {
@@ -486,6 +540,20 @@ function buildRoomScene(room) {
   );
   camera.updateProjectionMatrix();
 
+  // Visible ground-plane bounds for the orthographic camera, centered on the
+  // camera's look-at target. Characters are clamped to this rectangle so they
+  // never wander off the visible area.
+  const halfW = (viewSize * aspect / 2) / camera.zoom;
+  const halfH = (viewSize / 2) / camera.zoom;
+  const targetX = room.cameraTargetX ?? 0;
+  const targetZ = room.cameraTargetZ ?? 0;
+  const worldBounds = {
+    minX: targetX - halfW,
+    maxX: targetX + halfW,
+    minZ: targetZ - halfH,
+    maxZ: targetZ + halfH,
+  };
+
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.setClearColor(0x000000, 0);
   renderer.shadowMap.enabled = true;
@@ -493,26 +561,6 @@ function buildRoomScene(room) {
   renderer.setPixelRatio(window.devicePixelRatio);
 
   stage.insertBefore(renderer.domElement, stage.firstChild);
-
-  const hasBg = !!(room.backdropData || room.backdropUrl || ROOM_BACKDROP_FILES[room.backdrop]);
-  const floor = new THREE.Mesh(
-    new THREE.PlaneGeometry(20, 20),
-    new THREE.MeshLambertMaterial({
-      color: FLOOR_COLORS[room.backdrop] || '#1a3a1a',
-      transparent: hasBg, opacity: hasBg ? 0.18 : 1
-    })
-  );
-  floor.rotation.x = -Math.PI / 2;
-  floor.receiveShadow = true;
-  scene.add(floor);
-
-  if (!hasBg) {
-    const wallMat = new THREE.MeshLambertMaterial({ color: WALL_COLORS[room.backdrop] || '#2d5a27' });
-    const wN = new THREE.Mesh(new THREE.BoxGeometry(20, 6, 0.2), wallMat);
-    wN.position.set(0, 3, -8); scene.add(wN);
-    const wW = new THREE.Mesh(new THREE.BoxGeometry(0.2, 6, 20), wallMat);
-    wW.position.set(-8, 3, 0); scene.add(wW);
-  }
 
   scene.add(new THREE.AmbientLight(0xffffff, 1.3));
   const dl = new THREE.DirectionalLight(0xffffff, 0.7);
@@ -532,6 +580,37 @@ function buildRoomScene(room) {
     const ry = obj.rotation?.y ?? 0;
     const sc = obj.scale || 1;
 
+    // ── SPRITE BILLBOARD (frames array present) ───────────────
+    if (obj.frames && obj.frames.length) {
+      const texture = new THREE.Texture();
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      texture.image = img;
+      img.onload = () => { texture.needsUpdate = true; };
+      img.src = obj.frames[0];
+
+      const geo = new THREE.PlaneGeometry(1.0, 1.0);
+      const mat = new THREE.MeshBasicMaterial({
+        map: texture, transparent: true, alphaTest: 0.05, side: THREE.DoubleSide
+      });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.position.set(px, 0.5, pz);
+      mesh.castShadow = false;
+      mesh._objId = obj.id;
+      scene.add(mesh);
+      mesh.traverse(c => { if (c.isMesh) c._objId = obj.id; });
+
+      _objSpriteMap.set(obj.id, { texture, mesh, frames: obj.frames, frameIdx: 0, elapsed: 0 });
+
+      const lbl = document.createElement('div');
+      lbl.className = 'obj-label';
+      lbl.textContent = '\uD83D\uDCE6 ' + obj.name;
+      stage.appendChild(lbl);
+      labels.push({ label: lbl, obj: mesh, headY: 1.0 + 0.1 });
+      return; // skip GLB / fallback box
+    }
+
+    // ── GLB or fallback box (existing logic unchanged) ────────
     function placeObjMesh(model, autoScale) {
       const s = autoScale || 1;
       model.scale.setScalar(sc * s);
@@ -602,8 +681,12 @@ function buildRoomScene(room) {
   const charsInRoom = characters.filter(c => (c.roomIds || [c.roomId]).includes(room.id));
   charsInRoom.forEach((ch) => {
     const hasStoredPos = ch.sceneX != null && ch.sceneZ != null;
-    const cx = hasStoredPos ? ch.sceneX : 0;
-    const cz = hasStoredPos ? ch.sceneZ : 0;
+    let cx = hasStoredPos ? ch.sceneX : 0;
+    let cz = hasStoredPos ? ch.sceneZ : 0;
+    if (worldBounds) {
+      const c = _clampToBounds(cx, cz, worldBounds);
+      cx = c.x; cz = c.z;
+    }
     const mood = MOODS.find(m => m.label === ch.mood) || MOODS[0];
 
     const ring = new THREE.Mesh(
@@ -617,7 +700,7 @@ function buildRoomScene(room) {
 
     const mesh = _buildCharSprite(ch, cx, cz, scene);
     charObjects.push({ obj: mesh, chId: ch.id, cx, cz });
-    _initWanderAgent(ch.id, mesh, ring, cx, cz, null, null);
+    _initWanderAgent(ch.id, mesh, ring, cx, cz, null, null, worldBounds);
 
     const lbl = document.createElement('div');
     lbl.className = 'char-label';
@@ -646,6 +729,7 @@ function buildRoomScene(room) {
     glbMixers.forEach(m => m.update(dt));
     _wanderAgents.forEach(agent => _tickWander(agent, dt));
     _tickAllSprites(dt * 1000, camera);
+    _tickObjSprites(dt * 1000, camera);
     if (_roomEditMode && _dragTarget && _lastRoomPointer) {
       const point = _screenToFloor(_lastRoomPointer, renderer, camera);
       if (point) {
@@ -739,11 +823,150 @@ function destroyRoomScene() {
   threeScene = null;
   threeCamera = null;
   _destroyAllSprites();
+  _destroyObjSprites();
 }
 
 function editActiveRoom() {
   if (!activeRoomId) return;
   openRoomModal(activeRoomId);
+}
+
+// ─────────────────────────────────────────────────────────────
+// OBJECT MODAL — sprite section UI
+// ─────────────────────────────────────────────────────────────
+const OBJ_CHECKERBOARD = [
+  'background-image:linear-gradient(45deg,#ccc 25%,transparent 25%),',
+  'linear-gradient(-45deg,#ccc 25%,transparent 25%),',
+  'linear-gradient(45deg,transparent 75%,#ccc 75%),',
+  'linear-gradient(-45deg,transparent 75%,#ccc 75%);',
+  'background-size:12px 12px;',
+  'background-position:0 0,0 6px,6px -6px,-6px 0;',
+  'background-color:#fff;'
+].join('');
+
+function buildObjSpriteSection() {
+  const existing = document.getElementById('obj-sprite-section');
+  if (existing) existing.remove();
+
+  const section = document.createElement('div');
+  section.id = 'obj-sprite-section';
+  section.style.cssText = 'margin-top:14px;border-top:1px solid rgba(255,255,255,0.1);padding-top:10px;';
+  section.innerHTML = `
+    <button id="obj-sprite-toggle" onclick="lcRoom.toggleObjSpriteSection()"
+      style="background:none;border:none;color:var(--text,#e0e0e0);font-size:13px;
+             font-weight:600;cursor:pointer;padding:4px 0;display:flex;align-items:center;
+             gap:6px;width:100%;text-align:left;">
+      <span id="obj-sprite-arrow" style="display:inline-block;transition:transform .2s;">&#9658;</span>
+      &#127974; Sprite Frames
+    </button>
+    <div id="obj-sprite-body" style="display:none;margin-top:10px;">
+      <div style="font-size:11px;color:var(--text-muted,#999);margin-bottom:8px;">
+        Upload image frames that animate on the object in the room. Replaces the 3D model.
+      </div>
+      <div id="obj-sprite-strip"
+           style="display:flex;flex-wrap:nowrap;gap:6px;overflow-x:auto;
+                  padding-bottom:4px;min-height:64px;align-items:flex-start;">
+      </div>
+      <div style="margin-top:8px;display:flex;gap:6px;align-items:center;">
+        <button onclick="lcRoom.triggerObjFrameUpload()"
+          style="font-size:11px;padding:5px 12px;border-radius:999px;
+                 border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.05);
+                 color:var(--text,#e0e0e0);cursor:pointer;">+ Add frames</button>
+        <input id="obj-frame-input" type="file" accept="image/*" multiple
+               style="display:none;" onchange="lcRoom.onObjFrameFileChange(this)">
+        <span id="obj-frame-count"
+              style="font-size:11px;color:var(--text-muted,#999);"></span>
+      </div>
+    </div>
+  `;
+
+  const overlay = document.getElementById('obj-modal-overlay');
+  const actions = overlay.querySelector('.modal-actions, #of-delete, .obj-save-btn');
+  if (actions) actions.parentNode.insertBefore(section, actions);
+  else overlay.appendChild(section);
+
+  renderObjSpriteStrip();
+}
+
+function renderObjSpriteStrip() {
+  const strip   = document.getElementById('obj-sprite-strip');
+  const counter = document.getElementById('obj-frame-count');
+  if (!strip) return;
+  strip.innerHTML = '';
+  const frames = _objPendingFrames;
+
+  frames.forEach((dataUrl, index) => {
+    const card = document.createElement('div');
+    card.style.cssText = `position:relative;width:64px;height:80px;border-radius:6px;
+      border:1px solid rgba(255,255,255,0.18);overflow:hidden;flex-shrink:0;
+      ${OBJ_CHECKERBOARD}`;
+
+    const img = document.createElement('img');
+    img.src = dataUrl;
+    img.style.cssText = 'width:100%;height:100%;object-fit:contain;display:block;';
+    card.appendChild(img);
+
+    const del = document.createElement('button');
+    del.textContent = '\u00D7';
+    del.title = 'Remove frame';
+    del.style.cssText = 'position:absolute;top:2px;right:2px;width:16px;height:16px;' +
+      'border-radius:50%;background:rgba(0,0,0,.6);border:none;color:#fff;' +
+      'font-size:11px;cursor:pointer;display:flex;align-items:center;' +
+      'justify-content:center;padding:0;';
+    del.addEventListener('click', (e) => {
+      e.stopPropagation();
+      _objPendingFrames.splice(index, 1);
+      renderObjSpriteStrip();
+    });
+    card.appendChild(del);
+
+    const num = document.createElement('div');
+    num.textContent = String(index + 1);
+    num.style.cssText = 'position:absolute;bottom:0;left:0;right:0;text-align:center;' +
+      'font-size:9px;color:rgba(255,255,255,.65);text-shadow:0 0 4px rgba(0,0,0,.7);' +
+      'padding-bottom:2px;';
+    card.appendChild(num);
+
+    strip.appendChild(card);
+  });
+
+  if (counter) counter.textContent = frames.length ? `${frames.length} frame${frames.length > 1 ? 's' : ''}` : '';
+}
+
+function triggerObjFrameUpload() {
+  document.getElementById('obj-frame-input')?.click();
+}
+
+function onObjFrameFileChange(input) {
+  const files = Array.from(input.files || []);
+  if (!files.length) return;
+  const readers = files.map(file => new Promise(resolve => {
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      let data = e.target.result;
+      if (window.lcChroma && typeof window.lcChroma.chromaKey === 'function') {
+        try { data = await window.lcChroma.chromaKey(data, { h: 120, tolerance: 0.3, spill: 0.15 }); }
+        catch (_) {}
+      }
+      resolve(data);
+    };
+    reader.onerror = () => resolve(null);
+    reader.readAsDataURL(file);
+  }));
+  Promise.all(readers).then(results => {
+    results.forEach(r => { if (r) _objPendingFrames.push(r); });
+    renderObjSpriteStrip();
+    input.value = '';
+  });
+}
+
+function toggleObjSpriteSection() {
+  const body  = document.getElementById('obj-sprite-body');
+  const arrow = document.getElementById('obj-sprite-arrow');
+  if (!body) return;
+  const open = body.style.display !== 'none';
+  body.style.display = open ? 'none' : 'block';
+  if (arrow) arrow.style.transform = open ? '' : 'rotate(90deg)';
 }
 
 function openObjModal(objId) {
@@ -760,6 +983,8 @@ function openObjModal(objId) {
     document.getElementById('of-scale').value = obj.scale || 1;
     document.getElementById('of-delete').style.display = 'block';
     window._editingObjGlbData = obj.glbUrl?.startsWith('data:') ? obj.glbUrl : null;
+    // Seed frame array from existing object
+    _objPendingFrames = [...(obj.frames || [])];
   } else {
     document.getElementById('obj-modal-title').textContent = 'Add Object';
     ['of-name','of-desc','of-glb'].forEach(id => document.getElementById(id).value = '');
@@ -768,14 +993,21 @@ function openObjModal(objId) {
     document.getElementById('of-scale').value = '1';
     document.getElementById('of-delete').style.display = 'none';
     window._editingObjGlbData = null;
+    _objPendingFrames = [];
   }
+  window._editingObjFrames = _objPendingFrames;
   overlay.classList.add('open');
+  buildObjSpriteSection();
 }
 
 function closeObjModal() {
   document.getElementById('obj-modal-overlay').classList.remove('open');
   editingObjId = null;
   window._editingObjGlbData = null;
+  _objPendingFrames = [];
+  window._editingObjFrames = null;
+  const spriteSection = document.getElementById('obj-sprite-section');
+  if (spriteSection) spriteSection.remove();
 }
 
 function saveObject() {
@@ -793,7 +1025,8 @@ function saveObject() {
     pz:    parseFloat(document.getElementById('of-pz').value)    || 0,
     scale: parseFloat(document.getElementById('of-scale').value) || 1,
     position: existing?.position || null,
-    rotation: existing?.rotation || null
+    rotation: existing?.rotation || null,
+    frames: (_objPendingFrames.length ? [..._objPendingFrames] : (existing?.frames || [])),
   };
   if (editingObjId) objects = objects.map(o => o.id === editingObjId ? obj : o);
   else objects.push(obj);
@@ -815,6 +1048,8 @@ window.lcRoom = {
   editActiveRoom, openObjModal, closeObjModal, saveObject, deleteObject,
   showObjInspect, hideObjInspect, enableRoomEdit, onRoomObjectClick,
   spawnTalkCloseUp, dismissTalkCloseUp, setRoomCharacterState,
+  buildObjSpriteSection, renderObjSpriteStrip,
+  triggerObjFrameUpload, onObjFrameFileChange, toggleObjSpriteSection,
 };
 
 export {
@@ -822,4 +1057,6 @@ export {
   editActiveRoom, openObjModal, closeObjModal, saveObject, deleteObject,
   showObjInspect, hideObjInspect, enableRoomEdit, onRoomObjectClick,
   spawnTalkCloseUp, dismissTalkCloseUp, setRoomCharacterState,
+  buildObjSpriteSection, renderObjSpriteStrip,
+  triggerObjFrameUpload, onObjFrameFileChange, toggleObjSpriteSection,
 };
